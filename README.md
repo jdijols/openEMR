@@ -20,6 +20,10 @@
 
 [OpenEMR](https://open-emr.org) is a Free and Open Source electronic health records and medical practice management application. It features fully integrated electronic health records, practice management, scheduling, electronic billing, internationalization, free support, a vibrant community, and a whole lot more. It runs on Windows, Linux, Mac OS X, and many other platforms.
 
+### Gauntlet AgentForge (this fork)
+
+This repository includes **course process documentation** for the Gauntlet AI Clinical Co-Pilot / AgentForge work: case-study notes, tooling setup, and pre-code checklists. See **[Documentation/AgentForge/README.md](Documentation/AgentForge/README.md)** for the process trail and references (not part of upstream OpenEMR’s main documentation tree).
+
 ### Contributing
 
 OpenEMR is a leader in healthcare open source software and comprises a large and diverse community of software developers, medical providers and educators with a very healthy mix of both volunteers and professionals. [Join us and learn how to start contributing today!](https://open-emr.org/wiki/index.php/FAQ#How_do_I_begin_to_volunteer_for_the_OpenEMR_project.3F)
