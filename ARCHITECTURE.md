@@ -5,7 +5,7 @@
 
 > **Working document:** This file may be revised up to **MVP submission** (Gauntlet deadline). Keep the instructor table + executive summary aligned with whatever ships.
 
-> **MVP submission bundle (checklist):** Repo deliverables [`AUDIT.md`](AUDIT.md), [`USERS.md`](USERS.md), this [`ARCHITECTURE.md`](ARCHITECTURE.md) **plus** (1) **live URL** — OpenEMR (and agent stack when ready) on **DigitalOcean** + Docker per [Stage 2](Documentation/AgentForge/process/05-stage2-deployment-decision.md), (2) **Loom** — you on camera walking the architecture decisions, (3) **social post** — e.g. X / LinkedIn per case study (tag **@GauntletAI** where required). **Priority for tonight:** working **HTTPS deployment** and a URL graders can open.
+> **MVP submission bundle (checklist):** Repo deliverables [`AUDIT.md`](AUDIT.md), [`USERS.md`](USERS.md), this [`ARCHITECTURE.md`](ARCHITECTURE.md) **plus** (1) **live URL** — OpenEMR (and agent stack when ready) on a **Linux VPS** + Docker per [Stage 2](Documentation/AgentForge/process/05-stage2-deployment-decision.md) (Gauntlet MVP host: **Vultr**; any comparable VPS works), (2) **Loom** — you on camera walking the architecture decisions, (3) **social post** — e.g. X / LinkedIn per case study (tag **@GauntletAI** where required). **Priority for tonight:** working **HTTPS deployment** and a URL graders can open.
 
 ---
 
@@ -13,14 +13,14 @@
 
 | Decision | Choice | Why it’s justified |
 | --- | --- | --- |
-| **Hosting** | **DigitalOcean Droplet** + Docker Compose | Matches our **VPS + Compose** plan ([Stage 2 decision](Documentation/AgentForge/process/05-stage2-deployment-decision.md)). OpenEMR is a long-lived PHP + MariaDB stack; a single VM with Compose is what upstream expects. A cohort peer shipped a working demo this way — low surprise, workable ops. *Course/synthetic data:* DO is appropriate. *Future production under strict infrastructure BAA:* evaluate managed/regulated hosting separately — not a Gauntlet MVP blocker. |
+| **Hosting** | **Linux VPS** + Docker Compose (MVP deployed on **Vultr**) | Matches our **single-VM + Compose** plan ([Stage 2 decision](Documentation/AgentForge/process/05-stage2-deployment-decision.md)). OpenEMR is a long-lived PHP + MariaDB stack; a single VM with Compose is what upstream expects. A cohort peer shipped a working demo this way — low surprise, workable ops. *Course/synthetic data:* a standard VPS footprint is appropriate. *Future production under strict infrastructure BAA:* evaluate managed/regulated hosting separately — not a Gauntlet MVP blocker. |
 | **Panel UI** | **React** (e.g. Vite + TypeScript) | Team comfort and speed; isolates the co-pilot in an **iframe SPA** so we are not rewriting OpenEMR’s legacy Angular. Same language family as the **Agent API** (TypeScript) for shared types and simpler reasoning. |
 | **Agent backend** | **Node 20 + TypeScript + Vercel AI SDK** | Bounded **read → propose → confirm → write** flow — not multi-agent “planning.” Typed tools (Zod), provider swap without rewrites. |
 | **Chart reads / writes in OpenEMR** | **PHP custom module** (`oe-module-agentforge`) | OpenEMR’s **supported extension path** is PHP: `globals.php` session, GACL, existing services, audit hooks ([`Architecture-1`](AUDIT.md#architecture-1-openemr-is-a-hybrid-legacymodern-system-with-interfaceglobalsphp-as-the-shared-runtime-bridge), [`Architecture-4`](AUDIT.md#architecture-4-custom-modules-plus-event-hooks-are-the-most-plausible-in-repo-integration-path-for-a-v1-embedded-read-only-co-pilot)). We are **not** avoiding PHP for integration—we use it **where OpenEMR lives**. The **Agent Context Service** stays bounded (UUID in/out, explicit columns) so we do not inherit naive N+1 read patterns ([`Performance-7`](AUDIT.md#performance-7-n1-query-patterns-and-select--survive-in-services)). |
 | **Safety** | **Verification before display** + **active-chart binding** | Case study + audit: claims must cite chart sources; staff API paths need **session/chart binding** ([`Security-3`](AUDIT.md#security-3-fhir-patient-context-reads-and-staff-acl-reads-follow-different-enforcement-paths)). |
-| **Observability** | **Self-hosted Langfuse** (same Compose stack) | Agent traces often include prompts, tool payloads, and model output—**PHI-adjacent** once real charts are in play. **Self-hosted Langfuse** on the DigitalOcean droplet keeps that telemetry **inside our boundary** instead of shipping it to another vendor that would need its own BAA and retention story ([`Compliance-2`](AUDIT.md#compliance-2-external-llm-use-requires-a-phi-boundary-decision-before-any-real-chart-data-leaves-openemr)). It still gives turn-level tracing, latency, tool failures, and token/cost visibility—the case study asks for real observability, not “installed and ignored.” |
+| **Observability** | **Self-hosted Langfuse** (same Compose stack) | Agent traces often include prompts, tool payloads, and model output—**PHI-adjacent** once real charts are in play. **Self-hosted Langfuse** on **the same VPS** keeps that telemetry **inside our boundary** instead of shipping it to another vendor that would need its own BAA and retention story ([`Compliance-2`](AUDIT.md#compliance-2-external-llm-use-requires-a-phi-boundary-decision-before-any-real-chart-data-leaves-openemr)). It still gives turn-level tracing, latency, tool failures, and token/cost visibility—the case study asks for real observability, not “installed and ignored.” |
 
-**No pushback on DigitalOcean or React** for this project: they align with the fork, the audit, and practical delivery. The only caveat above is honest scope separation — **demo vs. enterprise HIPAA hosting** — not a reason to change the plan now.
+**No pushback on a conventional VPS vendor or React** for this project: they align with the fork, the audit, and practical delivery. The only caveat above is honest scope separation — **demo vs. enterprise HIPAA hosting** — not a reason to change the plan now.
 
 ---
 
@@ -28,12 +28,12 @@
 
 We are building an **embedded co-pilot** for **Dr. Maya Reynolds** (adult primary care, returning patients, non-emergent visits — [`USERS.md` §2](USERS.md)). Three moments: **before the room** (briefing), **in the room** (physician-only dictation, narrow structured writes **after explicit confirm**), **after the room** (same thread, Q&A, no silent writes).
 
-**Shape:** Two software pieces on **one DigitalOcean Droplet**, **Docker Compose**:
+**Shape:** Two software pieces on **one Linux VPS**, **Docker Compose**:
 
 1. **OpenEMR** (existing image) + a small **custom module** `oe-module-agentforge` — PHP hooks, session/chart context, **Agent Context Service** (bounded chart reads/writes server-side), and a **static mount or proxy** for the React panel build.
 2. **agentforge-api** — TypeScript service: LLM, tools, verification, transcripts, STT relay, talking to OpenEMR only over HTTP to the module.
 
-**Caddy** (or nginx) on the droplet terminates TLS and routes traffic to OpenEMR and the agent API. **Only the agent container** (via a small egress path) calls **BAA-class** LLM/STT APIs, with an **allowlisted** egress policy ([`Compliance-5`](AUDIT.md#compliance-5-no-outbound-network-egress-controls-the-llm-call-would-be-the-first-phi-bearing-outbound)).
+**Caddy** (or nginx) on **the VPS** terminates TLS and routes traffic to OpenEMR and the agent API. **Only the agent container** (via a small egress path) calls **BAA-class** LLM/STT APIs, with an **allowlisted** egress policy ([`Compliance-5`](AUDIT.md#compliance-5-no-outbound-network-egress-controls-the-llm-call-would-be-the-first-phi-bearing-outbound)).
 
 **React** implements the iframe UI: chat, citations, confirm buttons, push-to-talk. It talks to `agentforge-api` over HTTPS after a **postMessage + short-lived launch code** handshake — **no tokens in URLs** ([`Security-11`](AUDIT.md#security-11-embedded-ui-iframe-and-oauth-token-exposure)).
 
@@ -53,7 +53,7 @@ We are building an **embedded co-pilot** for **Dr. Maya Reynolds** (adult primar
 
 ```mermaid
 flowchart TB
-    subgraph DO["DigitalOcean Droplet — Docker Compose"]
+    subgraph VPS["Linux VPS — Docker Compose"]
         Caddy["Caddy — TLS reverse proxy"]
         OE["OpenEMR + oe-module-agentforge"]
         DB[(MariaDB)]
@@ -120,17 +120,17 @@ Negative statements (“no allergies on file”) only count if the **empty aller
 
 - **STT:** Streaming provider under BAA (e.g. Deepgram); **no audio file** retained; physician push-to-talk only ([`USERS.md` §3.2](USERS.md)).
 - **Eval:** **Synthea-imported** longitudinal charts + **hand-curated** golden cases ([`DataQuality-5`](AUDIT.md#dataquality-5-eval-ground-truth-requires-hybrid-synthetic-plus-curated-augmentation)). Deterministic checks: required citations, forbidden outputs, refusal paths, prompt-injection in notes.
-- **Observability — Langfuse (self-hosted):** Vercel AI SDK can emit traces compatible with Langfuse; running Langfuse **on the same droplet** as the agent keeps eval/tracing aligned with the audit’s emphasis on **not turning observability into a second PHI leak** (contrast with sending full traces to a SaaS that is not in our BAA footprint). We use **redacted-by-default** trace bodies where needed; we still record **what ran, in what order, durations, tool failures, tokens, and cost** so the case-study observability questions are answerable from our own stack.
+- **Observability — Langfuse (self-hosted):** Vercel AI SDK can emit traces compatible with Langfuse; running Langfuse **on the same VPS** as the agent keeps eval/tracing aligned with the audit’s emphasis on **not turning observability into a second PHI leak** (contrast with sending full traces to a SaaS that is not in our BAA footprint). We use **redacted-by-default** trace bodies where needed; we still record **what ran, in what order, durations, tool failures, tokens, and cost** so the case-study observability questions are answerable from our own stack.
 
 ---
 
-## DigitalOcean deployment (practical)
+## VPS deployment (practical)
 
-1. **Droplet** — Ubuntu LTS, 8 GB RAM class minimum for OpenEMR + DB + agent + Langfuse comfortably (scale up if needed).
-2. **Firewall (DO Cloud Firewall + optional UFW)** — allow **80/443** and **SSH** from trusted IPs; **never** expose **3306** publicly.
+1. **Instance** — Ubuntu LTS, 8 GB RAM class minimum for OpenEMR + DB + agent + Langfuse comfortably (scale up if needed).
+2. **Firewall** — provider cloud firewall plus **UFW** on the host: allow **80/443** and **SSH** from trusted IPs; **never** expose **3306** publicly.
 3. **Docker + Compose** — same graph as Stage 2: `openemr`, `db`, `agentforge-api`, `postgres`, `langfuse`, `caddy`, optional egress helper.
-4. **DNS** — A record to droplet; Caddy obtains Let’s Encrypt certs.
-5. **Secrets** — API keys via Docker secrets or DO-managed env, not committed to Git.
+4. **DNS / hostname** — **A record** (or nip.io/sslip hostname) to **the VPS public IPv4**; **Caddy obtains Let’s Encrypt certs** once a hostname is stable.
+5. **Secrets** — API keys via Docker secrets **or CI/deploy-injected env**, not committed to Git.
 
 Rollback: disable OpenEMR module **or** `docker compose` to previous image tags; transcripts live in Postgres.
 
@@ -140,7 +140,7 @@ Rollback: disable OpenEMR module **or** `docker compose` to previous image tags;
 
 | Scale (concurrent-ish physicians) | Rough LLM+STT / day | Note |
 | --- | --- | --- |
-| 100 | ~\$50–\$60 | Single droplet + backups |
+| 100 | ~\$50–\$60 | Single VPS + backups |
 | 1K | ~\$500+ | Replicas, managed Postgres |
 | 10K / 100K | Much higher | Regional cells, caching policy `Performance-5`, smaller models for intent-only turns |
 
@@ -152,7 +152,7 @@ Refresh with **real** token traces during Early Submission. Per-physician-day en
 
 | Gate | Focus |
 | --- | --- |
-| **MVP** | DO droplet + Compose + HTTPS; module shell + React panel + launch handshake; Context Service read path; security baseline items we accepted above |
+| **MVP** | Linux VPS + Compose + HTTPS; module shell + React panel + launch handshake; Context Service read path; security baseline items we accepted above |
 | **Early** | UC-A briefing + verification + Langfuse + eval harness + Synthea/curated data |
 | **Final** | UC-B confirm writes + UC-C thread + adversarial evals + demo video |
 
@@ -162,7 +162,7 @@ Refresh with **real** token traces during Early Submission. Per-physician-day en
 
 Anything not in [`USERS.md` §7.1 “V1 does not include”](USERS.md) stays out until `USERS.md` changes — e.g. immunizations, orders, note drafting, ambient recording, allergy delete.
 
-**Debt:** Context Service is not a pure public FHIR facade; pinned OpenEMR version must track security advisories; OpenEMR PHI at rest is unchanged ([`Security-5`](AUDIT.md#security-5-phi-columns-are-stored-in-cleartext-at-rest-encryption-is-wired-to-secrets-not-to-clinical-data)) — droplet **disk encryption** + ops hygiene for anything beyond demo.
+**Debt:** Context Service is not a pure public FHIR facade; pinned OpenEMR version must track security advisories; OpenEMR PHI at rest is unchanged ([`Security-5`](AUDIT.md#security-5-phi-columns-are-stored-in-cleartext-at-rest-encryption-is-wired-to-secrets-not-to-clinical-data)) — **VPS** **disk encryption** + ops hygiene for anything beyond demo.
 
 ---
 
@@ -186,10 +186,10 @@ Anything not in [`USERS.md` §7.1 “V1 does not include”](USERS.md) stays out
 - **Agent Context Service** — Module endpoints that return **bounded** chart slices with **source-pack** metadata.
 - **Source pack** — Stable pointer to where a fact came from (for citations and verification).
 - **Active-chart binding** — Tool/server checks that the patient UUID matches the open chart.
-- **Langfuse (self-hosted)** — Observability for agent runs (turn traces, tool steps, latency, tokens, cost). Running it on our droplet avoids treating a third-party trace SaaS as another PHI processor under [`Compliance-2`](AUDIT.md#compliance-2-external-llm-use-requires-a-phi-boundary-decision-before-any-real-chart-data-leaves-openemr).
+- **Langfuse (self-hosted)** — Observability for agent runs (turn traces, tool steps, latency, tokens, cost). Running it on **our VPS** avoids treating a third-party trace SaaS as another PHI processor under [`Compliance-2`](AUDIT.md#compliance-2-external-llm-use-requires-a-phi-boundary-decision-before-any-real-chart-data-leaves-openemr).
 
 ---
 
 ## References
 
-[`AUDIT.md`](AUDIT.md) · [`USERS.md`](USERS.md) · [Stage 2 deployment](Documentation/AgentForge/process/05-stage2-deployment-decision.md) · [Case study PDF](Documentation/AgentForge/references/Week%201%20-%20AgentForge.pdf)
+[`AUDIT.md`](AUDIT.md) · [`USERS.md`](USERS.md) · [Stage 2 deployment](Documentation/AgentForge/process/05-stage2-deployment-decision.md) · [VPS live deployment (Gauntlet)](Documentation/AgentForge/process/09-vps-live-deployment.md) · [Case study PDF](Documentation/AgentForge/references/Week%201%20-%20AgentForge.pdf)

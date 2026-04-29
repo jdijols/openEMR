@@ -19,6 +19,7 @@ This folder holds **course and process documentation** for the Clinical Co-Pilot
 | 6   | [process/06-stage3-audit.md](process/06-stage3-audit.md)                     | Stage 3: audit process pointer → [`AUDIT.md`](../../AUDIT.md) |
 | 7   | [process/07-stage4-users.md](process/07-stage4-users.md)                     | Stage 4: users process pointer → [`USERS.md`](../../USERS.md) |
 | 8   | [process/08-stage5-architecture.md](process/08-stage5-architecture.md)       | Stage 5: architecture process pointer → [`ARCHITECTURE.md`](../../ARCHITECTURE.md) |
+| 9   | [process/09-vps-live-deployment.md](process/09-vps-live-deployment.md)       | MVP: live OpenEMR on a Linux VPS (Vultr) + Compose; GitLab clone; nip.io / HTTPS path |
 
 Dated entries under `process/journal/week-N/` are session journals between milestones; they are not listed in the table.
 
@@ -29,7 +30,7 @@ Dated entries under `process/journal/week-N/` are session journals between miles
 
 ## How to extend this folder
 
-1. Add the next milestone as `process/09-<short-slug>.md` (increment the number; `08` is the Stage 5 architecture pointer at [`ARCHITECTURE.md`](../../ARCHITECTURE.md)).
+1. Add the next milestone as `process/10-<short-slug>.md` (next index **after `09`** in the table below).
 2. Update the table above so the index stays the single map of the trail.
 3. For working notes between milestones, add dated entries as `process/journal/week-N/MMDD-THHMM-topic.md`. The skill computes `N` from `course-start` in this README's frontmatter; create `week-N/` lazily if missing. Link decisions worth surfacing back into the relevant numbered process file.
 4. If `02-tooling-and-skills.md` grows too long, split changelogs into `02b-skills-changelog.md`.
