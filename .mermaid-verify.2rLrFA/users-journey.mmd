@@ -1,0 +1,39 @@
+flowchart LR
+    subgraph Pre["Pre-room — UC-A"]
+        direction TB
+        PreP["Physician<br/>Opens next returning<br/>adult patient chart"]
+        PreOE["OpenEMR shell<br/>Active-chart binding<br/>+ launch handshake<br/>(short-lived code, postMessage)"]
+        PreA["Agent in CUI right rail<br/>Context Service reads<br/>(encounters, problems, meds,<br/>allergies, vitals, labs, notes)"]
+        PreBrief["Source-cited briefing<br/>What changed since last visit;<br/>missing-data flags"]
+        PreP --> PreOE --> PreA --> PreBrief --> PreP
+    end
+
+    subgraph InR["In-room — UC-B"]
+        direction TB
+        InStart["Physician<br/>Starts visit transcript<br/>(tap start/stop or hold-to-talk)"]
+        InDict["Physician dictation only<br/>(no patient audio,<br/>no audio retained)"]
+        InSTT["agentforge-api STT relay<br/>Deepgram / AssemblyAI<br/>(BAA-class egress)"]
+        InProp["Agent proposal in CUI<br/>chief complaint · vitals<br/>(incl. pain/height/weight) ·<br/>tobacco · allergy add"]
+        InConf["Physician<br/>Explicit confirm<br/>('save' / 'confirm')"]
+        InWrite["Write module<br/>Physician session + ACL;<br/>active-chart binding;<br/>audit row log_from='agent'"]
+        InOE["OpenEMR<br/>Write accepted or rejected"]
+        InResult["Agent reports result<br/>+ updates transcript"]
+        InStart --> InDict --> InSTT --> InProp --> InConf --> InWrite --> InOE --> InResult --> InDict
+    end
+
+    subgraph Post["Post-room — UC-C"]
+        direction TB
+        PostEnd["Physician<br/>Ends transcript<br/>(thread persists)"]
+        PostRecap["Agent recap<br/>confirmed · rejected ·<br/>unresolved items"]
+        PostQA["Physician Q&A<br/>against transcript + chart"]
+        PostGate["Any new write<br/>requires fresh explicit confirm"]
+        PostEnd --> PostRecap --> PostQA --> PostGate --> PostQA
+    end
+
+    Pre --> InR --> Post
+
+    LF[("Langfuse self-hosted on VPS<br/>turn traces · tools · latency · cost")]
+    PreA -.->|"trace"| LF
+    InProp -.->|"trace"| LF
+    InWrite -.->|"trace"| LF
+    PostRecap -.->|"trace"| LF
