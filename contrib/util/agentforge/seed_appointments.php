@@ -1,0 +1,912 @@
+<?php
+
+/**
+ * AgentForge synthetic appointment seed.
+ *
+ * @package OpenEMR
+ * @link https://www.open-emr.org
+ * @license https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
+ */
+
+declare(strict_types=1);
+
+use OpenEMR\Common\Database\QueryUtils;
+use OpenEMR\Common\Session\SessionWrapperFactory;
+use OpenEMR\Services\AppointmentService;
+use OpenEMR\Services\PatientService;
+use OpenEMR\Validators\ProcessingResult;
+
+if (php_sapi_name() !== 'cli') {
+    fwrite(STDERR, "This script must be run from PHP CLI.\n");
+    exit(1);
+}
+
+$fileRoot = dirname(__DIR__, 3);
+$_GET['site'] = $_GET['site'] ?? 'default';
+$ignoreAuth = true;
+$sessionAllowWrite = true;
+
+require_once $fileRoot . '/interface/globals.php';
+
+final class AgentForgeAppointmentSeeder
+{
+    private const APPOINTMENT_MARKER = '[AgentForge Appointment Seed]';
+    private const SCHEDULED_PATIENT_MARKER_NAME = 'AgentForge Scheduled Patient ID';
+    private const SCHEDULED_PATIENT_PREFIX = 'AF-SCHEDULED-';
+    private const FIRST_SCHEDULED_PATIENT_EXTERNAL_ID = 14;
+    private const COHORT_MARKER_NAME = 'AgentForge Cohort ID';
+    private const COHORT_PREFIX = 'AF-COHORT-';
+    private const DEFAULT_GROUP = 'Default';
+    private const EASY_DEV_BASE_URL = 'http://localhost:8300';
+
+    private AppointmentService $appointmentService;
+    private PatientService $patientService;
+
+    /** @var array<string, array{id:int, username:string, display:string}> */
+    private array $providers;
+
+    /** @var array{id:int, name:string} */
+    private array $facility;
+
+    private int $systemUserId;
+
+    /** @var array<string, int> */
+    private array $categoryIds;
+
+    /**
+     * @param list<array<string, mixed>> $scheduledPatientSpecs
+     */
+    public function __construct(private readonly array $scheduledPatientSpecs, private readonly string $fileRoot)
+    {
+        $this->appointmentService = new AppointmentService();
+        $this->patientService = new PatientService();
+        $this->providers = $this->loadProviders();
+        $this->facility = $this->loadFacility();
+        $this->systemUserId = $this->loadSystemUserId();
+        $this->categoryIds = $this->loadCategoryIds();
+        $this->seedSession();
+    }
+
+    public function run(): void
+    {
+        $this->assertBaseline();
+        $this->normalizeStockDemoPatients();
+        $this->clearExistingSeed();
+
+        $scheduledPatients = $this->createScheduledPatients();
+        $stockPatients = $this->loadStockPatients();
+        $cohortPatients = $this->loadCohortPatients();
+        $establishedPatients = array_merge($stockPatients, $cohortPatients);
+
+        if ($establishedPatients === []) {
+            throw new RuntimeException('Need at least one stock or AgentForge cohort patient for established-patient appointments.');
+        }
+
+        $appointments = $this->seedAppointments($establishedPatients, $scheduledPatients);
+        $this->writeManifest($appointments, $stockPatients, $cohortPatients, $scheduledPatients);
+        $this->printSummary($appointments, $stockPatients, $cohortPatients, $scheduledPatients);
+        $this->printSanityQueries();
+    }
+
+    private function assertBaseline(): void
+    {
+        if (count($this->providers) < 3) {
+            throw new RuntimeException('Need at least three active authorized users/providers before seeding AgentForge appointments.');
+        }
+
+        if ($this->facility['id'] <= 0) {
+            throw new RuntimeException('No facility row found. Run dev-reset-install-demodata before seeding appointments.');
+        }
+
+        foreach (['established_patient', 'new_patient'] as $constantId) {
+            if (empty($this->categoryIds[$constantId])) {
+                throw new RuntimeException("Missing active calendar category {$constantId}.");
+            }
+        }
+    }
+
+    /**
+     * @return array<string, array{id:int, username:string, display:string}>
+     */
+    private function loadProviders(): array
+    {
+        $rows = QueryUtils::fetchRecords(
+            "SELECT id, username, fname, lname
+             FROM users
+             WHERE authorized = 1 AND active = 1
+             ORDER BY CASE username
+                WHEN 'physician' THEN 1
+                WHEN 'clinician' THEN 2
+                WHEN 'admin' THEN 3
+                ELSE 4
+             END, id
+             LIMIT 3"
+        );
+
+        $providers = [];
+        $keys = ['A', 'B', 'C'];
+        foreach ($rows as $index => $row) {
+            $providers[$keys[$index]] = [
+                'id' => (int)$row['id'],
+                'username' => (string)$row['username'],
+                'display' => trim((string)($row['fname'] ?? '') . ' ' . (string)($row['lname'] ?? '')) ?: (string)$row['username'],
+            ];
+        }
+
+        return $providers;
+    }
+
+    /**
+     * @return array{id:int, name:string}
+     */
+    private function loadFacility(): array
+    {
+        $row = QueryUtils::fetchRecords(
+            "SELECT id, name
+             FROM facility
+             ORDER BY primary_business_entity DESC, service_location DESC, id
+             LIMIT 1"
+        )[0] ?? null;
+
+        return [
+            'id' => (int)($row['id'] ?? 0),
+            'name' => (string)($row['name'] ?? ''),
+        ];
+    }
+
+    private function loadSystemUserId(): int
+    {
+        $systemUserId = QueryUtils::fetchSingleValue(
+            "SELECT id FROM users WHERE username = ? ORDER BY id LIMIT 1",
+            'id',
+            ['oe-system']
+        );
+
+        if (!empty($systemUserId)) {
+            return (int)$systemUserId;
+        }
+
+        return (int)QueryUtils::fetchSingleValue(
+            "SELECT id FROM users WHERE username = ? ORDER BY id LIMIT 1",
+            'id',
+            ['admin']
+        );
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function loadCategoryIds(): array
+    {
+        $rows = QueryUtils::fetchRecords(
+            "SELECT pc_catid, pc_constant_id
+             FROM openemr_postcalendar_categories
+             WHERE pc_active = 1 AND pc_constant_id IN (?, ?)",
+            ['established_patient', 'new_patient']
+        );
+
+        $categoryIds = [];
+        foreach ($rows as $row) {
+            $categoryIds[(string)$row['pc_constant_id']] = (int)$row['pc_catid'];
+        }
+
+        return $categoryIds;
+    }
+
+    private function seedSession(): void
+    {
+        $session = SessionWrapperFactory::getInstance()->getActiveSession();
+        $session->set('authUserID', $this->systemUserId);
+        $session->set('authUser', 'oe-system');
+        $session->set('userauthorized', 1);
+        $session->set('groupname', self::DEFAULT_GROUP);
+        $session->set('site_id', $_GET['site'] ?? 'default');
+    }
+
+    private function clearExistingSeed(): void
+    {
+        QueryUtils::sqlStatementThrowException(
+            "DELETE FROM openemr_postcalendar_events WHERE pc_hometext LIKE ?",
+            [self::APPOINTMENT_MARKER . '%']
+        );
+
+        $scheduledPatientPids = QueryUtils::fetchTableColumn(
+            "SELECT pid
+             FROM patient_data
+             WHERE genericname1 = ? AND genericval1 LIKE ?",
+            'pid',
+            [self::SCHEDULED_PATIENT_MARKER_NAME, self::SCHEDULED_PATIENT_PREFIX . '%']
+        );
+
+        $pids = array_map(static fn(int|string $pid): int => (int)$pid, $scheduledPatientPids);
+        if ($pids === []) {
+            return;
+        }
+
+        QueryUtils::sqlStatementThrowException(
+            $this->inSql("DELETE FROM openemr_postcalendar_events WHERE pc_pid IN (%s)", $pids),
+            $pids
+        );
+        QueryUtils::sqlStatementThrowException(
+            $this->inSql("DELETE FROM patient_access_onsite WHERE pid IN (%s)", $pids),
+            $pids
+        );
+        QueryUtils::sqlStatementThrowException(
+            $this->inSql("DELETE FROM patient_data WHERE pid IN (%s)", $pids),
+            $pids
+        );
+    }
+
+    private function normalizeStockDemoPatients(): void
+    {
+        foreach ($this->stockPatientDemographics() as $patient) {
+            QueryUtils::sqlStatementThrowException(
+                "UPDATE patient_data
+                 SET pubpid = ?, DOB = ?, phone_home = ?, ss = ?
+                 WHERE pid = ? AND fname = ? AND lname = ?",
+                [
+                    $patient['pubpid'],
+                    $patient['DOB'],
+                    $patient['phone_home'],
+                    $patient['ss'],
+                    $patient['pid'],
+                    $patient['fname'],
+                    $patient['lname'],
+                ]
+            );
+        }
+    }
+
+    /**
+     * @return list<array{pid:int, pubpid:string, fname:string, lname:string, DOB:string, phone_home:string, ss:string}>
+     */
+    private function stockPatientDemographics(): array
+    {
+        return [
+            [
+                'pid' => 1,
+                'pubpid' => '0001',
+                'fname' => 'Phil',
+                'lname' => 'Belford',
+                'DOB' => '1972-02-09',
+                'phone_home' => '(619) 555-0001',
+                'ss' => '900-45-0001',
+            ],
+            [
+                'pid' => 2,
+                'pubpid' => '0002',
+                'fname' => 'Susan',
+                'lname' => 'Underwood',
+                'DOB' => '1967-02-08',
+                'phone_home' => '(619) 555-0002',
+                'ss' => '900-45-0002',
+            ],
+            [
+                'pid' => 3,
+                'pubpid' => '0003',
+                'fname' => 'Wanda',
+                'lname' => 'Moore',
+                'DOB' => '2007-02-18',
+                'phone_home' => '(619) 555-0003',
+                'ss' => '900-45-0003',
+            ],
+        ];
+    }
+
+    /**
+     * @return list<array{pid:int, pubpid:string, name:string, source:string, primary_provider:string}>
+     */
+    private function createScheduledPatients(): array
+    {
+        $patients = [];
+        foreach ($this->scheduledPatientSpecs as $index => $patientSpec) {
+            $provider = $this->providers[$patientSpec['primary_provider']];
+            $number = $index + 1;
+            $marker = sprintf('%s%03d', self::SCHEDULED_PATIENT_PREFIX, $number);
+            $externalId = sprintf('%04d', self::FIRST_SCHEDULED_PATIENT_EXTERNAL_ID + $index);
+            $result = $this->patientService->insert([
+                'pubpid' => $externalId,
+                'fname' => $patientSpec['fname'],
+                'lname' => $patientSpec['lname'],
+                'mname' => $patientSpec['mname'] ?? '',
+                'DOB' => $patientSpec['DOB'],
+                'sex' => $patientSpec['sex'],
+                'status' => $patientSpec['status'] ?? 'single',
+                'language' => $patientSpec['language'] ?? 'english',
+                'street' => $patientSpec['street'],
+                'city' => $patientSpec['city'] ?? 'San Diego',
+                'state' => $patientSpec['state'] ?? 'CA',
+                'postal_code' => $patientSpec['postal_code'] ?? '92101',
+                'phone_home' => $patientSpec['phone_home'] ?? sprintf('(619) 555-%04d', 3000 + $number),
+                'phone_cell' => $patientSpec['phone_cell'] ?? '',
+                'ss' => $patientSpec['ss'] ?? sprintf('900-46-%04d', 3000 + $number),
+                'email' => $patientSpec['email'] ?? strtolower($patientSpec['fname'] . '.' . $patientSpec['lname']) . '@example.invalid',
+                'providerID' => $provider['id'],
+                'genericname1' => self::SCHEDULED_PATIENT_MARKER_NAME,
+                'genericval1' => $marker,
+                'financial_review' => date('Y-m-d 00:00:00'),
+                'hipaa_mail' => 'YES',
+                'hipaa_voice' => 'YES',
+                'hipaa_notice' => 'YES',
+                'hipaa_message' => 'YES',
+            ]);
+
+            $this->assertProcessingResult($result, 'scheduled patient ' . $marker);
+            $record = $result->getFirstDataResult();
+            $patients[] = [
+                'pid' => (int)$record['pid'],
+                'pubpid' => $externalId,
+                'name' => $patientSpec['fname'] . ' ' . $patientSpec['lname'],
+                'source' => 'new',
+                'primary_provider' => $provider['display'],
+            ];
+        }
+
+        return $patients;
+    }
+
+    /**
+     * @return list<array{pid:int, pubpid:string, name:string, source:string, primary_provider:string}>
+     */
+    private function loadStockPatients(): array
+    {
+        $rows = QueryUtils::fetchRecords(
+            "SELECT p.pid, p.pubpid, p.fname, p.lname, u.fname AS provider_fname, u.lname AS provider_lname
+             FROM patient_data p
+             LEFT JOIN users u ON u.id = p.providerID
+             WHERE p.pid IN (1, 2, 3)
+             ORDER BY p.pid"
+        );
+
+        return array_map(static function (array $row): array {
+            return [
+                'pid' => (int)$row['pid'],
+                'pubpid' => (string)$row['pubpid'],
+                'name' => trim((string)$row['fname'] . ' ' . (string)$row['lname']),
+                'source' => 'stock',
+                'primary_provider' => trim((string)($row['provider_fname'] ?? '') . ' ' . (string)($row['provider_lname'] ?? '')),
+            ];
+        }, $rows);
+    }
+
+    /**
+     * @return list<array{pid:int, pubpid:string, name:string, source:string, primary_provider:string}>
+     */
+    private function loadCohortPatients(): array
+    {
+        $rows = QueryUtils::fetchRecords(
+            "SELECT p.pid, p.pubpid, p.fname, p.lname, u.fname AS provider_fname, u.lname AS provider_lname
+             FROM patient_data p
+             LEFT JOIN users u ON u.id = p.providerID
+             WHERE p.genericname1 = ? AND p.genericval1 LIKE ?
+             ORDER BY CAST(p.pubpid AS UNSIGNED), p.pid",
+            [self::COHORT_MARKER_NAME, self::COHORT_PREFIX . '%']
+        );
+
+        return array_map(static function (array $row): array {
+            return [
+                'pid' => (int)$row['pid'],
+                'pubpid' => (string)$row['pubpid'],
+                'name' => trim((string)$row['fname'] . ' ' . (string)$row['lname']),
+                'source' => 'cohort',
+                'primary_provider' => trim((string)($row['provider_fname'] ?? '') . ' ' . (string)($row['provider_lname'] ?? '')),
+            ];
+        }, $rows);
+    }
+
+    /**
+     * @param list<array{pid:int, pubpid:string, name:string, source:string, primary_provider:string}> $establishedPatients
+     * @param list<array{pid:int, pubpid:string, name:string, source:string, primary_provider:string}> $newPatients
+     * @return list<array<string, mixed>>
+     */
+    private function seedAppointments(array $establishedPatients, array $newPatients): array
+    {
+        $weekdays = $this->nextWeekdays();
+        $templates = $this->scheduleTemplates();
+        $establishedIndex = 0;
+        $newIndex = 0;
+        $patientSchedule = [];
+        $appointments = [];
+
+        foreach ($weekdays as $dayIndex => $date) {
+            $templateIndex = $dayIndex % count($templates);
+            foreach ($this->providers as $providerKey => $provider) {
+                foreach ($templates[$templateIndex][$providerKey] as $slotIndex => $slot) {
+                    $pool = $slot['source'] === 'new' ? $newPatients : $establishedPatients;
+                    $poolIndex = $slot['source'] === 'new' ? $newIndex : $establishedIndex;
+                    $patient = $this->choosePatient($pool, $poolIndex, $date, $slot['start'], (int)$slot['duration'], $patientSchedule);
+
+                    if ($slot['source'] === 'new') {
+                        $newIndex = $poolIndex;
+                    } else {
+                        $establishedIndex = $poolIndex;
+                    }
+
+                    $title = $this->appointmentTitle((string)$slot['source'], (int)$slot['duration'], $dayIndex, $slotIndex);
+                    $eid = $this->appointmentService->insert($patient['pid'], [
+                        'pc_catid' => $slot['source'] === 'new' ? $this->categoryIds['new_patient'] : $this->categoryIds['established_patient'],
+                        'pc_title' => $title,
+                        'pc_duration' => (int)$slot['duration'],
+                        'pc_hometext' => self::APPOINTMENT_MARKER . ' ' . $title,
+                        'pc_apptstatus' => '-',
+                        'pc_eventDate' => $date,
+                        'pc_startTime' => $slot['start'],
+                        'pc_facility' => $this->facility['id'],
+                        'pc_billing_location' => $this->facility['id'],
+                        'pc_aid' => $provider['id'],
+                        'pc_website' => null,
+                    ]);
+
+                    $appointments[] = [
+                        'eid' => (int)$eid,
+                        'date' => $date,
+                        'provider_key' => $providerKey,
+                        'provider' => $provider['display'],
+                        'start' => $slot['start'],
+                        'end' => $this->endTime($slot['start'], (int)$slot['duration']),
+                        'duration_minutes' => (int)($slot['duration'] / 60),
+                        'category' => $slot['source'] === 'new' ? 'New Patient' : 'Established Patient',
+                        'patient_source' => $patient['source'],
+                        'pid' => $patient['pid'],
+                        'pubpid' => $patient['pubpid'],
+                        'patient' => $patient['name'],
+                        'title' => $title,
+                    ];
+                }
+            }
+        }
+
+        return $appointments;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function nextWeekdays(): array
+    {
+        $today = new DateTimeImmutable('today');
+        $dates = [];
+
+        for ($offset = 0; $offset < 7; $offset++) {
+            $date = $today->modify('+' . $offset . ' days');
+            $dayOfWeek = (int)$date->format('N');
+            if ($dayOfWeek >= 1 && $dayOfWeek <= 5) {
+                $dates[] = $date->format('Y-m-d');
+            }
+        }
+
+        return $dates;
+    }
+
+    /**
+     * @return list<array<string, list<array{start:string, duration:int, source:string}>>>
+     */
+    private function scheduleTemplates(): array
+    {
+        return [
+            [
+                'A' => array_merge(
+                    $this->block('08:30', [['established', 15], ['established', 15], ['new', 30], ['established', 15], ['established', 15], ['established', 15]]),
+                    $this->block('13:15', [['established', 15], ['new', 30], ['established', 15], ['established', 15], ['established', 15], ['established', 15]])
+                ),
+                'B' => array_merge(
+                    $this->block('09:00', [['new', 30], ['established', 15], ['established', 15], ['established', 15], ['established', 15], ['established', 15]]),
+                    $this->block('14:00', [['established', 15], ['established', 15], ['new', 30], ['established', 15], ['established', 15]])
+                ),
+                'C' => array_merge(
+                    $this->block('08:00', [['established', 15], ['established', 15], ['established', 15], ['established', 15], ['new', 30]]),
+                    $this->block('11:00', [['established', 15], ['established', 15], ['established', 15], ['established', 15]]),
+                    $this->block('15:00', [['new', 30], ['established', 15], ['established', 15]])
+                ),
+            ],
+            [
+                'A' => array_merge(
+                    $this->block('09:15', [['established', 15], ['established', 15], ['established', 15], ['new', 30], ['established', 15]]),
+                    $this->block('11:30', [['established', 15], ['established', 15], ['established', 15]]),
+                    $this->block('14:15', [['established', 15], ['new', 30], ['established', 15], ['established', 15]])
+                ),
+                'B' => array_merge(
+                    $this->block('08:15', [['established', 15], ['new', 30], ['established', 15], ['established', 15], ['established', 15], ['established', 15]]),
+                    $this->block('13:00', [['established', 15], ['established', 15], ['established', 15], ['new', 30], ['established', 15]])
+                ),
+                'C' => array_merge(
+                    $this->block('10:00', [['new', 30], ['established', 15], ['established', 15], ['established', 15]]),
+                    $this->block('13:30', [['established', 15], ['established', 15], ['established', 15], ['established', 15], ['new', 30], ['established', 15]])
+                ),
+            ],
+            [
+                'A' => array_merge(
+                    $this->block('08:00', [['new', 30], ['established', 15], ['established', 15], ['established', 15], ['established', 15]]),
+                    $this->block('10:30', [['established', 15], ['established', 15], ['established', 15]]),
+                    $this->block('13:45', [['new', 30], ['established', 15], ['established', 15], ['established', 15]])
+                ),
+                'B' => array_merge(
+                    $this->block('09:30', [['established', 15], ['established', 15], ['new', 30], ['established', 15], ['established', 15]]),
+                    $this->block('13:15', [['established', 15], ['established', 15], ['established', 15], ['established', 15], ['new', 30]])
+                ),
+                'C' => array_merge(
+                    $this->block('08:45', [['established', 15], ['established', 15], ['established', 15], ['established', 15], ['new', 30], ['established', 15]]),
+                    $this->block('14:30', [['established', 15], ['new', 30], ['established', 15], ['established', 15]])
+                ),
+            ],
+            [
+                'A' => array_merge(
+                    $this->block('10:00', [['established', 15], ['new', 30], ['established', 15], ['established', 15], ['established', 15]]),
+                    $this->block('13:00', [['established', 15], ['established', 15], ['new', 30], ['established', 15], ['established', 15], ['established', 15]])
+                ),
+                'B' => array_merge(
+                    $this->block('08:00', [['established', 15], ['established', 15], ['established', 15], ['new', 30], ['established', 15], ['established', 15]]),
+                    $this->block('11:15', [['established', 15], ['established', 15]]),
+                    $this->block('14:00', [['new', 30], ['established', 15], ['established', 15]])
+                ),
+                'C' => array_merge(
+                    $this->block('09:00', [['established', 15], ['established', 15], ['new', 30], ['established', 15], ['established', 15]]),
+                    $this->block('13:15', [['established', 15], ['established', 15], ['established', 15], ['new', 30], ['established', 15]])
+                ),
+            ],
+            [
+                'A' => array_merge(
+                    $this->block('08:30', [['established', 15], ['established', 15], ['established', 15], ['established', 15], ['new', 30], ['established', 15]]),
+                    $this->block('12:45', [['established', 15], ['established', 15], ['established', 15]]),
+                    $this->block('15:00', [['new', 30], ['established', 15], ['established', 15]])
+                ),
+                'B' => array_merge(
+                    $this->block('09:00', [['established', 15], ['new', 30], ['established', 15], ['established', 15], ['established', 15]]),
+                    $this->block('13:30', [['established', 15], ['established', 15], ['established', 15], ['new', 30], ['established', 15]])
+                ),
+                'C' => array_merge(
+                    $this->block('08:15', [['new', 30], ['established', 15], ['established', 15], ['established', 15], ['established', 15], ['established', 15]]),
+                    $this->block('11:00', [['established', 15], ['established', 15]]),
+                    $this->block('13:45', [['established', 15], ['new', 30], ['established', 15], ['established', 15]])
+                ),
+            ],
+        ];
+    }
+
+    /**
+     * @param list<array{string, int}> $items
+     * @return list<array{start:string, duration:int, source:string}>
+     */
+    private function block(string $startTime, array $items): array
+    {
+        $slots = [];
+        $cursor = new DateTimeImmutable('2000-01-01 ' . $startTime);
+
+        foreach ($items as $item) {
+            [$source, $durationMinutes] = $item;
+            $slots[] = [
+                'start' => $cursor->format('H:i'),
+                'duration' => $durationMinutes * 60,
+                'source' => $source,
+            ];
+            $cursor = $cursor->modify('+' . $durationMinutes . ' minutes');
+        }
+
+        return $slots;
+    }
+
+    /**
+     * @param list<array{pid:int, pubpid:string, name:string, source:string, primary_provider:string}> $pool
+     * @param array<int, array<string, list<array{start:int, end:int}>>> $patientSchedule
+     * @return array{pid:int, pubpid:string, name:string, source:string, primary_provider:string}
+     */
+    private function choosePatient(array $pool, int &$poolIndex, string $date, string $startTime, int $duration, array &$patientSchedule): array
+    {
+        if ($pool === []) {
+            throw new RuntimeException('No patients available for appointment assignment.');
+        }
+
+        $startMinutes = $this->minutesSinceMidnight($startTime);
+        $endMinutes = $startMinutes + (int)($duration / 60);
+        $poolCount = count($pool);
+
+        for ($attempt = 0; $attempt < $poolCount; $attempt++) {
+            $candidateIndex = ($poolIndex + $attempt) % $poolCount;
+            $patient = $pool[$candidateIndex];
+            if (!$this->patientHasOverlap((int)$patient['pid'], $date, $startMinutes, $endMinutes, $patientSchedule)) {
+                $poolIndex = ($candidateIndex + 1) % $poolCount;
+                $patientSchedule[$patient['pid']][$date][] = [
+                    'start' => $startMinutes,
+                    'end' => $endMinutes,
+                ];
+                return $patient;
+            }
+        }
+
+        throw new RuntimeException('Unable to assign a patient without an overlapping appointment.');
+    }
+
+    /**
+     * @param array<int, array<string, list<array{start:int, end:int}>>> $patientSchedule
+     */
+    private function patientHasOverlap(int $pid, string $date, int $startMinutes, int $endMinutes, array $patientSchedule): bool
+    {
+        foreach ($patientSchedule[$pid][$date] ?? [] as $appointment) {
+            if ($startMinutes < $appointment['end'] && $endMinutes > $appointment['start']) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function appointmentTitle(string $source, int $duration, int $dayIndex, int $slotIndex): string
+    {
+        $newPatientTitles = [
+            'New patient intake: transfer of care',
+            'New patient visit: hypertension concern',
+            'New patient visit: preventive care',
+            'New patient intake: medication reconciliation',
+            'New patient visit: fatigue evaluation',
+            'New patient visit: diabetes risk counseling',
+        ];
+        $establishedTitles = [
+            'Diabetes follow-up and refills',
+            'Blood pressure check',
+            'Medication follow-up',
+            'Annual preventive visit',
+            'Asthma action plan review',
+            'ADHD medication follow-up',
+            'Lab review and care plan',
+            'Anticoagulation follow-up',
+            'Geriatric medication review',
+            'Postpartum primary-care follow-up',
+            'Migraine follow-up',
+            'Sports physical',
+        ];
+        $complexTitles = [
+            'Complex chronic care follow-up',
+            'Care gap closure visit',
+            'Multiple medication review',
+            'Diabetes and kidney monitoring',
+        ];
+
+        if ($source === 'new') {
+            return $newPatientTitles[($dayIndex + $slotIndex) % count($newPatientTitles)];
+        }
+
+        if ($duration >= 1800) {
+            return $complexTitles[($dayIndex + $slotIndex) % count($complexTitles)];
+        }
+
+        return $establishedTitles[($dayIndex + $slotIndex) % count($establishedTitles)];
+    }
+
+    /**
+     * @param list<array<string, mixed>> $appointments
+     * @param list<array{pid:int, pubpid:string, name:string, source:string, primary_provider:string}> $stockPatients
+     * @param list<array{pid:int, pubpid:string, name:string, source:string, primary_provider:string}> $cohortPatients
+     * @param list<array{pid:int, pubpid:string, name:string, source:string, primary_provider:string}> $scheduledPatients
+     */
+    private function writeManifest(array $appointments, array $stockPatients, array $cohortPatients, array $scheduledPatients): void
+    {
+        $path = $this->fileRoot . '/Documentation/AgentForge/cohort/appointments.md';
+        $dir = dirname($path);
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            throw new RuntimeException('Unable to create appointment manifest directory: ' . $dir);
+        }
+
+        $summary = $this->providerDateSummary($appointments);
+        $lines = [
+            '# AgentForge Synthetic Appointment Schedule',
+            '',
+            'Generated by `contrib/util/agentforge/seed_appointments.php` on ' . date('Y-m-d H:i:s T') . '.',
+            '',
+            'All appointments and scheduled-patient records are fabricated synthetic data for demo and evaluation use only.',
+            '',
+            '## Patient Sources',
+            '',
+            sprintf('- Stock demo patients used: %d', count($stockPatients)),
+            sprintf('- AgentForge cohort patients used: %d', count($cohortPatients)),
+            sprintf('- Appointment-only scheduled patients created: %d', count($scheduledPatients)),
+            '',
+            '## Provider-Day Summary',
+            '',
+            '| date | provider | appointments | first | last | new-patient slots |',
+            '| --- | --- | ---: | --- | --- | ---: |',
+        ];
+
+        foreach ($summary as $row) {
+            $lines[] = sprintf(
+                '| %s | %s | %d | %s | %s | %d |',
+                $row['date'],
+                $row['provider'],
+                $row['count'],
+                $row['first'],
+                substr($row['last'], 0, 5),
+                $row['new_count']
+            );
+        }
+
+        $lines[] = '';
+        $lines[] = '## Appointment Detail';
+        $lines[] = '';
+        $lines[] = '| date | provider | time | patient | source | category | title |';
+        $lines[] = '| --- | --- | --- | --- | --- | --- | --- |';
+
+        foreach ($appointments as $appointment) {
+            $chartUrl = self::EASY_DEV_BASE_URL . '/interface/patient_file/summary/demographics.php?set_pid=' . $appointment['pid'];
+            $lines[] = sprintf(
+                '| %s | %s | %s-%s | [%s](%s) | %s | %s | %s |',
+                $appointment['date'],
+                $appointment['provider'],
+                $appointment['start'],
+                substr((string)$appointment['end'], 0, 5),
+                str_replace('|', '/', (string)$appointment['patient']),
+                $chartUrl,
+                $appointment['patient_source'],
+                $appointment['category'],
+                str_replace('|', '/', (string)$appointment['title'])
+            );
+        }
+
+        $lines[] = '';
+        $lines[] = '## Verification';
+        $lines[] = '';
+        $lines[] = '- Calendar: `' . self::EASY_DEV_BASE_URL . '/interface/main/calendar/index.php`.';
+        $firstScheduledExternalId = sprintf('%04d', self::FIRST_SCHEDULED_PATIENT_EXTERNAL_ID);
+        $lastScheduledExternalId = sprintf('%04d', self::FIRST_SCHEDULED_PATIENT_EXTERNAL_ID + count($scheduledPatients) - 1);
+        $lines[] = '- Finder: `' . self::EASY_DEV_BASE_URL . '/interface/main/finder/dynamic_finder.php` then search by External ID `' . $firstScheduledExternalId . '` through `' . $lastScheduledExternalId . '`.';
+        $lines[] = '';
+        $lines[] = '```sql';
+        $lines[] = 'SELECT pc_eventDate, pc_aid, COUNT(*)';
+        $lines[] = 'FROM openemr_postcalendar_events';
+        $lines[] = "WHERE pc_hometext LIKE '" . self::APPOINTMENT_MARKER . "%'";
+        $lines[] = 'GROUP BY pc_eventDate, pc_aid';
+        $lines[] = 'ORDER BY pc_eventDate, pc_aid;';
+        $lines[] = '';
+        $lines[] = 'SELECT pc_eventDate, pc_aid, pc_startTime, pc_endTime, pc_pid, pc_title';
+        $lines[] = 'FROM openemr_postcalendar_events';
+        $lines[] = "WHERE pc_hometext LIKE '" . self::APPOINTMENT_MARKER . "%'";
+        $lines[] = 'ORDER BY pc_eventDate, pc_aid, pc_startTime;';
+        $lines[] = '```';
+        $lines[] = '';
+
+        file_put_contents($path, implode("\n", $lines) . "\n");
+    }
+
+    /**
+     * @param list<array<string, mixed>> $appointments
+     * @return list<array{date:string, provider:string, count:int, first:string, last:string, new_count:int}>
+     */
+    private function providerDateSummary(array $appointments): array
+    {
+        $summary = [];
+        foreach ($appointments as $appointment) {
+            $key = $appointment['date'] . '|' . $appointment['provider'];
+            $summary[$key] ??= [
+                'date' => (string)$appointment['date'],
+                'provider' => (string)$appointment['provider'],
+                'count' => 0,
+                'first' => (string)$appointment['start'],
+                'last' => (string)$appointment['end'],
+                'new_count' => 0,
+            ];
+            $summary[$key]['count']++;
+            $summary[$key]['first'] = min($summary[$key]['first'], (string)$appointment['start']);
+            $summary[$key]['last'] = max($summary[$key]['last'], (string)$appointment['end']);
+            if ($appointment['patient_source'] === 'new') {
+                $summary[$key]['new_count']++;
+            }
+        }
+
+        return array_values($summary);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $appointments
+     * @param list<array{pid:int, pubpid:string, name:string, source:string, primary_provider:string}> $stockPatients
+     * @param list<array{pid:int, pubpid:string, name:string, source:string, primary_provider:string}> $cohortPatients
+     * @param list<array{pid:int, pubpid:string, name:string, source:string, primary_provider:string}> $scheduledPatients
+     */
+    private function printSummary(array $appointments, array $stockPatients, array $cohortPatients, array $scheduledPatients): void
+    {
+        echo "\nAgentForge synthetic appointments seeded successfully.\n\n";
+        printf("Providers: %d\n", count($this->providers));
+        printf("Stock patients used: %d\n", count($stockPatients));
+        printf("Cohort patients used: %d\n", count($cohortPatients));
+        printf("Appointment-only patients created: %d\n", count($scheduledPatients));
+        printf("Appointments created: %d\n\n", count($appointments));
+        echo "Provider/day summary:\n";
+        printf("%-12s %-18s %-6s %-6s %-6s %-4s\n", 'date', 'provider', 'count', 'first', 'last', 'new');
+        foreach ($this->providerDateSummary($appointments) as $row) {
+            printf(
+                "%-12s %-18s %-6d %-6s %-6s %-4d\n",
+                $row['date'],
+                $row['provider'],
+                $row['count'],
+                $row['first'],
+                substr($row['last'], 0, 5),
+                $row['new_count']
+            );
+        }
+        echo "\nManifest written to Documentation/AgentForge/cohort/appointments.md\n";
+    }
+
+    private function printSanityQueries(): void
+    {
+        echo "\nSanity queries:\n";
+        echo "SELECT pc_eventDate, pc_aid, COUNT(*) FROM openemr_postcalendar_events WHERE pc_hometext LIKE '" . self::APPOINTMENT_MARKER . "%' GROUP BY pc_eventDate, pc_aid ORDER BY pc_eventDate, pc_aid;\n";
+        echo "SELECT pc_eventDate, pc_aid, pc_startTime, pc_endTime, pc_pid, pc_title FROM openemr_postcalendar_events WHERE pc_hometext LIKE '" . self::APPOINTMENT_MARKER . "%' ORDER BY pc_eventDate, pc_aid, pc_startTime;\n";
+    }
+
+    private function endTime(string $startTime, int $duration): string
+    {
+        return (new DateTimeImmutable('2000-01-01 ' . $startTime))
+            ->modify('+' . (int)($duration / 60) . ' minutes')
+            ->format('H:i:s');
+    }
+
+    private function minutesSinceMidnight(string $time): int
+    {
+        [$hour, $minute] = array_map('intval', explode(':', $time));
+        return ($hour * 60) + $minute;
+    }
+
+    private function assertProcessingResult(ProcessingResult $result, string $label): void
+    {
+        if (!$result->isValid() || !$result->hasData()) {
+            throw new RuntimeException($label . ' failed: ' . json_encode([
+                'validation' => $result->getValidationMessages(),
+                'internal' => $result->getInternalErrors(),
+            ], JSON_THROW_ON_ERROR));
+        }
+    }
+
+    /**
+     * @param list<int|string> $values
+     */
+    private function placeholders(array $values): string
+    {
+        return implode(',', array_fill(0, count($values), '?'));
+    }
+
+    /**
+     * @param list<int|string> $values
+     */
+    private function inSql(string $template, array $values): string
+    {
+        return sprintf($template, $this->placeholders($values));
+    }
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function af_scheduled_patient(string $provider, string $fname, string $lname, string $dob, string $sex, string $street): array
+{
+    return [
+        'primary_provider' => $provider,
+        'fname' => $fname,
+        'lname' => $lname,
+        'DOB' => $dob,
+        'sex' => $sex,
+        'street' => $street,
+    ];
+}
+
+$scheduledPatients = [
+    af_scheduled_patient('A', 'Avery', 'Wells', '1992-05-04', 'Female', '2040 Kalmia Street'),
+    af_scheduled_patient('B', 'Jordan', 'Price', '1988-09-21', 'Male', '7719 Bayview Drive'),
+    af_scheduled_patient('C', 'Camila', 'Nguyen', '1979-02-14', 'Female', '3610 Citrus Avenue'),
+    af_scheduled_patient('A', 'Logan', 'Carter', '2006-12-03', 'Male', '9551 Mesa Brook Lane'),
+    af_scheduled_patient('B', 'Priya', 'Shah', '1968-07-29', 'Female', '1428 Laurel Canyon Road'),
+    af_scheduled_patient('C', 'Noah', 'Bennett', '1958-01-18', 'Male', '8172 Harbor Point'),
+    af_scheduled_patient('A', 'Elena', 'Morales', '1999-03-09', 'Female', '4309 Juniper Terrace'),
+    af_scheduled_patient('B', 'Miles', 'Reed', '1981-11-17', 'Male', '2636 Mission Park Way'),
+    af_scheduled_patient('C', 'Talia', 'Brooks', '1975-06-25', 'Female', '6405 Palm Grove Court'),
+    af_scheduled_patient('A', 'Owen', 'Foster', '2013-10-08', 'Male', '1297 Redwood Circle'),
+    af_scheduled_patient('B', 'Mei', 'Chen', '1949-04-30', 'Female', '5308 Vista Meadow Drive'),
+    af_scheduled_patient('C', 'Isaac', 'Turner', '1962-08-12', 'Male', '9074 Seabreeze Avenue'),
+    af_scheduled_patient('A', 'Rina', 'Kapoor', '1986-02-02', 'Female', '7780 Mesa Verde Lane'),
+    af_scheduled_patient('B', 'Caleb', 'Morgan', '1994-09-13', 'Male', '3180 Laurel Street'),
+    af_scheduled_patient('C', 'Amara', 'Cole', '2002-05-22', 'Female', '6042 Harbor View Road'),
+];
+
+try {
+    (new AgentForgeAppointmentSeeder($scheduledPatients, $fileRoot))->run();
+} catch (Throwable $throwable) {
+    fwrite(STDERR, "AgentForge appointment seed failed: " . $throwable->getMessage() . "\n");
+    fwrite(STDERR, $throwable->getTraceAsString() . "\n");
+    exit(1);
+}

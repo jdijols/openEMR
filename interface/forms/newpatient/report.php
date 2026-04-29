@@ -73,7 +73,13 @@ function newpatient_report($pid, $encounter, $cols, $id): void
          * @var OEGlobalsBag $globalsBag
          */
         $globalsBag = OEGlobalsBag::getInstance()->get('globalsBag');
-        if ($globalsBag->getInt(GlobalFeaturesEnum::INHOUSE_PHARMACY->value, 0) === 1) {
+        // interface/globals.php normalizes `inhouse_pharmacy` to a PHP boolean
+        // (default false; true when the underlying gl_value is truthy). Using
+        // ParameterBag::getInt() throws UnexpectedValueException when the value
+        // is boolean false, blanking out the Visit Summary report. Use the
+        // boolean getter to match how the value is stored and how every other
+        // call site in the codebase reads it.
+        if ($globalsBag->getBoolean(GlobalFeaturesEnum::INHOUSE_PHARMACY->value)) {
             $encounterUuid = UuidRegistry::uuidToString($result['uuid']);
             $patientService = new PatientService();
             $patientUuid = UuidRegistry::uuidToString($patientService->getUuid($pid));
