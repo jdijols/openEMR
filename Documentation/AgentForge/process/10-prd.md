@@ -22,4 +22,8 @@ Session that added this milestone + task list + Gate 0 handoff: [`journal/week-1
 
 ## Next execution step
 
-Begin **Gate 0** from [`implementation/clinical-copilot-task-list.md`](../implementation/clinical-copilot-task-list.md) in a fresh working session (scaffold §3 + contract spine).
+Begin **Gate 1** — security primitives — from [`implementation/clinical-copilot-task-list.md`](../implementation/clinical-copilot-task-list.md#gate-1--security-primitives-first).
+
+## Decisions (update 2026-04-30)
+
+- **Gate 0 closed:** Scaffold + contract spine verified on engineer host and pushed to GitLab. Milestone: [`process/11-gate0-complete.md`](11-gate0-complete.md); journal: [`journal/week-1/0430-T0215-gate0-verified-gitlab.md`](journal/week-1/0430-T0215-gate0-verified-gitlab.md). Task list rows marked `[x]` in [`implementation/clinical-copilot-task-list.md`](../implementation/clinical-copilot-task-list.md).

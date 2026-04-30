@@ -23,7 +23,7 @@ From repo root:
 2. `cd interface/modules/custom_modules/oe-module-agentforge && composer dump-autoload` — no errors.
 3. `cd agentforge/api && npm install && npm run typecheck && npm run build && npm test`
 4. `cd agentforge/cui && npm install && npm run typecheck && npm run lint && npm run build` — expect `dist/index.html`.
-5. `composer phpunit -- -c phpunit-isolated.xml tests/Tests/Isolated/Modules/AgentForge/ModuleHttpContractTest.php`
+5. `php vendor/bin/phpunit -c phpunit-isolated.xml tests/Tests/Isolated/Modules/AgentForge/ModuleHttpContractTest.php` — root Composer script uses bare `phpunit` (often missing on PATH); see [`0430-T0215-gate0-verified-gitlab.md`](0430-T0215-gate0-verified-gitlab.md).
 6. `docker compose -f docker/development-easy/docker-compose.yml -f docker/agentforge/docker-compose.override.yml config`
 
 ## User intervention
