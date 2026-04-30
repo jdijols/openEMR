@@ -1,0 +1,17 @@
+{
+  "paths": [
+    "context/identity.php",
+    "context/encounters.php",
+    "context/problems.php",
+    "context/allergies.php",
+    "context/meds.php",
+    "context/vitals.php",
+    "context/labs.php",
+    "context/notes_metadata.php",
+    "context/social_history.php",
+    "write/chief_complaint.php",
+    "write/vitals.php",
+    "write/tobacco.php",
+    "write/allergy.php"
+  ]
+}

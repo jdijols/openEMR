@@ -1,0 +1,1 @@
+-- AgentForge module schema (Gate 1 — agentforge_launch_code, log correlation_id)

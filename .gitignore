@@ -3,6 +3,13 @@
 
 # environment vars
 .env
+*.env
+secrets.env
+**/secrets.env
+
+# AgentForge / Node artifacts
+**/dist/
+.cache
 
 # vendor and assets
 node_modules
