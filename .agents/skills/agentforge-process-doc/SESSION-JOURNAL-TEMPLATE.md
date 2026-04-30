@@ -1,6 +1,6 @@
 # Session Journal Template
 
-Copy this file to `Documentation/AgentForge/process/journal/week-N/MMDD-THHMM-<short-topic>.md` and fill in. The week number `N` comes from `course-start` in the AgentForge README frontmatter; the filename uses local time at write (e.g. `0427-T2030-flatten-journal-restructure.md`). Highlights only — no full transcripts. Aim for one screen.
+Copy this file to `Documentation/AgentForge/process/journal/week-N/MMDD-THHMM-<short-topic>.md` and fill in. The week number `N` comes from `course-start` in the AgentForge README frontmatter. **The `MMDD-THHMM` prefix and YAML `date:` must come from US Central (`America/Chicago`) via the main skill’s shell commands — never guessed.** Highlights only — no full transcripts. Aim for one screen.
 
 ---
 
@@ -81,6 +81,7 @@ related_milestone: <e.g. process/04-users-and-workflow.md, or "none">
 
 ## Notes for the agent filling this in
 
+- **Filename and frontmatter dates:** Run `TZ=America/Chicago date +"%m%d-T%H%M"` for the prefix and `TZ=America/Chicago date +"%Y-%m-%d"` for YAML `date:`; do not invent `HHMM`.
 - **Highlights only.** If a section has no content, write `_None this session._` instead of padding.
 - **Decision count target:** 2–6. If you have more than 8, you are probably logging non-pivots.
 - **Do not paste full transcripts** under any section. Quote the prompt that mattered, summarize the answer.

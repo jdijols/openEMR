@@ -4,7 +4,7 @@
 
 ## Verification
 
-Engineer re-ran installs and tests on host (PHP 8.5 + Composer + Redis extension); pushed one combined commit to GitLab. Session journal: [`journal/week-1/0430-T0215-gate0-verified-gitlab.md`](journal/week-1/0430-T0215-gate0-verified-gitlab.md). Scaffold session: [`journal/week-1/0429-T2330-gate0-scaffold-spine.md`](journal/week-1/0429-T2330-gate0-scaffold-spine.md).
+Engineer re-ran installs and tests on host (PHP 8.5 + Composer + Redis extension); pushed one combined commit to GitLab. Session journal: [`journal/week-1/0429-T2015-gate0-verified-gitlab.md`](journal/week-1/0429-T2015-gate0-verified-gitlab.md). Scaffold session: [`journal/week-1/0429-T1845-gate0-scaffold-spine.md`](journal/week-1/0429-T1845-gate0-scaffold-spine.md).
 
 ## Decisions (lifted from journals)
 

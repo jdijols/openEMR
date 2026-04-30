@@ -28,6 +28,15 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      // PRD §6.3 / G2-10 — never inject untrusted HTML into the chat UI.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'JSXAttribute[name.name="dangerouslySetInnerHTML"]',
+          message:
+            'dangerouslySetInnerHTML is forbidden in the CUI (PRD §6.3). Render text/claim blocks as React children only.',
+        },
+      ],
     },
   },
 );

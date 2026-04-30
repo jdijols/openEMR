@@ -1,0 +1,31 @@
+services:
+  # Production overlay for AgentForge.
+  # Stack with: `-f docker-compose.yml -f ../agentforge/docker-compose.override.yml -f ../agentforge/docker-compose.prod.yml`.
+  #
+  # Architecture: agentforge-api stays on the internal Docker network only and
+  # is NEVER published to the host. Caddy is the single public entry point and
+  # terminates TLS for ${AGENTFORGE_PUBLIC_HOSTNAME} via Let's Encrypt.
+  agentforge-api:
+    command: ['sh', '-c', 'cd /app && npm ci && npm run build && PORT=3000 node dist/index.js']
+    working_dir: /app
+    volumes:
+      - ../../agentforge/api:/app
+    environment:
+      PORT: '3000'
+    # Intentionally NO `ports:` here — internal-only.
+
+  caddy:
+    ports:
+      - '0.0.0.0:80:80'
+      - '0.0.0.0:443:443'
+      - '0.0.0.0:443:443/udp'
+    env_file:
+      - ${AGENTFORGE_SECRETS_FILE:-../agentforge/secrets.prod.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

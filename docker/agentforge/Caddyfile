@@ -1,0 +1,12 @@
+# Public TLS reverse proxy for the Agent API.
+# Hostname is taken from the AGENTFORGE_PUBLIC_HOSTNAME env var on the caddy
+# container. Caddy handles automatic HTTPS via Let's Encrypt (HTTP-01 on :80,
+# serving on :443). agentforge-api stays on the internal Docker network only.
+{$AGENTFORGE_PUBLIC_HOSTNAME} {
+    encode gzip
+    reverse_proxy agentforge-api:3000
+    log {
+        output stdout
+        format console
+    }
+}

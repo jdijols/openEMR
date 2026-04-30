@@ -26,4 +26,4 @@ Begin **Gate 1** — security primitives — from [`implementation/clinical-copi
 
 ## Decisions (update 2026-04-30)
 
-- **Gate 0 closed:** Scaffold + contract spine verified on engineer host and pushed to GitLab. Milestone: [`process/11-gate0-complete.md`](11-gate0-complete.md); journal: [`journal/week-1/0430-T0215-gate0-verified-gitlab.md`](journal/week-1/0430-T0215-gate0-verified-gitlab.md). Task list rows marked `[x]` in [`implementation/clinical-copilot-task-list.md`](../implementation/clinical-copilot-task-list.md).
+- **Gate 0 closed:** Scaffold + contract spine verified on engineer host and pushed to GitLab. Milestone: [`process/11-gate0-complete.md`](11-gate0-complete.md); journal: [`journal/week-1/0429-T2015-gate0-verified-gitlab.md`](journal/week-1/0429-T2015-gate0-verified-gitlab.md). Task list rows marked `[x]` in [`implementation/clinical-copilot-task-list.md`](../implementation/clinical-copilot-task-list.md).

@@ -1,1 +1,129 @@
-{# Gate 2 — right-rail iframe container #}
+{# Right rail + CUI iframe; stays mounted when hidden (PRD §4.2, ARCHITECTURE host UX). #}
+<div id="agentforge-rail"
+     class="agentforge-rail"
+     data-rail-width="{{ rail_width }}"
+     style="--agentforge-rail-width: {{ rail_width }}px;">
+    <div class="agentforge-rail__header d-flex align-items-center justify-content-between border-bottom bg-light px-2 py-1">
+        <span class="small font-weight-bold text-muted">{{ 'Clinical Co-Pilot'|xl }}</span>
+        <button type="button" class="btn btn-sm btn-link agentforge-rail__close" aria-label="{{ 'Close'|xl }}">&times;</button>
+    </div>
+    <iframe id="agentforge-cui-frame"
+            class="agentforge-rail__iframe"
+            title="{{ 'AgentForge panel'|xl }}"
+            src="about:blank"
+            data-panel-src="{{ panel_src|e('html_attr') }}"
+            sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
+</div>
+<style>
+    .agentforge-rail {
+        position: fixed;
+        top: 0;
+        right: 0;
+        height: 100vh;
+        width: var(--agentforge-rail-width, 420px);
+        max-width: 100vw;
+        z-index: 1040;
+        background: #fff;
+        box-shadow: -2px 0 12px rgba(0, 0, 0, 0.12);
+        display: none;
+        flex-direction: column;
+    }
+
+    .agentforge-rail.agentforge-rail--open {
+        display: flex;
+    }
+
+    .agentforge-rail__iframe {
+        flex: 1 1 auto;
+        border: 0;
+        width: 100%;
+        min-height: 0;
+    }
+
+    body.agentforge-rail-pad #mainBox {
+        transition: margin-inline-end 0.15s ease-out;
+    }
+</style>
+<script>
+    (function () {
+        var rail = document.getElementById('agentforge-rail');
+        var toggle = document.getElementById('agentforge-rail-toggle');
+        var main = document.getElementById('mainBox');
+        var frame = document.getElementById('agentforge-cui-frame');
+        if (!rail || !toggle) {
+            return;
+        }
+
+        var width = parseInt(rail.getAttribute('data-rail-width') || '420', 10) || 420;
+        var panelSrc = frame ? frame.getAttribute('data-panel-src') || '' : '';
+        var panelLoaded = false;
+
+        function ensurePanelLoaded() {
+            if (panelLoaded || !frame || panelSrc === '') {
+                return;
+            }
+            panelLoaded = true;
+            frame.setAttribute('src', panelSrc);
+        }
+
+        function setOverlayMode(on) {
+            rail.classList.toggle('agentforge-rail--overlay', on);
+            if (main) {
+                if (on) {
+                    main.style.marginInlineEnd = '';
+                    document.body.classList.remove('agentforge-rail-pad');
+                } else if (rail.classList.contains('agentforge-rail--open')) {
+                    main.style.marginInlineEnd = width + 'px';
+                    document.body.classList.add('agentforge-rail-pad');
+                } else {
+                    main.style.marginInlineEnd = '';
+                    document.body.classList.remove('agentforge-rail-pad');
+                }
+            }
+        }
+
+        function updateLayout() {
+            if (!main || !rail.classList.contains('agentforge-rail--open')) {
+                setOverlayMode(false);
+                return;
+            }
+            var needsOverlay = main.scrollWidth > (window.innerWidth - width - 8);
+            setOverlayMode(needsOverlay);
+        }
+
+        function openRail() {
+            ensurePanelLoaded();
+            rail.classList.add('agentforge-rail--open');
+            toggle.setAttribute('aria-expanded', 'true');
+            updateLayout();
+        }
+
+        function closeRail() {
+            rail.classList.remove('agentforge-rail--open');
+            toggle.setAttribute('aria-expanded', 'false');
+            if (main) {
+                main.style.marginInlineEnd = '';
+            }
+            document.body.classList.remove('agentforge-rail-pad');
+        }
+
+        toggle.addEventListener('click', function () {
+            if (rail.classList.contains('agentforge-rail--open')) {
+                closeRail();
+            } else {
+                openRail();
+            }
+        });
+
+        var closers = rail.querySelectorAll('.agentforge-rail__close');
+        for (var i = 0; i < closers.length; i++) {
+            closers[i].addEventListener('click', closeRail);
+        }
+
+        window.addEventListener('resize', function () {
+            if (rail.classList.contains('agentforge-rail--open')) {
+                updateLayout();
+            }
+        });
+    })();
+</script>

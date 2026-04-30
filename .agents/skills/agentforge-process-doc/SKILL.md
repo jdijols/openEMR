@@ -22,11 +22,33 @@ Pick one (the user may ask for both):
 
 If unclear, ask one question. Otherwise proceed.
 
+### Journal filename timestamp (mandatory — no hallucinated times)
+
+The model does **not** have a trustworthy wall clock. Guessing “about now” produces wrong filenames (wrong hour, wrong day boundary, or nonsense future times).
+
+**Rules:**
+
+1. **Timezone (fixed):** All journal clock fields use **US Central Time** via the IANA zone **`America/Chicago`** (CST/CDT handled automatically). Always pass `TZ=America/Chicago` on the commands below — do **not** rely on the shell’s default timezone.
+
+2. **Primary source:** Immediately before naming the journal file, run this in the user’s workspace shell:
+
+   ```bash
+   TZ=America/Chicago date +"%m%d-T%H%M"
+   ```
+
+   Use the **entire output** as the `MMDD-THHMM` prefix of the filename. Do not tweak the digits.
+
+3. **Frontmatter `date:`** — Run `TZ=America/Chicago date +"%Y-%m-%d"` and use that value so the YAML `date` matches the same **Central** calendar day as the filename’s `MMDD`.
+
+4. **Forbidden:** Do not derive `HHMM` from chat “feeling”, training data, unrelated examples, conversation order, or the `Today's date` line in user info when it has **no time** (that field is date-only unless the user pasted a timestamp). Do not reuse times from older journal entries as a pattern.
+
+5. **If the shell cannot run:** Ask the user once for **US Central** wall time in 24-hour form (`HHMM`) and the calendar day if needed (`MMDD`), then use exactly what they give. Do not substitute a guessed time.
+
 ## 2. Session wrap (compact and document)
 
-1. **Compute the course week.** Read `course-start` (ISO `YYYY-MM-DD`) from the YAML frontmatter at the top of [Documentation/AgentForge/README.md](../../../Documentation/AgentForge/README.md). Compute `N = max(1, floor((today - course-start) / 7) + 1)`. If the frontmatter is missing, ask the user once for the course start date and write it into the README before continuing.
+1. **Compute the course week.** Read `course-start` (ISO `YYYY-MM-DD`) from the YAML frontmatter at the top of [Documentation/AgentForge/README.md](../../../Documentation/AgentForge/README.md). Take **`today`** as the calendar date from `TZ=America/Chicago date +"%Y-%m-%d"` (same zone as journal filenames). Compute `N = max(1, floor((today - course-start) / 7) + 1)`. If the frontmatter is missing, ask the user once for the course start date and write it into the README before continuing.
 2. **Ensure the week directory exists.** `Documentation/AgentForge/process/journal/week-N/` — create silently if missing. Do not create future weeks proactively.
-3. **Create the journal file** as `process/journal/week-N/MMDD-THHMM-<short-topic>.md` using `SESSION-JOURNAL-TEMPLATE.md` in this skill folder. Use **local time** at write — `MM`+`DD` are 2 digits each (no separator), `T` is a literal separator, `HHMM` is 24-hour time (2 digits each, no separator). Slug is 2–4 words, kebab-case. Example: `0427-T2030-flatten-journal-restructure.md`.
+3. **Create the journal file** as `process/journal/week-N/MMDD-THHMM-<short-topic>.md` using `SESSION-JOURNAL-TEMPLATE.md` in this skill folder. **`MMDD` and `HHMM` must come from an authoritative clock — never invent, estimate, or round times.** Follow **Journal filename timestamp** (§1 above) before picking the filename. `T` is a literal separator between date and time. Slug is 2–4 words, kebab-case. Example shape: `0427-T2030-flatten-journal-restructure.md` (the digits must match what you measured, not this example).
 4. Fill every section. **Highlights only — never paste full transcripts.** Aim for one screen of content; expand only when there is real signal.
 5. Always include a **Key decisions** subsection (see next section). This is the part future readers will care about most.
 6. If the session changed any file, list them under **Files touched** with full repo-relative paths.
@@ -87,7 +109,7 @@ This implements README "How to extend this folder" item 3 without duplicating co
 
 ## 6. Tooling churn → 02 changelog
 
-If the session installed/removed/upgraded a skill, gstack tool, or other dev-side dependency, append a dated bullet to the **Changelog** at the bottom of [process/02-tooling-and-skills.md](../../../Documentation/AgentForge/process/02-tooling-and-skills.md):
+If the session installed/removed/upgraded a skill, gstack tool, or other dev-side dependency, append a dated bullet to the **Changelog** at the bottom of [process/02-tooling-and-skills.md](../../../Documentation/AgentForge/process/02-tooling-and-skills.md). Use **`TZ=America/Chicago date +"%Y-%m-%d"`** for the bullet’s calendar date so it matches journal convention.
 
 ```markdown
 - **YYYY-MM-DD** — <one-line summary of what changed>.
@@ -111,5 +133,5 @@ While writing, if you encounter any of these, fix in the same change:
 
 ## Reference files
 
-- `SESSION-JOURNAL-TEMPLATE.md` — copy-paste template for `process/journal/week-N/MMDD-THHMM-*.md`.
-- `MILESTONE-NAMING.md` — slug rules, week computation, and the "journal vs numbered" decision.
+- `SESSION-JOURNAL-TEMPLATE.md` — copy-paste template for `process/journal/week-N/MMDD-THHMM-*.md` (filename prefix from `TZ=America/Chicago date +"%m%d-T%H%M"`, not invented).
+- `MILESTONE-NAMING.md` — slug rules, week computation, journal naming, and the "journal vs numbered" decision.

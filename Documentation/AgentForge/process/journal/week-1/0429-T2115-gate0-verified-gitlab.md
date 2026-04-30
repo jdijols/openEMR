@@ -12,7 +12,7 @@ Close out Gate 0 after engineer verification: PHP/Composer/PECL Redis, isolated 
 
 ## Context
 
-Gate 0 scaffold shipped in a prior agent session ([`0429-T2330-gate0-scaffold-spine.md`](0429-T2330-gate0-scaffold-spine.md)). OpenEMR’s `composer.json` script `phpunit-isolated` calls bare `phpunit` (not on PATH); host install needed `ext-redis` for `composer install`.
+Gate 0 scaffold shipped in a prior agent session ([`0429-T2130-gate0-scaffold-spine.md`](0429-T2130-gate0-scaffold-spine.md)). OpenEMR’s `composer.json` script `phpunit-isolated` calls bare `phpunit` (not on PATH); host install needed `ext-redis` for `composer install`.
 
 ## Key decisions
 
@@ -65,5 +65,5 @@ Gate 0 exit criteria are green on the engineer’s machine; implementation is on
 
 ## Links
 
-- Milestone: [process/11-gate0-complete.md](../../11-gate0-complete.md)
-- Prior scaffold journal: [0429-T2330-gate0-scaffold-spine.md](0429-T2330-gate0-scaffold-spine.md)
+- Milestone: [process/11-gate0-complete.md](../11-gate0-complete.md)
+- Prior scaffold journal: [0429-T2130-gate0-scaffold-spine.md](0429-T2130-gate0-scaffold-spine.md)

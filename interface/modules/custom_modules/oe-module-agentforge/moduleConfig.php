@@ -19,5 +19,7 @@ return [
     'require' => [
         'openemr' => '>=7.0.0',
     ],
-    'tables' => [],
+    'tables' => [
+        'agentforge_launch_code',
+    ],
 ];

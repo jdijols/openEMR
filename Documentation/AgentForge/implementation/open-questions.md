@@ -65,7 +65,7 @@ This document records gaps, inconsistencies, and risks identified by auditing th
 **What Gate 1 requires (13 tasks, all test-first on security tasks):**
 - SQL schema + `LaunchCode` mint/redeem with TTL and single-use enforcement
 - `ActiveChartBinding::assert` with three Given/When/Then scenarios
-- `AdminGuard` blocking admin/super with PHPUnit coverage
+- no co-pilot privilege bypass: admin/super follows normal OpenEMR superuser semantics, while all endpoints retain non-empty ACL specs and active-chart binding
 - `AclMap` with empty-spec PHPStan/PHPUnit guard
 - `AgentAuditLogger` with metadata-only assertion
 - TS handshake redeem endpoint with constant-time HMAC

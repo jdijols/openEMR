@@ -75,7 +75,7 @@ Pulled verbatim from [`USERS.md` §7.1](USERS.md). The agent must **refuse or de
 - Draft or finalize free-text encounter notes.
 - Capture patient audio or retain audio files.
 - Write without an explicit physician confirm.
-- Operate from `admin` / `admin/super` accounts (UI-level guard; see [`AUDIT.md` Security-10](AUDIT.md#security-10-gacl-semantics-superuser-bypass-and-fail-open-caller-bugs)).
+- Bypass the active OpenEMR session, chart binding, or ACLs that would govern the same action in the normal UI.
 
 The full refusal list and degraded-behavior expectations are in [`USERS.md` §7.2-§7.3](USERS.md). The Verification section §9 enforces them in code; the Eval section §10 measures them.
 
@@ -155,7 +155,7 @@ openEMR/
 │   │   ├── Security/
 │   │   │   ├── ActiveChartBinding.php        # reusable invariant
 │   │   │   ├── LaunchCode.php                # mint/redeem with TTL
-│   │   │   └── AdminGuard.php                # block admin/super
+│   │   │   └── SessionTokenVerifier.php      # HMAC token verification
 │   │   ├── Audit/AgentAuditLogger.php        # writes log_from='agent' rows + correlation id
 │   │   └── Acl/AclMap.php                    # explicit ACO sections, no empty specs
 │   ├── templates/                            # Twig
@@ -595,28 +595,26 @@ Scenario: OpenEMR rejects the write
 - [`AUDIT.md` Compliance-1](AUDIT.md#compliance-1-openemr-has-configurable-audit-logging-but-agent-reads-need-their-own-traceability-model), [Compliance-6](AUDIT.md#compliance-6-log-tamper-evidence-is-partial-and-optional-there-is-no-first-class-agent-actor) — first-class agent actor.
 - [`AUDIT.md` Security-4](AUDIT.md#security-4-current-logging-surfaces-can-retain-phi-rich-request-sql-and-api-payload-details) — no PHI in logs.
 
-### 4.9 ACL declarations + admin/super guard
+### 4.9 ACL declarations + no parallel privilege plane
 
 #### 4.9.1 Implementation surface
 
-- `OpenEMR\Modules\AgentForge\Acl\AclMap` declares one ACO section `agentforge` with these values:
-  - `read_chart` — required for any §4.4 endpoint.
-  - `propose_write` — required for any §4.7 endpoint.
-  - `module_admin` — required to install/uninstall the module (matches OpenEMR convention).
-- Each endpoint's request handler calls `AclMain::aclCheckCore('agentforge', '<value>')` as a non-empty spec. This closes the [`AUDIT.md` Security-10](AUDIT.md#security-10-gacl-semantics-superuser-bypass-and-fail-open-caller-bugs) "empty ACO spec → fail-open" hole.
-- `OpenEMR\Modules\AgentForge\Security\AdminGuard` blocks `admin/super` from launching the rail. The header icon is hidden when the active user is `admin` or has `admin/super`. If a user re-enables the icon manually (e.g. via dev tools), `panel.php` refuses to mint a launch code with `403 {"error":"admin_user_blocked"}`.
-- A documentation note in `interface/modules/custom_modules/oe-module-agentforge/README.md` records this as accepted-risk for synthetic-data demo and a hard prerequisite for real-PHI deployment per [`ARCHITECTURE.md` "Security rules we do not relax"](ARCHITECTURE.md).
+- `OpenEMR\Modules\AgentForge\Acl\AclMap` centralizes the ACL specs used by the module:
+  - chart read / rail launch uses the existing OpenEMR chart-read permission `patients/demo`, so users who can open the chart in the UI can open the co-pilot.
+  - module-owned `agentforge` ACOs remain available for module administration and optional write-proposal entitlement, but they are not a second chart-read gate.
+- Each endpoint's request handler calls `AclMain::aclCheckCore('<section>', '<value>')` with a non-empty spec. This closes the [`AUDIT.md` Security-10](AUDIT.md#security-10-gacl-semantics-superuser-bypass-and-fail-open-caller-bugs) "empty ACO spec → fail-open" hole.
+- `admin/super` users are allowed to launch and use the co-pilot under the same OpenEMR session semantics as physicians. The accepted risk is that `admin/super` bypasses normal GACL, so role-scoped ACL guarantees do not apply to that account class; active-chart binding, launch-code/token hygiene, explicit-confirm writes, and V1 write-target limits still apply.
+- The co-pilot is not a parallel privilege plane: if OpenEMR would deny an action for the current session, the module denies it too; if OpenEMR grants it (including superuser grant), the co-pilot may use it within V1 scope.
 
 #### 4.9.2 Done means
 
 - [ ] Every read/write endpoint calls `aclCheckCore('agentforge', '<value>')` with a non-empty spec.
-- [ ] The header icon is hidden for `admin` and `admin/super` users.
-- [ ] `panel.php` refuses launch-code mint for those users.
-- [ ] Module README records the accepted-risk note.
+- [ ] `admin/super` can launch when authenticated, but receives no special bypass beyond the normal OpenEMR superuser model.
+- [ ] Module README records the accepted-risk note and the “same session, no parallel privilege plane” rule.
 
 #### 4.9.3 Cross-references
 
-- [`AUDIT.md` Security-10](AUDIT.md#security-10-gacl-semantics-superuser-bypass-and-fail-open-caller-bugs) — empty-spec fail-open + admin/super bypass.
+- [`AUDIT.md` Security-10](AUDIT.md#security-10-gacl-semantics-superuser-bypass-and-fail-open-caller-bugs) — empty-spec fail-open + admin/super bypass risk.
 - [`ARCHITECTURE.md` "Security rules we do not relax"](ARCHITECTURE.md) — admin/super accepted-risk language.
 
 ---
@@ -658,7 +656,7 @@ Node 20 + Hono + Vercel AI SDK + Zod, TypeScript strict, all under `agentforge/a
 - [ ] Endpoint validates input with Zod.
 - [ ] Failure cases return generic 401 (mirrors §4.3.4).
 - [ ] Session token verification uses constant-time HMAC compare.
-- [ ] Endpoint refuses to issue tokens when the module reports the source user is `admin/super`.
+- [ ] Endpoint issues tokens for any module-accepted authenticated user, including `admin/super`; authorization remains downstream in OpenEMR session/GACL enforcement and V1 tool scope.
 
 ### 5.3 OpenEMR module typed HTTP client
 
@@ -1509,14 +1507,16 @@ Scenario: No tokens in URLs
 
 Cross-references: [`AUDIT.md` Security-11](AUDIT.md#security-11-embedded-ui-iframe-and-oauth-token-exposure).
 
-### 8.3 No agent launch from `admin/super`
+### 8.3 No privilege bypass through the co-pilot
 
 ```gherkin
-Scenario: Admin user blocked
-  Given the active OpenEMR user is admin
-   When the user visits any page that would render the AgentForge header icon
-   Then the icon is not rendered
-   And direct calls to panel.php return 403 admin_user_blocked (per §4.9)
+Scenario: Co-pilot mirrors OpenEMR authorization
+  Given the active OpenEMR user is authenticated and can open the chart
+   When the user opens the AgentForge rail
+   Then the launch handshake succeeds for that session
+    And the session token is bound to the same user and active chart
+    And every read/write endpoint still enforces its non-empty ACL spec and active-chart binding
+    And `admin/super` receives no additional co-pilot bypass beyond normal OpenEMR superuser semantics
 ```
 
 Cross-references: [`AUDIT.md` Security-10](AUDIT.md#security-10-gacl-semantics-superuser-bypass-and-fail-open-caller-bugs); [`ARCHITECTURE.md` "Security rules we do not relax"](ARCHITECTURE.md).

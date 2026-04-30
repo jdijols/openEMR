@@ -1,4 +1,18 @@
 services:
+  # Gate 1+: env_file is selected per environment. Default = dev.
+  # Override with `AGENTFORGE_SECRETS_FILE=../agentforge/secrets.prod.env docker compose ... up -d`.
+  # Paths: with `-f docker/development-easy/docker-compose.yml` first, Compose resolves
+  # relatives from that file's directory → `../agentforge/secrets.<env>.env`.
+  openemr:
+    env_file:
+      - ${AGENTFORGE_SECRETS_FILE:-../agentforge/secrets.dev.env}
+    # Joined to agentforge_internal so agentforge-api can reach OpenEMR S2S
+    # via service-name DNS (`http://openemr/...`) for handshake_redeem and
+    # context endpoints. The development-easy network is preserved.
+    networks:
+      - default
+      - agentforge_internal
+
   # Skeleton only (Gate 0) — images/health/volumes finalized in Gate 6.
   postgres:
     image: postgres:16-alpine
@@ -22,6 +36,8 @@ services:
     image: node:20-alpine
     command: ['sleep', 'infinity']
     working_dir: /app
+    env_file:
+      - ${AGENTFORGE_SECRETS_FILE:-../agentforge/secrets.dev.env}
     depends_on:
       - postgres
       - openemr
