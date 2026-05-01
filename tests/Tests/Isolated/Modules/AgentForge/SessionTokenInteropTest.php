@@ -86,16 +86,17 @@ final class SessionTokenInteropTest extends TestCase
     public function testVerifierRejectsMalformedFacilityTzClaim(): void
     {
         // Defensive: a non-string facility_tz should fail validation rather
-        // than silently degrade to UTC at the agent.
+        // than silently degrade to UTC at the agent. Uses mintFromRawPayload()
+        // so the test can construct a structurally-malformed token without
+        // tripping PHPStan on the typed mint() signature.
         $secret = '0123456789abcdef0123456789abcdef';
         $now = time();
-        $token = SessionTokenIssuerFixture::mint($secret, [
+        $token = SessionTokenIssuerFixture::mintFromRawPayload($secret, [
             'user_id' => 12,
             'patient_uuid' => 'uuid-bad-tz',
             'encounter_id' => null,
             'iat' => $now - 5,
             'exp' => $now + 1000,
-            // @phpstan-ignore-next-line — intentionally wrong type for negative test
             'facility_tz' => 12345,
         ]);
 

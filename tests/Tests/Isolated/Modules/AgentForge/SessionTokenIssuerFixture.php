@@ -19,6 +19,20 @@ final class SessionTokenIssuerFixture
      */
     public static function mint(string $secret, array $payload): string
     {
+        return self::mintFromRawPayload($secret, $payload);
+    }
+
+    /**
+     * Sibling of {@see self::mint()} for *negative* interop tests that need to
+     * mint a structurally-malformed token (e.g. wrong JSON type for a claim)
+     * to assert the verifier rejects it. The signature is intentionally
+     * permissive so the test data can violate the canonical payload shape
+     * without tripping PHPStan at the call site.
+     *
+     * @param array<string, mixed> $payload
+     */
+    public static function mintFromRawPayload(string $secret, array $payload): string
+    {
         $canonical = json_encode($payload, \JSON_THROW_ON_ERROR);
         $payloadB64 = self::base64UrlEncode($canonical);
         $sig = self::b64UrlHmacSha256($payloadB64, $secret);
