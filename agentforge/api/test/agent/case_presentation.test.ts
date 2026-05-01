@@ -84,6 +84,19 @@ function sessionForPatient(env: ReturnType<typeof testEnv>, patient: string): st
   );
 }
 
+function sessionForPatientWithEncounter(
+  env: ReturnType<typeof testEnv>,
+  patient: string,
+  encounterId: number,
+): string {
+  return mintSessionToken(
+    { user_id: 1, patient_uuid: patient, encounter_id: encounterId },
+    env.SESSION_TOKEN_SECRET,
+    Math.floor(Date.now() / 1000),
+    600,
+  );
+}
+
 beforeEach(() => {
   generateTextMock.mockReset();
   __resetCasePresentationCacheForTests();
@@ -269,5 +282,107 @@ describe('runCasePresentation', () => {
     const [r1, r2] = await Promise.all([p1, p2]);
     expect(r1).toEqual(r2);
     expect(generateTextMock).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * P3 fix — encounter_id participates in the cache key. Reproducer:
+   * brief generated against encounter A on patient X must NOT be served
+   * back to encounter B on the same patient X. Pre-fix the second call
+   * silently returned the cached "encounter A" brief; post-fix it forces
+   * a fresh LLM call.
+   */
+  it('does not serve a cached brief across two encounters on the same patient (P3)', async () => {
+    const env = testEnv();
+    const { obs } = recordingObs();
+    const tokA = sessionForPatientWithEncounter(env, 'pat-shared', 100);
+    const tokB = sessionForPatientWithEncounter(env, 'pat-shared', 200);
+
+    generateTextMock.mockResolvedValueOnce({
+      text: JSON.stringify({
+        blocks: [{ type: 'claim', text: 'Brief for encounter 100.', citation_ids: ['sp-ident'] }],
+      }),
+      totalUsage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+    });
+    generateTextMock.mockResolvedValueOnce({
+      text: JSON.stringify({
+        blocks: [{ type: 'claim', text: 'Brief for encounter 200.', citation_ids: ['sp-ident'] }],
+      }),
+      totalUsage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+    });
+
+    const briefA = await runCasePresentation(env, obs, { sessionToken: tokA, patientUuid: 'pat-shared' }, 'p3-a');
+    const briefB = await runCasePresentation(env, obs, { sessionToken: tokB, patientUuid: 'pat-shared' }, 'p3-b');
+
+    expect(generateTextMock).toHaveBeenCalledTimes(2);
+    const blockA = briefA.blocks[0] as { type: string; text?: string };
+    const blockB = briefB.blocks[0] as { type: string; text?: string };
+    expect(blockA.text).toBe('Brief for encounter 100.');
+    expect(blockB.text).toBe('Brief for encounter 200.');
+  });
+
+  /**
+   * P3 fix — when the model returns zero blocks, the verification step
+   * synthesizes an `insufficient_evidence_after_verification` refusal. Pre-fix
+   * that refusal landed in the cache, so a transient empty-brief hiccup
+   * pinned the operator to a blank rail for the full 30-min TTL. Post-fix the
+   * second call fires a fresh LLM attempt and recovers.
+   */
+  it('does not cache an empty-brief result transformed to refusal by verification (P3)', async () => {
+    const env = testEnv();
+    const { obs } = recordingObs();
+    const tok = sessionForPatient(env, 'pat-empty');
+
+    generateTextMock.mockResolvedValueOnce({
+      text: JSON.stringify({ blocks: [] }),
+      totalUsage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+    });
+    generateTextMock.mockResolvedValueOnce({
+      text: JSON.stringify({
+        blocks: [{ type: 'claim', text: 'Recovered brief.', citation_ids: ['sp-ident'] }],
+      }),
+      totalUsage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+    });
+
+    const first = await runCasePresentation(env, obs, { sessionToken: tok, patientUuid: 'pat-empty' }, 'p3-empty');
+    const firstBlock = first.blocks[0] as { type: string; reason?: string };
+    expect(firstBlock.type).toBe('refusal');
+    expect(firstBlock.reason).toBe('insufficient_evidence_after_verification');
+
+    const second = await runCasePresentation(env, obs, { sessionToken: tok, patientUuid: 'pat-empty' }, 'p3-second');
+    expect(generateTextMock).toHaveBeenCalledTimes(2);
+    const recovered = second.blocks[0] as { type: string; text?: string };
+    expect(recovered.text).toBe('Recovered brief.');
+  });
+
+  /**
+   * P3 fix — refusal-only result blocks are NOT written to cache for the
+   * same reason: a model refusal (e.g. policy issue, no_recent_encounter)
+   * should not silence subsequent attempts after the underlying state
+   * changes.
+   */
+  it('does not cache a refusal-only blocks result (P3)', async () => {
+    const env = testEnv();
+    const { obs } = recordingObs();
+    const tok = sessionForPatient(env, 'pat-refusal');
+
+    generateTextMock.mockResolvedValueOnce({
+      text: JSON.stringify({ blocks: [{ type: 'refusal', reason: 'no_recent_encounter' }] }),
+      totalUsage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+    });
+    generateTextMock.mockResolvedValueOnce({
+      text: JSON.stringify({
+        blocks: [{ type: 'claim', text: 'Now we have a brief.', citation_ids: ['sp-ident'] }],
+      }),
+      totalUsage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+    });
+
+    const refused = await runCasePresentation(env, obs, { sessionToken: tok, patientUuid: 'pat-refusal' }, 'p3-r1');
+    expect((refused.blocks[0] as { type: string }).type).toBe('refusal');
+
+    const recovered = await runCasePresentation(env, obs, { sessionToken: tok, patientUuid: 'pat-refusal' }, 'p3-r2');
+    expect(generateTextMock).toHaveBeenCalledTimes(2);
+    const block = recovered.blocks[0] as { type: string; text?: string };
+    expect(block.type).toBe('claim');
+    expect(block.text).toBe('Now we have a brief.');
   });
 });

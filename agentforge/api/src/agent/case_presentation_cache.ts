@@ -12,16 +12,27 @@ type CachedPayload = {
 
 const store = new Map<string, CachedPayload>();
 
-function cacheKey(sessionToken: string, patientUuid: string): string {
+/**
+ * `encounterId` is part of the key per the post-deploy P3 fix: a brief is
+ * encounter-scoped (today's note vs. last visit's note differ materially), and
+ * the same `(sessionToken, patientUuid)` can legitimately reach the cache
+ * across two encounters when the rail re-mints the launch code mid-session
+ * (P2 fix). Without it, the brief for encounter A is silently served for
+ * encounter B and the operator has no escape hatch short of waiting out the
+ * 30-minute TTL. `null` is its own bucket (no encounter saved yet).
+ */
+function cacheKey(sessionToken: string, patientUuid: string, encounterId: number | null): string {
   const tok = createHash('sha256').update(sessionToken, 'utf8').digest('hex');
-  return `${patientUuid}\0${tok}`;
+  const enc = encounterId === null ? 'none' : String(encounterId);
+  return `${patientUuid}\0${enc}\0${tok}`;
 }
 
 export function casePresentationCacheGet(
   sessionToken: string,
   patientUuid: string,
+  encounterId: number | null,
 ): { blocks: ChatBlock[]; citation_navigation: Record<string, CitationNavigationHint> } | null {
-  const key = cacheKey(sessionToken, patientUuid);
+  const key = cacheKey(sessionToken, patientUuid, encounterId);
   const hit = store.get(key);
   if (hit === undefined) {
     return null;
@@ -38,12 +49,13 @@ export function casePresentationCacheGet(
 export function casePresentationCacheSet(
   sessionToken: string,
   patientUuid: string,
+  encounterId: number | null,
   payload: {
     readonly blocks: ChatBlock[];
     readonly citation_navigation: Record<string, CitationNavigationHint>;
   },
 ): void {
-  const key = cacheKey(sessionToken, patientUuid);
+  const key = cacheKey(sessionToken, patientUuid, encounterId);
   store.set(key, {
     blocks: payload.blocks,
     citation_navigation: payload.citation_navigation,

@@ -373,6 +373,18 @@ export default function App(): ReactElement {
   }
 
   function refreshChartBinding(): void {
+    // P3 fix: a plain `window.location.reload()` re-mounts the iframe but does
+    // NOT bust the agent-side 30-minute brief cache, so an operator who saw a
+    // blank/stale brief and clicked Refresh would get the same blank brief
+    // back. Fire a `force_refresh` present-patient first so the API drops the
+    // cached entry for this (patient, encounter, sessionToken) tuple. This is
+    // fire-and-forget — failures are tolerated silently because the reload
+    // that follows will retry from a clean iframe mount anyway.
+    if (handshake.status === 'ready' && patientUuid !== null && patientUuid !== '') {
+      void postPresentPatient(apiBase, handshake.sessionToken, patientUuid, true).catch(() => {
+        /* ignore — the reload below is the user-visible recovery path */
+      });
+    }
     window.location.reload();
   }
 
