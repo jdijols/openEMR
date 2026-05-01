@@ -5,7 +5,15 @@
  * correlation-id round trip (client-generated → header → server may echo).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AgentForgeDeliveryError, getConversationRecap, postChat, postPresentPatient, redeemHandshake } from './client.js';
+import {
+  AgentForgeDeliveryError,
+  getConversationRecap,
+  postChat,
+  postPresentPatient,
+  postProposalConfirm,
+  postProposalReject,
+  redeemHandshake,
+} from './client.js';
 
 const ORIGINAL_FETCH = globalThis.fetch;
 
@@ -215,6 +223,136 @@ describe('postPresentPatient (G3-11 case presentation)', () => {
       patient_uuid: 'pat-1',
       force_refresh: true,
     });
+  });
+});
+
+describe('postProposalConfirm (P1 hardening — typed error frames)', () => {
+  it('returns accepted=true on 200 + ok=true + accepted=true', async () => {
+    globalThis.fetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({ ok: true, accepted: true, correlation_id: 'ok-1' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    ) as typeof fetch;
+
+    const out = await postProposalConfirm(
+      'http://api.local',
+      'sess.tok',
+      'pat-1',
+      '00000000-0000-4000-8000-00000000c0de',
+      'prop-1',
+    );
+    expect(out.accepted).toBe(true);
+  });
+
+  it('passes through reason on 200 + ok=true + accepted=false (real OpenEMR rejection)', async () => {
+    globalThis.fetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({ ok: true, accepted: false, reason: 'encounter not found', correlation_id: 'r-1' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    ) as typeof fetch;
+
+    const out = await postProposalConfirm(
+      'http://api.local',
+      'sess.tok',
+      'pat-1',
+      '00000000-0000-4000-8000-00000000c0de',
+      'prop-2',
+    );
+    expect(out.accepted).toBe(false);
+    expect(out.reason).toBe('encounter not found');
+  });
+
+  it('throws AgentForgeDeliveryError carrying serverError + correlationId on 400 duplicate_proposal', async () => {
+    globalThis.fetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({ error: 'duplicate_proposal', correlation_id: 'corr-dup-12345678' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } },
+      ),
+    ) as typeof fetch;
+
+    const errUnknown = await postProposalConfirm(
+      'http://api.local',
+      'sess.tok',
+      'pat-1',
+      '00000000-0000-4000-8000-00000000c0de',
+      'prop-3',
+    ).catch((e): unknown => e);
+
+    expect(errUnknown).toBeInstanceOf(AgentForgeDeliveryError);
+    const err = errUnknown as AgentForgeDeliveryError;
+    expect(err.kind).toBe('bad_request');
+    expect(err.serverError).toBe('duplicate_proposal');
+    expect(err.correlationId).toBe('corr-dup-12345678');
+  });
+
+  it('throws AgentForgeDeliveryError with serverError=unauthenticated on 401 from openemr_error path', async () => {
+    globalThis.fetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          error: 'openemr_error',
+          correlation_id: 'corr-401',
+          detail: { error: 'unauthenticated' },
+        }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } },
+      ),
+    ) as typeof fetch;
+
+    const errUnknown = await postProposalConfirm(
+      'http://api.local',
+      'sess.tok',
+      'pat-1',
+      '00000000-0000-4000-8000-00000000c0de',
+      'prop-4',
+    ).catch((e): unknown => e);
+
+    expect(errUnknown).toBeInstanceOf(AgentForgeDeliveryError);
+    const err = errUnknown as AgentForgeDeliveryError;
+    expect(err.kind).toBe('backend_error');
+    expect(err.serverError).toBe('openemr_error');
+    expect(err.correlationId).toBe('corr-401');
+  });
+
+  it('throws AgentForgeDeliveryError network_unreachable when fetch rejects', async () => {
+    globalThis.fetch = vi.fn(async (): Promise<Response> =>
+      Promise.reject(new TypeError('Failed to fetch')),
+    ) as typeof fetch;
+
+    const errUnknown = await postProposalConfirm(
+      'http://api.local',
+      'sess.tok',
+      'pat-1',
+      '00000000-0000-4000-8000-00000000c0de',
+      'prop-5',
+    ).catch((e): unknown => e);
+
+    expect(errUnknown).toBeInstanceOf(AgentForgeDeliveryError);
+    expect((errUnknown as AgentForgeDeliveryError).kind).toBe('network_unreachable');
+  });
+});
+
+describe('postProposalReject (P1 hardening — typed error frames)', () => {
+  it('throws AgentForgeDeliveryError with serverError on 409 not_pending', async () => {
+    globalThis.fetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({ error: 'not_pending', correlation_id: 'corr-409' }),
+        { status: 409, headers: { 'Content-Type': 'application/json' } },
+      ),
+    ) as typeof fetch;
+
+    const errUnknown = await postProposalReject(
+      'http://api.local',
+      'sess.tok',
+      'pat-1',
+      '00000000-0000-4000-8000-00000000c0de',
+      'prop-rej-1',
+    ).catch((e): unknown => e);
+
+    expect(errUnknown).toBeInstanceOf(AgentForgeDeliveryError);
+    const err = errUnknown as AgentForgeDeliveryError;
+    expect(err.serverError).toBe('not_pending');
+    expect(err.correlationId).toBe('corr-409');
   });
 });
 

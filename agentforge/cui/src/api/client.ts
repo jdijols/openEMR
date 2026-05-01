@@ -1,4 +1,4 @@
-import type { RecapListItem, RedeemResponse } from '../types/chat.js';
+import type { ChatBlock, ChatResponse, CitationNavigationHint, RecapListItem, RedeemResponse } from '../types/chat.js';
 
 /** Thrown when /chat or /present-patient fails (transport, HTTP, or malformed JSON). Inspect `kind` + `correlationId` for UX. */
 export type AgentForgeDeliveryKind =
@@ -9,13 +9,25 @@ export type AgentForgeDeliveryKind =
   | 'invalid_success_response';
 
 export class AgentForgeDeliveryError extends Error {
+  /**
+   * Literal `error` string from the Agent API response body when present
+   * (e.g., `duplicate_proposal`, `unauthenticated`, `missing_encounter_id`).
+   * Distinct from `kind`, which is a CUI-side category. Surfaced in the rail
+   * so post-deploy bugs are self-diagnosing without a server log dive.
+   */
+  readonly serverError?: string;
+
   constructor(
     readonly kind: AgentForgeDeliveryKind,
     readonly correlationId?: string,
+    serverError?: string,
   ) {
     const suffix = correlationId !== undefined ? ` (${correlationId})` : '';
     super(`${kind}${suffix}`);
     this.name = 'AgentForgeDeliveryError';
+    if (serverError !== undefined) {
+      this.serverError = serverError;
+    }
   }
 }
 
@@ -46,14 +58,14 @@ function readFailBody(json: unknown): { serverError?: string; correlationId?: st
 export function deliveryErrorFromAgentResponse(status: number, json: unknown): AgentForgeDeliveryError {
   const { serverError, correlationId } = readFailBody(json);
   if (status === 501) {
-    return new AgentForgeDeliveryError('misconfigured_llm', correlationId);
+    return new AgentForgeDeliveryError('misconfigured_llm', correlationId, serverError);
   }
 
   const looksClientFault =
     status === 400 || serverError === 'invalid_request' || serverError === 'bad_request';
   const kind = looksClientFault ? 'bad_request' : 'backend_error';
 
-  return new AgentForgeDeliveryError(kind, correlationId);
+  return new AgentForgeDeliveryError(kind, correlationId, serverError);
 }
 
 function stripBase(base: string): string {
@@ -205,22 +217,32 @@ export async function postProposalConfirm(
   const base = stripBase(apiBase);
   const correlationId = randomCorrelationId();
   const cid = encodeURIComponent(conversationExternalId);
-  const res = await fetch(`${base}/conversations/${cid}/confirm`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Correlation-Id': correlationId,
-    },
-    body: JSON.stringify({
-      session_token: sessionToken,
-      patient_uuid: patientUuid,
-      proposal_id: proposalId,
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${base}/conversations/${cid}/confirm`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Correlation-Id': correlationId,
+      },
+      body: JSON.stringify({
+        session_token: sessionToken,
+        patient_uuid: patientUuid,
+        proposal_id: proposalId,
+      }),
+    });
+  } catch {
+    throw new AgentForgeDeliveryError('network_unreachable', correlationId);
+  }
 
   const json: unknown = await res.json().catch(() => null);
-  if (!res.ok || !json || typeof json !== 'object' || (json as { ok?: unknown }).ok !== true) {
-    throw new Error('proposal_confirm_failed');
+
+  if (!res.ok) {
+    throw deliveryErrorFromAgentResponse(res.status, json);
+  }
+
+  if (!json || typeof json !== 'object' || (json as { ok?: unknown }).ok !== true) {
+    throw new AgentForgeDeliveryError('invalid_success_response', correlationId);
   }
 
   const body = json as { accepted?: unknown; reason?: unknown };
@@ -240,22 +262,32 @@ export async function postProposalReject(
   const base = stripBase(apiBase);
   const correlationId = randomCorrelationId();
   const cid = encodeURIComponent(conversationExternalId);
-  const res = await fetch(`${base}/conversations/${cid}/reject`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Correlation-Id': correlationId,
-    },
-    body: JSON.stringify({
-      session_token: sessionToken,
-      patient_uuid: patientUuid,
-      proposal_id: proposalId,
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${base}/conversations/${cid}/reject`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Correlation-Id': correlationId,
+      },
+      body: JSON.stringify({
+        session_token: sessionToken,
+        patient_uuid: patientUuid,
+        proposal_id: proposalId,
+      }),
+    });
+  } catch {
+    throw new AgentForgeDeliveryError('network_unreachable', correlationId);
+  }
 
   const json: unknown = await res.json().catch(() => null);
-  if (!res.ok || !json || typeof json !== 'object' || (json as { ok?: unknown }).ok !== true) {
-    throw new Error('proposal_reject_failed');
+
+  if (!res.ok) {
+    throw deliveryErrorFromAgentResponse(res.status, json);
+  }
+
+  if (!json || typeof json !== 'object' || (json as { ok?: unknown }).ok !== true) {
+    throw new AgentForgeDeliveryError('invalid_success_response', correlationId);
   }
 }
 

@@ -1,7 +1,25 @@
 import type { ReactElement } from 'react';
 import { useLayoutEffect, useState } from 'react';
-import { postProposalConfirm, postProposalReject } from '../api/client.js';
+import { AgentForgeDeliveryError, postProposalConfirm, postProposalReject } from '../api/client.js';
 import type { ChatBlock, ChatMessage, CitationNavigationHint } from '../types/chat.js';
+
+/**
+ * Format a confirm/reject failure for the rail. Surfaces the literal server
+ * `error` string + a short correlation id so post-deploy bugs (e.g. P1
+ * `duplicate_proposal`, `unauthenticated`, `missing_encounter_id`) are
+ * self-diagnosing without a server log dive.
+ */
+function formatDeliveryFailure(verb: 'Confirm' | 'Decline', err: unknown): string {
+  if (err instanceof AgentForgeDeliveryError) {
+    const code = err.serverError ?? err.kind;
+    const corr =
+      err.correlationId !== undefined && err.correlationId !== '' ?
+        ` — corr ${err.correlationId.slice(0, 8)}`
+      : '';
+    return `${verb} failed (${code})${corr}`;
+  }
+  return `${verb} failed.`;
+}
 
 /** OpenEMR / Agent API wiring for clinician confirm decisions (assistant proposal blocks only). */
 export type ProposalApiEnv = Readonly<{
@@ -36,8 +54,16 @@ function displayAssistantText(text: string): string {
 }
 
 type ProposalPhase = Readonly<{
-  phase: 'idle' | 'submitting' | 'accepted' | 'declined' | 'openemr_denied';
+  /**
+   * `openemr_denied` is reserved for real OpenEMR business rejections
+   * (HTTP 200 from the module + `accepted: false` with a `reason`).
+   * Transport/auth/server failures use `delivery_failed` so the rail
+   * surfaces a typed code + correlation id instead of a misleading
+   * "Rejected by OpenEMR" prefix.
+   */
+  phase: 'idle' | 'submitting' | 'accepted' | 'declined' | 'openemr_denied' | 'delivery_failed';
   openemrReason?: string | undefined;
+  deliveryMessage?: string | undefined;
 }>;
 
 function ProposalBlock(
@@ -68,6 +94,11 @@ function ProposalBlock(
           `Rejected by OpenEMR: ${ui.openemrReason}`
         : 'Rejected by OpenEMR.';
     }
+    if (ui.phase === 'delivery_failed') {
+      return ui.deliveryMessage !== undefined && ui.deliveryMessage.trim() !== '' ?
+          ui.deliveryMessage
+        : 'Request failed.';
+    }
     return '';
   }
 
@@ -84,8 +115,8 @@ function ProposalBlock(
       } else {
         setUi({ phase: 'openemr_denied', openemrReason: outcome.reason });
       }
-    } catch {
-      setUi({ phase: 'openemr_denied', openemrReason: 'Request failed.' });
+    } catch (e) {
+      setUi({ phase: 'delivery_failed', deliveryMessage: formatDeliveryFailure('Confirm', e) });
     }
   }
 
@@ -98,8 +129,8 @@ function ProposalBlock(
     try {
       await postProposalReject(env.apiBase, env.sessionToken, env.patientUuid, env.conversationId, proposalId);
       setUi({ phase: 'declined' });
-    } catch {
-      setUi({ phase: 'openemr_denied', openemrReason: 'Decline failed.' });
+    } catch (e) {
+      setUi({ phase: 'delivery_failed', deliveryMessage: formatDeliveryFailure('Decline', e) });
     }
   }
 
