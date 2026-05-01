@@ -22,6 +22,9 @@ This folder holds **course and process documentation** for the Clinical Co-Pilot
 | 9   | [process/09-vps-live-deployment.md](process/09-vps-live-deployment.md)       | MVP: live OpenEMR on a Linux VPS (Vultr) + Compose; GitLab clone; nip.io / HTTPS path |
 | 10  | [process/10-prd.md](process/10-prd.md)                                       | PRD + gate-ordered implementation task list; pointer to [`PRD.md`](../../PRD.md) and [`implementation/clinical-copilot-task-list.md`](implementation/clinical-copilot-task-list.md) |
 | 11  | [process/11-gate0-complete.md](process/11-gate0-complete.md)                 | Gate 0 scaffold + contract spine closed; verification journal; handoff to Gate 1 |
+| 12  | [process/12-gate1-gate2-complete.md](process/12-gate1-gate2-complete.md)       | Gate 1 security primitives + Gate 2 UC-A read spine closed; journal evidence; handoff to Gate 3 |
+| 13  | [process/13-gate3-complete.md](process/13-gate3-complete.md)                 | Gate 3 UC-A read completeness closed; case presentation + verification; handoff to Gate 4 |
+| 14  | [process/14-gate4-complete.md](process/14-gate4-complete.md)                 | Gate 4 UC-B confirmed writes closed; G4-10 chief-complaint E2E + `log_from='agent'` audit; handoff to Gate 5 |
 
 Dated entries under `process/journal/week-N/` are session journals between milestones; they are not listed in the table.
 
@@ -32,7 +35,7 @@ Dated entries under `process/journal/week-N/` are session journals between miles
 
 ## How to extend this folder
 
-1. Add the next milestone as `process/12-<short-slug>.md` (next index **after `11`** in the table below).
+1. Add the next milestone as `process/15-<short-slug>.md` (next index **after `14`** in the table above).
 2. Update the table above so the index stays the single map of the trail.
 3. For working notes between milestones, add dated entries as `process/journal/week-N/MMDD-THHMM-topic.md`. The skill computes `N` from `course-start` in this README's frontmatter; create `week-N/` lazily if missing. Link decisions worth surfacing back into the relevant numbered process file.
 4. If `02-tooling-and-skills.md` grows too long, split changelogs into `02b-skills-changelog.md`.

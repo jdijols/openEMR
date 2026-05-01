@@ -13,6 +13,10 @@ OpenEMR custom module for **AgentForge V1 Clinical Co-Pilot** ([`PRD.md`](../../
 - `admin/super` users are allowed to launch and use the co-pilot under the same OpenEMR session semantics as physicians. The accepted risk is that `admin/super` bypasses normal GACL, so role-scoped ACL guarantees do not apply to that account class; active-chart binding, launch-code/token hygiene, explicit-confirm writes, and V1 write-target limits still apply.
 - The co-pilot is not a parallel privilege plane: if OpenEMR would deny an action for the current session, the module denies it too; if OpenEMR grants it (including superuser grant), the co-pilot may use it within V1 scope.
 
+### UC-B confirmed writes (`public/write/`)
+
+Chief complaint (**Gate 4 G4-01**, `public/write/chief_complaint.php`), vitals (**G4-02**, `public/write/vitals.php`), and tobacco (**G4-03**, `public/write/tobacco.php`; patient-level, **no encounter_id**) check **`agentforge` / `propose_write`** on top of session token + active-chart binding. Grant that ACO to roles that should allow Agent API–initiated confirmed writes after you install the module schema (includes table `agentforge_completed_write_proposal` for proposal-id dedupe).
+
 ### 4.9.2 Done means (PRD)
 
 - [ ] Every read/write endpoint calls `aclCheckCore('agentforge', '<value>')` with a non-empty spec.

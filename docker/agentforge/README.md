@@ -31,9 +31,14 @@ cd docker/development-easy
 docker compose -f docker-compose.yml -f ../agentforge/docker-compose.override.yml up -d
 ```
 
-In dev, run the Agent API on the host (`cd agentforge/api && npm run dev`) so the
-browser can reach `http://localhost:3000`; the compose `agentforge-api` container
-is a placeholder (`sleep infinity`).
+In dev, run the Agent API on the host so the browser can reach `http://localhost:3000`:
+`cd agentforge/api && npm run dev:host`. That overrides `POSTGRES_URL` to **`127.0.0.1:15432`**
+(Postgres published on the loopback). Plain `npm run dev` keeps `secrets.dev.env`’s
+`@postgres:5432`, which **does not resolve on the Mac**, so `/health` shows Postgres
+degraded and `/chat` fails. The compose `agentforge-api` container is a placeholder
+(`sleep infinity`).
+
+**macOS (`mounts denied` / File Sharing):** If Compose fails with `mounts denied` for paths under this repo (e.g. `.../docker/library/sql-ssl-certs-keys/easy/ca.pem`), open **Docker Desktop → Settings → Resources → File Sharing** and add the **parent directory** that contains the repo (often `/Users/<you>/Documents` or **`/Users`**). Use normal macOS casing when `cd`-ing (**`/Users/...`**). Apply & restart Docker, then run `compose up -d` again.
 
 **Prod** — adds `docker-compose.prod.yml`, which runs the Agent API in the
 container and fronts it with Caddy as a TLS reverse proxy. The Hono API is
@@ -90,10 +95,35 @@ Do this on the server where Docker runs (same layout as `development-easy` + ove
    ```bash
    curl -fsS "https://${AGENTFORGE_PUBLIC_HOSTNAME}/health"
    ```
-   Expect JSON `ok:true`.
+   Expect JSON `ok: true`, `deps.postgres: "reachable"`. **`ok:false`** with `postgres: "degraded_chat_requires_migrations_or_url"` usually means **`002_gate4_conversations.sql`** was not applied (`cd agentforge/api && npm run db:migrate`). Symptom: **case presentation works** (no DB) but **chat send fails with a server error**.
 
 5. **OpenEMR smoke (browser)** — log in → open **one** demo/cohort chart → open Clinical Co-Pilot rail → allergy or identity prompt with cited **Claim**(s). If handshake fails, check CORS Origin, HTTPS vs HTTP mix, and that `OPENEMR_MODULE_SHARED_SECRET` matches between PHP and API.
 
 6. **Logs** — `docker compose logs -f agentforge-api caddy openemr` (service names may vary slightly by profile).
 
 Rotate any API keys or shared secrets if they appeared in plaintext outside the VPS.
+
+### Agent Postgres baseline (Gate G3-00)
+
+`POSTGRES_URL` uses hostname **`postgres`** so it works **inside** Compose (API container, Langfuse). On your Mac, that hostname does not resolve (`ENOTFOUND`), so host-run scripts use **`POSTGRES_URL_MIGRATE`** aimed at **localhost**.
+
+1. **`docker-compose.override.yml`** maps Postgres to **`127.0.0.1:15432`** → container port `5432`. Recreate the stack after pulling:
+   ```bash
+   cd docker/development-easy
+   docker compose -f docker-compose.yml -f ../agentforge/docker-compose.override.yml up -d
+   ```
+
+2. **Run migrations from the host** (dotenv-cli does **not** override vars already set in the shell):
+
+   ```bash
+   cd agentforge/api
+   POSTGRES_URL_MIGRATE='postgresql://agentforge:agentforge@127.0.0.1:15432/agentforge' npm run db:migrate
+   ```
+
+   Optionally add `POSTGRES_URL_MIGRATE` to `secrets.dev.env`; keep **`POSTGRES_URL`** as `...@postgres:5432/...` for containers.
+
+Creates the `agentforge` schema + heartbeat table via `agentforge/api/db/migrations/001_agentforge_init.sql`.
+
+**Alternative (no localhost port):** run SQL from inside the network with `docker compose exec postgres psql …` against the same migrations (not scripted here).
+
+**Langfuse DB sharing:** both can use the same Postgres instance; Langfuse uses its own schema/tables — keep the **`agentforge`** schema for API-owned data so migrations do not collide.

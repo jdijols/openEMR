@@ -28,6 +28,19 @@ final class AgentAuditLogger
     }
 
     /**
+     * Record a metadata-only AgentForge audit event with `log_from='agent'` (PRD §4.8, S10).
+     *
+     * Implementation note: we call `EventAuditLogger::recordLogItem` directly, **not**
+     * `EventAuditLogger::newEvent`. `newEvent`'s non-portal branch silently drops the
+     * `$log_from` argument when it forwards to `recordLogItem` (only 7 of the 8 positional
+     * args are passed), which would coerce every agent event to `log_from='open-emr'` and
+     * make the S10 / G4-10 done proof unverifiable from the database.
+     *
+     * `$failureReason` is restricted by callers to a known safe enum (e.g. 'encounter not found',
+     * 'encounter invalid', 'write failed', 'provider_error', 'unsupported_write', 'acl_denied');
+     * it is appended verbatim to the audit comments so an operator can see *why* a write
+     * was rejected without inspecting raw clinical payload bodies.
+     *
      * @param array<string, mixed> $payload
      */
     public static function recordAgentEvent(
@@ -38,11 +51,15 @@ final class AgentAuditLogger
         string $target,
         string $correlationId,
         bool $success = true,
-        array $payload = []
+        array $payload = [],
+        ?string $failureReason = null
     ): void {
         $comments = 'action=' . $action . ' target=' . $target . ' correlation_id=' . $correlationId;
         if ($payload !== []) {
             $comments .= ' payload_keys=' . implode(',', array_keys($payload));
+        }
+        if ($failureReason !== null && $failureReason !== '') {
+            $comments .= ' failure_reason=' . $failureReason;
         }
 
         if (self::$testSink !== null) {
@@ -59,13 +76,14 @@ final class AgentAuditLogger
             return;
         }
 
-        EventAuditLogger::getInstance()->newEvent(
+        EventAuditLogger::getInstance()->recordLogItem(
+            $success ? 1 : 0,
             'agentforge',
             $authUser,
             $authProvider,
-            $success ? 1 : 0,
             $comments,
             $patientId,
+            'agentforge',
             'agent'
         );
     }

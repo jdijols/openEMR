@@ -2,8 +2,10 @@ import { z } from 'zod';
 import type { Env } from '../env.js';
 import {
   allergiesResponseSchema,
+  chartContextRowsResponseSchema,
   identityResponseSchema,
   type AllergyRow,
+  type ContextRow,
   type IdentityDataRow,
 } from './types.js';
 
@@ -67,6 +69,18 @@ async function postContext(
 }
 
 /**
+ * Authenticated POST to AgentForge PHP module endpoints (`public/write`, `public/context`).
+ */
+export async function postModuleJson(
+  env: Env,
+  relativePhpPath: string,
+  ctx: OpenEmrClientContext,
+  body: Record<string, unknown>,
+): Promise<unknown> {
+  return postContext(env, relativePhpPath, body, ctx);
+}
+
+/**
  * PRD §5.3 — Context Service read; S2S auth headers + JSON body mirror §4.4.
  */
 export async function getIdentity(
@@ -101,6 +115,25 @@ export async function getAllergies(
   const parsed = allergiesResponseSchema.safeParse(raw);
   if (!parsed.success) {
     throw new OpenEmrCallError('openemr_schema_allergies', 500, raw);
+  }
+  return parsed.data.data;
+}
+
+export async function getChartContextRows(
+  env: Env,
+  ctx: OpenEmrClientContext,
+  patientUuid: string,
+  relativePhpPath: string,
+): Promise<readonly ContextRow[]> {
+  const raw = await postContext(
+    env,
+    relativePhpPath,
+    { session_token: ctx.sessionToken, patient_uuid: patientUuid },
+    ctx,
+  );
+  const parsed = chartContextRowsResponseSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new OpenEmrCallError('openemr_schema_context_rows', 500, raw);
   }
   return parsed.data.data;
 }

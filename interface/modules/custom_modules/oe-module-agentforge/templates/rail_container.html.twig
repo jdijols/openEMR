@@ -1,12 +1,12 @@
-{# Right rail + CUI iframe; stays mounted when hidden (PRD §4.2, ARCHITECTURE host UX). #}
+{# Embedded right-column CUI panel (PRD §4.2; sibling of #framesDisplay inside #mainFrames_div).
+   Stays mounted across tab switches and toggle (G2-13); pid polling + iframe blank/reload (G3-12);
+   §6.7 NAV_REQUEST routes encounter / chart_section back into the host tab system. #}
 <div id="agentforge-rail"
      class="agentforge-rail"
      data-rail-width="{{ rail_width }}"
+     {% if rail_patient_uuid != '' %}data-shell-patient-uuid="{{ rail_patient_uuid }}"{% endif %}
+     data-web-root="{{ web_root_js }}"
      style="--agentforge-rail-width: {{ rail_width }}px;">
-    <div class="agentforge-rail__header d-flex align-items-center justify-content-between border-bottom bg-light px-2 py-1">
-        <span class="small font-weight-bold text-muted">{{ 'Clinical Co-Pilot'|xl }}</span>
-        <button type="button" class="btn btn-sm btn-link agentforge-rail__close" aria-label="{{ 'Close'|xl }}">&times;</button>
-    </div>
     <iframe id="agentforge-cui-frame"
             class="agentforge-rail__iframe"
             title="{{ 'AgentForge panel'|xl }}"
@@ -14,23 +14,35 @@
             data-panel-src="{{ panel_src|e('html_attr') }}"
             sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
 </div>
+<div id="agentforge-rail-splitter"
+     class="agentforge-rail-splitter"
+     role="separator"
+     aria-orientation="vertical"
+     aria-label="{{ 'Resize Clinical Co-Pilot panel'|xla }}"
+     tabindex="0"></div>
 <style>
-    .agentforge-rail {
-        position: fixed;
-        top: 0;
-        right: 0;
-        height: 100vh;
-        width: var(--agentforge-rail-width, 420px);
-        max-width: 100vw;
-        z-index: 1040;
-        background: #fff;
-        box-shadow: -2px 0 12px rgba(0, 0, 0, 0.12);
-        display: none;
-        flex-direction: column;
+    /* #mainFrames_div is .d-flex.flex-row; we live as flex children alongside #framesDisplay. */
+    #mainFrames_div #framesDisplay {
+        flex: 1 1 auto;
+        min-width: 0;
     }
 
-    .agentforge-rail.agentforge-rail--open {
+    .agentforge-rail {
+        flex: 0 0 var(--agentforge-rail-width, 420px);
+        min-width: 320px;
+        max-width: 600px;
+        background: #fff;
+        border-inline-start: 1px solid #d0d0d8;
+        box-shadow: -1px 0 6px rgba(0, 0, 0, 0.06);
         display: flex;
+        flex-direction: column;
+        min-height: 0;
+        align-self: stretch;
+    }
+
+    .agentforge-rail--collapsed,
+    .agentforge-rail-splitter--hidden {
+        display: none !important;
     }
 
     .agentforge-rail__iframe {
@@ -38,25 +50,344 @@
         border: 0;
         width: 100%;
         min-height: 0;
+        display: block;
     }
 
-    body.agentforge-rail-pad #mainBox {
-        transition: margin-inline-end 0.15s ease-out;
+    .agentforge-rail-splitter {
+        flex: 0 0 4px;
+        cursor: col-resize;
+        background: transparent;
+        position: relative;
+        user-select: none;
+        align-self: stretch;
+    }
+
+    .agentforge-rail-splitter:hover,
+    .agentforge-rail-splitter--dragging {
+        background: #c0c4cc;
+    }
+
+    .agentforge-rail-splitter:focus-visible {
+        outline: 2px solid #0645ad;
+        outline-offset: -2px;
+    }
+
+    /* While dragging, suppress iframe pointer interception so the splitter follows the cursor. */
+    body.agentforge-rail-dragging iframe {
+        pointer-events: none;
+    }
+
+    body.agentforge-rail-dragging {
+        cursor: col-resize;
+        user-select: none;
     }
 </style>
 <script>
     (function () {
+        var STORAGE_KEY_WIDTH = 'agentforge.rail.width';
+        var STORAGE_KEY_COLLAPSED = 'agentforge.rail.collapsed';
+        var MIN_WIDTH = 320;
+        var MAX_WIDTH = 600;
+        var MIN_FRAMES_WIDTH = 480;
+
         var rail = document.getElementById('agentforge-rail');
+        var splitter = document.getElementById('agentforge-rail-splitter');
         var toggle = document.getElementById('agentforge-rail-toggle');
-        var main = document.getElementById('mainBox');
         var frame = document.getElementById('agentforge-cui-frame');
-        if (!rail || !toggle) {
+        if (!rail || !splitter || !toggle) {
             return;
         }
 
-        var width = parseInt(rail.getAttribute('data-rail-width') || '420', 10) || 420;
+        var defaultWidth = parseInt(rail.getAttribute('data-rail-width') || '420', 10) || 420;
         var panelSrc = frame ? frame.getAttribute('data-panel-src') || '' : '';
         var panelLoaded = false;
+        var webRoot = rail.getAttribute('data-web-root') || '';
+
+        function safeSessionGet(key) {
+            try {
+                return window.sessionStorage.getItem(key);
+            } catch (ignored) {
+                return null;
+            }
+        }
+
+        function safeSessionSet(key, val) {
+            try {
+                window.sessionStorage.setItem(key, val);
+            } catch (ignored) {
+                /* ignore quota / private mode errors — preference is best-effort */
+            }
+        }
+
+        function clampWidth(px) {
+            if (!isFinite(px)) {
+                return defaultWidth;
+            }
+            if (px < MIN_WIDTH) {
+                return MIN_WIDTH;
+            }
+            if (px > MAX_WIDTH) {
+                return MAX_WIDTH;
+            }
+            return px;
+        }
+
+        function applyWidth(px) {
+            var w = clampWidth(px);
+            rail.style.setProperty('--agentforge-rail-width', w + 'px');
+            return w;
+        }
+
+        var storedWidth = parseInt(safeSessionGet(STORAGE_KEY_WIDTH) || '', 10);
+        applyWidth(isFinite(storedWidth) && storedWidth > 0 ? storedWidth : defaultWidth);
+
+        /** Prefer OpenEMR tab APIs / RTop; never assign window.top.location (drops rail + tabs chrome). */
+        function baseWebRoot() {
+            var topWin = window.top;
+            try {
+                if (typeof topWin.webroot_url === 'string' && topWin.webroot_url !== '') {
+                    return topWin.webroot_url;
+                }
+            } catch (ignored) {
+            }
+            return webRoot;
+        }
+
+        function navigateEncounterInChrome(encId) {
+            var topWin = window.top;
+            var root = baseWebRoot();
+            var url =
+                root +
+                '/interface/patient_file/encounter/encounter_top.php?set_encounter=' +
+                encodeURIComponent(String(encId));
+            if (typeof topWin.goToEncounter === 'function') {
+                topWin.goToEncounter(encId);
+                return;
+            }
+            if (typeof topWin.navigateTab === 'function') {
+                topWin.navigateTab(url, 'enc', function () {
+                    if (typeof topWin.activateTabByName === 'function') {
+                        topWin.activateTabByName('enc', true);
+                    }
+                });
+                return;
+            }
+            try {
+                if (topWin.RTop && topWin.RTop.location) {
+                    topWin.RTop.location = url;
+                }
+            } catch (ignored) {
+            }
+        }
+
+        function navigateDemographicsInChrome() {
+            var topWin = window.top;
+            var root = baseWebRoot();
+            var url = root + '/interface/patient_file/summary/demographics.php';
+            if (typeof topWin.loadCurrentPatient === 'function') {
+                topWin.loadCurrentPatient();
+                return;
+            }
+            if (typeof topWin.navigateTab === 'function') {
+                topWin.navigateTab(url, 'pat', function () {
+                    if (typeof topWin.activateTabByName === 'function') {
+                        topWin.activateTabByName('pat', true);
+                    }
+                });
+                return;
+            }
+            try {
+                if (topWin.RTop && topWin.RTop.location) {
+                    topWin.RTop.location = url;
+                }
+            } catch (ignored) {
+            }
+        }
+
+        /** URLs align with Dashboard card links in demographics.php and patient menu (standard.json). */
+        function urlForChartSection(section, pidStr) {
+            var root = baseWebRoot();
+            var demos = root + '/interface/patient_file/summary/demographics.php';
+            if (!section || typeof section !== 'string') {
+                return demos;
+            }
+            switch (section) {
+                case 'demographics':
+                    return demos;
+                case 'allergies':
+                    return root + '/interface/patient_file/summary/stats_full.php?active=all&category=allergy';
+                case 'medical_problem':
+                    return root + '/interface/patient_file/summary/stats_full.php?active=all&category=medical_problem';
+                case 'medications':
+                    return root + '/interface/patient_file/summary/stats_full.php?active=all&category=medication';
+                case 'vitals':
+                    return root + '/interface/patient_file/encounter/trend_form.php?formname=vitals&context=dashboard';
+                case 'labs':
+                    return root + '/interface/patient_file/summary/labdata.php';
+                case 'social_history':
+                    return root + '/interface/patient_file/history/history.php';
+                case 'documents':
+                    if (pidStr && pidStr !== '') {
+                        return root + '/controller.php?document&list&patient_id=' + encodeURIComponent(pidStr);
+                    }
+                    return demos;
+                default:
+                    return demos;
+            }
+        }
+
+        function navigatePatTabUrl(url) {
+            var topWin = window.top;
+            if (typeof topWin.navigateTab === 'function') {
+                topWin.navigateTab(url, 'pat', function () {
+                    if (typeof topWin.activateTabByName === 'function') {
+                        topWin.activateTabByName('pat', true);
+                    }
+                });
+                return;
+            }
+            try {
+                if (topWin.RTop && topWin.RTop.location) {
+                    topWin.RTop.location = url;
+                }
+            } catch (ignored) {
+            }
+        }
+
+        function navigateChartSectionFromHint(params) {
+            var p = params && typeof params === 'object' ? params : {};
+            var section = typeof p.section === 'string' ? p.section : '';
+            var pidStr = readPidProbe();
+            if (!section || section === 'demographics') {
+                navigateDemographicsInChrome();
+                return;
+            }
+            navigatePatTabUrl(urlForChartSection(section, pidStr));
+        }
+
+        function readPidProbe() {
+            try {
+                var appPatient =
+                    window.top &&
+                    window.top.app_view_model &&
+                    window.top.app_view_model.application_data &&
+                    window.top.app_view_model.application_data.patient &&
+                    window.top.app_view_model.application_data.patient();
+                if (appPatient && appPatient.pid) {
+                    var appPid = appPatient.pid();
+                    if (appPid !== null && appPid !== undefined && String(appPid) !== '') {
+                        return String(appPid);
+                    }
+                }
+            } catch (ignored) {
+                // Fall back to DOM probes below; cross-frame errors should not break the rail.
+            }
+
+            var inp = document.querySelector('input[name="pid"]');
+            return inp && inp.value ? String(inp.value) : '';
+        }
+
+        var prevPid = readPidProbe();
+
+        function postPresentPatientToFrame() {
+            if (!frame || !frame.contentWindow) {
+                return;
+            }
+            try {
+                frame.contentWindow.postMessage({ type: 'AGENTFORGE_PRESENT_PATIENT' }, window.location.origin);
+            } catch (ignored) {
+            }
+        }
+
+        function schedulePresentPatientPing() {
+            window.setTimeout(postPresentPatientToFrame, 200);
+        }
+
+        if (frame) {
+            frame.addEventListener('load', function () {
+                if (!rail.classList.contains('agentforge-rail--collapsed') && readPidProbe() !== '') {
+                    schedulePresentPatientPing();
+                }
+            });
+        }
+
+        function blankPanelIframe() {
+            panelLoaded = false;
+            if (frame) {
+                frame.setAttribute('src', 'about:blank');
+            }
+        }
+
+        setInterval(function () {
+            var cur = readPidProbe();
+            if (cur !== prevPid) {
+                prevPid = cur;
+                blankPanelIframe();
+                if (cur !== '' && !rail.classList.contains('agentforge-rail--collapsed')) {
+                    ensurePanelLoaded();
+                    schedulePresentPatientPing();
+                } else if (!rail.classList.contains('agentforge-rail--collapsed')) {
+                    ensurePanelLoaded();
+                }
+            }
+        }, 1500);
+
+        window.addEventListener('message', function (ev) {
+            if (!frame || ev.source !== frame.contentWindow) {
+                return;
+            }
+            if (ev.origin !== window.location.origin) {
+                return;
+            }
+            var data = ev.data;
+            if (!data || typeof data !== 'object' || data.type !== 'NAV_REQUEST') {
+                return;
+            }
+            var doc = null;
+            try {
+                doc = frame.contentDocument;
+            } catch (ignored) {
+                return;
+            }
+            var iframeRoot = doc ? doc.documentElement : null;
+            var boundUuid = iframeRoot ? (iframeRoot.getAttribute('data-patient-uuid') || '') : '';
+            var expected = typeof data.expected_patient_uuid === 'string' ? data.expected_patient_uuid : '';
+            if (expected !== '' && boundUuid !== '' && expected !== boundUuid && frame.contentWindow) {
+                frame.contentWindow.postMessage({ type: 'NAV_REFUSED', reason: 'chart_mismatch' }, window.location.origin);
+                return;
+            }
+            var hint = data.hint;
+            if (!hint || typeof hint.kind !== 'string') {
+                return;
+            }
+            if (typeof window.top.restoreSession === 'function') {
+                window.top.restoreSession();
+            }
+            if (hint.kind === 'encounter') {
+                var rawEnc = hint.params && hint.params.encounter_id;
+                var encId =
+                    typeof rawEnc === 'number'
+                        ? rawEnc
+                        : typeof rawEnc === 'string'
+                            ? parseInt(rawEnc, 10)
+                            : NaN;
+                if (!(encId > 0)) {
+                    return;
+                }
+                navigateEncounterInChrome(encId);
+                return;
+            }
+
+            if (hint.kind === 'chart_section') {
+                navigateChartSectionFromHint(hint.params);
+                return;
+            }
+
+            if (frame.contentWindow) {
+                frame.contentWindow.postMessage({ type: 'NAV_LIMITED' }, window.location.origin);
+            }
+            navigateDemographicsInChrome();
+        });
 
         function ensurePanelLoaded() {
             if (panelLoaded || !frame || panelSrc === '') {
@@ -66,64 +397,169 @@
             frame.setAttribute('src', panelSrc);
         }
 
-        function setOverlayMode(on) {
-            rail.classList.toggle('agentforge-rail--overlay', on);
-            if (main) {
-                if (on) {
-                    main.style.marginInlineEnd = '';
-                    document.body.classList.remove('agentforge-rail-pad');
-                } else if (rail.classList.contains('agentforge-rail--open')) {
-                    main.style.marginInlineEnd = width + 'px';
-                    document.body.classList.add('agentforge-rail-pad');
-                } else {
-                    main.style.marginInlineEnd = '';
-                    document.body.classList.remove('agentforge-rail-pad');
+        function setCollapsed(collapsed) {
+            rail.classList.toggle('agentforge-rail--collapsed', collapsed);
+            splitter.classList.toggle('agentforge-rail-splitter--hidden', collapsed);
+            toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            safeSessionSet(STORAGE_KEY_COLLAPSED, collapsed ? '1' : '0');
+            if (!collapsed) {
+                ensurePanelLoaded();
+                if (readPidProbe() !== '') {
+                    schedulePresentPatientPing();
                 }
             }
         }
 
-        function updateLayout() {
-            if (!main || !rail.classList.contains('agentforge-rail--open')) {
-                setOverlayMode(false);
+        toggle.addEventListener('click', function () {
+            var nowCollapsed = !rail.classList.contains('agentforge-rail--collapsed');
+            setCollapsed(nowCollapsed);
+        });
+
+        // Splitter: pointer-event drag clamped against MIN/MAX width and a min frame width.
+        (function wireSplitter() {
+            var dragging = false;
+            var pointerId = null;
+
+            function onPointerMove(ev) {
+                if (!dragging) {
+                    return;
+                }
+                var mainFrames = document.getElementById('mainFrames_div');
+                if (!mainFrames) {
+                    return;
+                }
+                var rect = mainFrames.getBoundingClientRect();
+                // For LTR, column is on the right edge; width = (rect.right - clientX). RTL mirrors.
+                var isRtl = (document.documentElement.getAttribute('dir') || '').toLowerCase() === 'rtl' ||
+                    getComputedStyle(document.documentElement).direction === 'rtl';
+                var rawWidth = isRtl ? (ev.clientX - rect.left) : (rect.right - ev.clientX);
+                var maxByFrames = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, rect.width - MIN_FRAMES_WIDTH));
+                var clamped = Math.min(maxByFrames, Math.max(MIN_WIDTH, rawWidth));
+                applyWidth(clamped);
+            }
+
+            function endDrag(ev) {
+                if (!dragging) {
+                    return;
+                }
+                dragging = false;
+                splitter.classList.remove('agentforge-rail-splitter--dragging');
+                document.body.classList.remove('agentforge-rail-dragging');
+                if (pointerId !== null) {
+                    try {
+                        splitter.releasePointerCapture(pointerId);
+                    } catch (ignored) {
+                    }
+                    pointerId = null;
+                }
+                var current = parseInt(getComputedStyle(rail).getPropertyValue('--agentforge-rail-width') || '', 10);
+                if (isFinite(current) && current > 0) {
+                    safeSessionSet(STORAGE_KEY_WIDTH, String(current));
+                }
+                window.removeEventListener('pointermove', onPointerMove);
+                window.removeEventListener('pointerup', endDrag);
+                window.removeEventListener('pointercancel', endDrag);
+            }
+
+            splitter.addEventListener('pointerdown', function (ev) {
+                if (ev.button !== 0) {
+                    return;
+                }
+                ev.preventDefault();
+                dragging = true;
+                pointerId = ev.pointerId;
+                try {
+                    splitter.setPointerCapture(pointerId);
+                } catch (ignored) {
+                }
+                splitter.classList.add('agentforge-rail-splitter--dragging');
+                document.body.classList.add('agentforge-rail-dragging');
+                window.addEventListener('pointermove', onPointerMove);
+                window.addEventListener('pointerup', endDrag);
+                window.addEventListener('pointercancel', endDrag);
+            });
+
+            // Keyboard arrows for accessibility.
+            splitter.addEventListener('keydown', function (ev) {
+                var step = ev.shiftKey ? 32 : 8;
+                var current = parseInt(getComputedStyle(rail).getPropertyValue('--agentforge-rail-width') || '', 10);
+                if (!isFinite(current) || current <= 0) {
+                    current = defaultWidth;
+                }
+                var next = null;
+                if (ev.key === 'ArrowLeft') {
+                    next = current + step;
+                } else if (ev.key === 'ArrowRight') {
+                    next = current - step;
+                } else if (ev.key === 'Home') {
+                    next = MAX_WIDTH;
+                } else if (ev.key === 'End') {
+                    next = MIN_WIDTH;
+                }
+                if (next === null) {
+                    return;
+                }
+                ev.preventDefault();
+                var w = applyWidth(next);
+                safeSessionSet(STORAGE_KEY_WIDTH, String(w));
+            });
+        })();
+
+        // Relocate rail + splitter to live as siblings of #framesDisplay inside #mainFrames_div.
+        // EVENT_BODY_RENDER_POST renders us at end-of-body; knockout populates #framesDisplay async.
+        function relocateIntoMainFrames() {
+            var mainFrames = document.getElementById('mainFrames_div');
+            var framesDisplay = document.getElementById('framesDisplay');
+            if (!mainFrames || !framesDisplay) {
+                return false;
+            }
+            if (rail.parentNode !== mainFrames || splitter.parentNode !== mainFrames) {
+                mainFrames.appendChild(splitter);
+                mainFrames.appendChild(rail);
+            }
+            return true;
+        }
+
+        function tryRelocateLoop() {
+            if (relocateIntoMainFrames()) {
                 return;
             }
-            var needsOverlay = main.scrollWidth > (window.innerWidth - width - 8);
-            setOverlayMode(needsOverlay);
+            var attempts = 0;
+            var timer = setInterval(function () {
+                attempts++;
+                if (relocateIntoMainFrames() || attempts > 40) {
+                    clearInterval(timer);
+                }
+            }, 100);
+            // Also watch for DOM mutations — knockout's foreach over tabsList may not be live yet.
+            if (typeof MutationObserver === 'function') {
+                var rootObs = document.body;
+                if (rootObs) {
+                    var obs = new MutationObserver(function () {
+                        if (relocateIntoMainFrames()) {
+                            obs.disconnect();
+                            clearInterval(timer);
+                        }
+                    });
+                    obs.observe(rootObs, { childList: true, subtree: true });
+                }
+            }
         }
 
-        function openRail() {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', tryRelocateLoop, { once: true });
+        } else {
+            tryRelocateLoop();
+        }
+
+        // Initial collapsed state — restore from sessionStorage; default to expanded.
+        var storedCollapsed = safeSessionGet(STORAGE_KEY_COLLAPSED) === '1';
+        setCollapsed(storedCollapsed);
+        if (!storedCollapsed) {
             ensurePanelLoaded();
-            rail.classList.add('agentforge-rail--open');
-            toggle.setAttribute('aria-expanded', 'true');
-            updateLayout();
-        }
-
-        function closeRail() {
-            rail.classList.remove('agentforge-rail--open');
-            toggle.setAttribute('aria-expanded', 'false');
-            if (main) {
-                main.style.marginInlineEnd = '';
+            if (readPidProbe() !== '') {
+                schedulePresentPatientPing();
             }
-            document.body.classList.remove('agentforge-rail-pad');
         }
-
-        toggle.addEventListener('click', function () {
-            if (rail.classList.contains('agentforge-rail--open')) {
-                closeRail();
-            } else {
-                openRail();
-            }
-        });
-
-        var closers = rail.querySelectorAll('.agentforge-rail__close');
-        for (var i = 0; i < closers.length; i++) {
-            closers[i].addEventListener('click', closeRail);
-        }
-
-        window.addEventListener('resize', function () {
-            if (rail.classList.contains('agentforge-rail--open')) {
-                updateLayout();
-            }
-        });
     })();
 </script>

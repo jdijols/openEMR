@@ -1,0 +1,10 @@
+{
+  "case_id": "nwoc-fail-synthetic",
+  "expect_pass_for_eval_report": false,
+  "correlation_id": "eval-synth-nwoc-bad",
+  "use_case": "UC-B",
+  "steps": [
+    { "kind": "proposal", "proposal_id": "prop-bad-1" },
+    { "kind": "openemr_write", "proposal_id": "prop-bad-1" }
+  ]
+}

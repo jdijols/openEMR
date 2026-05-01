@@ -20,6 +20,9 @@ services:
       POSTGRES_USER: agentforge
       POSTGRES_PASSWORD: agentforge
       POSTGRES_DB: agentforge
+    ports:
+      # Host-only migrate / local tools ($G3-00). Containers still use hostname `postgres:5432`.
+      - '127.0.0.1:15432:5432'
     networks:
       - agentforge_internal
 

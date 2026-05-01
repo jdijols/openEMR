@@ -10,7 +10,12 @@
 
 declare(strict_types=1);
 
+use OpenEMR\Common\Session\SessionWrapperFactory;
 use OpenEMR\Common\Uuid\UuidRegistry;
+use OpenEMR\Modules\AgentForge\Audit\AgentAuditLogger;
+use OpenEMR\Modules\AgentForge\Context\ChartContextAuthorizationException;
+use OpenEMR\Modules\AgentForge\Context\ChartContextGate;
+use OpenEMR\Services\PatientService;
 
 /**
  * Bootstrap OpenEMR globals from a script in public/.
@@ -134,4 +139,104 @@ function agentforge_pid_to_uuid_string(int $pid): ?string
     }
 
     return UuidRegistry::uuidToString($row['uuid']);
+}
+
+/**
+ * Gate 3 — shared Context Service ingress: JSON body parse, correlation id, ChartContextGate bind, PID resolution,
+ * capped window.limit (defaults 10, max 50).
+ *
+ * @return array{
+ *   correlation_id: string,
+ *   patient_uuid: string,
+ *   session_token: string,
+ *   pid: int,
+ *   ctx: array<string, mixed>,
+ *   window_limit: int,
+ * }
+ */
+function agentforge_context_service_ingress(string $contextAuditKey): array
+{
+    $body = agentforge_json_input();
+    $sessionToken = isset($body['session_token']) && \is_string($body['session_token']) ? \trim($body['session_token']) : '';
+    $patientUuid = isset($body['patient_uuid']) && \is_string($body['patient_uuid']) ? \trim($body['patient_uuid']) : '';
+    if ($sessionToken === '' || $patientUuid === '') {
+        agentforge_emit_json(400, ['error' => 'invalid_request']);
+    }
+
+    $windowLimit = 10;
+    if (isset($body['window']) && \is_array($body['window'])) {
+        $l = $body['window']['limit'] ?? null;
+        if (\is_int($l)) {
+            $windowLimit = \max(1, \min(50, $l));
+        } elseif (\is_string($l) && \is_numeric($l)) {
+            $windowLimit = \max(1, \min(50, (int) $l));
+        }
+    }
+
+    $correlationId = agentforge_incoming_correlation_id();
+
+    try {
+        $ctx = ChartContextGate::authorizeFromGlobals($sessionToken, $patientUuid);
+    } catch (ChartContextAuthorizationException $e) {
+        if ($e->httpStatus === 403 && $e->errorCode === 'active_chart_mismatch') {
+            $session = SessionWrapperFactory::getInstance()->getActiveSession();
+            $rawAu = $session->get('authUser');
+            $au = \is_string($rawAu) ? $rawAu : '';
+            if ($au !== '') {
+                $rawProv = $session->get('authProvider');
+                $prov = \is_string($rawProv) && $rawProv !== '' ? $rawProv : 'Default';
+                $rawPid = $session->get('pid');
+                $p = \is_int($rawPid) ? $rawPid : (\is_string($rawPid) && \is_numeric($rawPid) ? (int) $rawPid : 0);
+                AgentAuditLogger::recordAgentEvent(
+                    $au,
+                    $prov,
+                    $p > 0 ? $p : null,
+                    'context_read',
+                    $contextAuditKey,
+                    $correlationId,
+                    false,
+                    ['reason' => $e->errorCode],
+                );
+            }
+        }
+
+        agentforge_emit_json($e->httpStatus, ['error' => $e->errorCode, 'correlation_id' => $correlationId]);
+    }
+
+    $pid = (int) $ctx['pid'];
+    if ($pid <= 0) {
+        $probe = (new PatientService())->getOne($patientUuid);
+        $first = $probe->getFirstDataResult();
+        if (!\is_array($first)) {
+            agentforge_emit_json(404, ['error' => 'not_found', 'correlation_id' => $correlationId]);
+        }
+
+        $rawPid = $first['pid'] ?? null;
+        $pid = \is_int($rawPid) ? $rawPid : (\is_string($rawPid) && \is_numeric($rawPid) ? (int) $rawPid : 0);
+    }
+
+    return [
+        'correlation_id' => $correlationId,
+        'patient_uuid' => $patientUuid,
+        'session_token' => $sessionToken,
+        'pid' => $pid,
+        'ctx' => $ctx,
+        'window_limit' => $windowLimit,
+    ];
+}
+
+/**
+ * @param array<mixed>|string|null $maybeBytesUuid
+ */
+function agentforge_normalize_uuid_payload($maybeBytesUuid): string
+{
+    if (!\is_string($maybeBytesUuid) || $maybeBytesUuid === '') {
+        return '';
+    }
+
+    if (\strlen($maybeBytesUuid) === 16) {
+        return UuidRegistry::uuidToString($maybeBytesUuid);
+    }
+
+    return $maybeBytesUuid;
 }

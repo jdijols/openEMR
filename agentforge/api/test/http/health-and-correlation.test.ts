@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { buildApp } from '../../src/app.js';
 import { createObservability } from '../../src/observability/index.js';
 import { testEnv } from '../helpers/env-fixture.js';
+import { createStubPgPool } from '../helpers/stub-pg-pool.js';
 
 describe('correlation + health', () => {
   const env = testEnv();
-  const app = buildApp(env, createObservability(env));
+  const app = buildApp(env, createObservability(env), createStubPgPool());
 
   it('every response includes X-Correlation-Id', async () => {
     const res = await app.request('/health');
@@ -17,7 +18,7 @@ describe('correlation + health', () => {
     expect(res.headers.get('x-correlation-id')).toBe('prefixed-cid');
   });
 
-  it('GET /health returns documented Gate 0 shape (deps unknown)', async () => {
+  it('GET /health returns version, providers, and Postgres readiness for Gate 4 chat', async () => {
     const res = await app.request('/health');
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
@@ -26,7 +27,7 @@ describe('correlation + health', () => {
     expect(body.providers).toEqual({ llm: env.LLM_PROVIDER, stt: env.STT_PROVIDER });
     expect(body.deps).toEqual({
       openemr_module: 'unknown',
-      postgres: 'unknown',
+      postgres: 'reachable',
       langfuse: 'unknown',
     });
   });

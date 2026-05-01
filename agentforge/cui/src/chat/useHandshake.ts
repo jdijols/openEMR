@@ -37,6 +37,10 @@ export function useHandshake(launchCode: string | null, patientUuid: string | nu
         if (cancelled) {
           return;
         }
+        if (!result.identity.patient_uuid_present) {
+          setState({ status: 'error', message: 'no_chart_bound' });
+          return;
+        }
         setState({ status: 'ready', sessionToken: result.session_token });
       } catch {
         if (cancelled) {

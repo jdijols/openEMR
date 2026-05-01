@@ -82,3 +82,26 @@ describe('useHandshake (PRD §6.2 / G2-09)', () => {
     expect(result.current).toEqual({ status: 'error', message: 'handshake_failed' });
   });
 });
+
+describe('useHandshake (G3-09 / PRD §6.6)', () => {
+  it('enters no_chart_bound when redeem returns patient_uuid_present false', async () => {
+    globalThis.fetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          session_token: 'tok.no-chart',
+          identity: {
+            user_id: 1,
+            patient_uuid_present: false,
+            encounter_id_present: false,
+          },
+          expires_at: '2099-01-01T00:00:00Z',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    ) as typeof fetch;
+
+    const { result } = renderHook(() => useHandshake('lc-chartless', 'pat-attr'));
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current).toEqual({ status: 'error', message: 'no_chart_bound' });
+  });
+});

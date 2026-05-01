@@ -10,6 +10,10 @@ services:
     working_dir: /app
     volumes:
       - ../../agentforge/api:/app
+      # Required: src/openemr/types.ts imports ../../../contracts/module-http-paths.json,
+      # which resolves to /contracts inside the container (since /app = agentforge/api).
+      # Without this mount the API fails to build (TS2307) and the container exit-loops.
+      - ../../agentforge/contracts:/contracts
     environment:
       PORT: '3000'
     # Intentionally NO `ports:` here — internal-only.

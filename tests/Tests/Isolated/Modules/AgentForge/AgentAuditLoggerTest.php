@@ -51,4 +51,57 @@ final class AgentAuditLoggerTest extends TestCase
         self::assertStringNotContainsString('120/80', (string) $captured['comments']);
         self::assertStringNotContainsString('Jane', (string) $captured['comments']);
     }
+
+    /** Failure-reason field surfaces in audit comments so write_rejected rows name the cause. */
+    public function testFailureReasonAppearsInComments(): void
+    {
+        $captured = null;
+        AgentAuditLogger::setTestSink(static function (array $row) use (&$captured): void {
+            $captured = $row;
+        });
+
+        AgentAuditLogger::recordAgentEvent(
+            'reynolds',
+            'Default',
+            123,
+            'write_rejected',
+            'chief_complaint',
+            'corr-test-2',
+            false,
+            ['reason' => 'provider_error'],
+            'encounter invalid'
+        );
+
+        self::assertIsArray($captured);
+        self::assertSame('agent', $captured['log_from']);
+        self::assertSame(0, $captured['success']);
+        $comments = (string) $captured['comments'];
+        self::assertStringContainsString('action=write_rejected', $comments);
+        self::assertStringContainsString('target=chief_complaint', $comments);
+        self::assertStringContainsString('correlation_id=corr-test-2', $comments);
+        self::assertStringContainsString('failure_reason=encounter invalid', $comments);
+    }
+
+    /** Default behavior unchanged when no failure_reason supplied (no trailing field). */
+    public function testFailureReasonOmittedWhenNull(): void
+    {
+        $captured = null;
+        AgentAuditLogger::setTestSink(static function (array $row) use (&$captured): void {
+            $captured = $row;
+        });
+
+        AgentAuditLogger::recordAgentEvent(
+            'reynolds',
+            'Default',
+            null,
+            'write_apply',
+            'vitals',
+            'corr-test-3',
+            true,
+            []
+        );
+
+        self::assertIsArray($captured);
+        self::assertStringNotContainsString('failure_reason=', (string) $captured['comments']);
+    }
 }

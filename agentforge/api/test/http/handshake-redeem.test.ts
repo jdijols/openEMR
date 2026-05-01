@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { buildApp } from '../../src/app.js';
 import { createObservability } from '../../src/observability/index.js';
 import { testEnv } from '../helpers/env-fixture.js';
+import { createStubPgPool } from '../helpers/stub-pg-pool.js';
 
 describe('POST /handshake/redeem', () => {
   const originalFetch = globalThis.fetch;
@@ -22,7 +23,7 @@ describe('POST /handshake/redeem', () => {
 
   it('returns 401 invalid_launch_code on malformed body', async () => {
     const env = testEnv();
-    const app = buildApp(env, createObservability(env));
+    const app = buildApp(env, createObservability(env), createStubPgPool());
     const res = await app.request('/handshake/redeem', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -45,7 +46,7 @@ describe('POST /handshake/redeem', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    const app = buildApp(env, createObservability(env));
+    const app = buildApp(env, createObservability(env), createStubPgPool());
     const res = await app.request('/handshake/redeem', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -75,7 +76,7 @@ describe('POST /handshake/redeem', () => {
         return new Response(JSON.stringify({ error: 'invalid_launch_code' }), { status: 403 });
       }),
     );
-    const app = buildApp(env, createObservability(env));
+    const app = buildApp(env, createObservability(env), createStubPgPool());
     const res = await app.request('/handshake/redeem', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

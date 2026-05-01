@@ -57,9 +57,21 @@ final class Bootstrap
         $globals = OEGlobalsBag::getInstance();
         $webroot = $globals->getWebRoot();
         $panelSrc = $webroot . '/interface/modules/custom_modules/oe-module-agentforge/public/panel.php';
+        $common = \dirname(__DIR__) . '/public/agentforge_common.php';
+        if (is_file($common)) {
+            require_once $common;
+        }
+        $pid = (int) (SessionWrapperFactory::getInstance()->getActiveSession()->get('pid') ?? 0);
+        $railPatientUuidAttr = '';
+        if ($pid > 0 && function_exists('agentforge_pid_to_uuid_string')) {
+            $u = agentforge_pid_to_uuid_string($pid);
+            $railPatientUuidAttr = ($u !== null && $u !== '') ? htmlspecialchars($u, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') : '';
+        }
         echo $this->twig()->render('rail_container.html.twig', [
             'panel_src' => $panelSrc,
             'rail_width' => self::RAIL_WIDTH_PX,
+            'web_root_js' => $webroot === '' ? '' : htmlspecialchars((string) $webroot, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'),
+            'rail_patient_uuid' => $railPatientUuidAttr,
         ]);
     }
 

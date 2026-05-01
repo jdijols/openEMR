@@ -1,0 +1,11 @@
+{
+  "case_id": "nwoc-pass-synthetic",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-synth-nwoc-ok",
+  "use_case": "UC-B",
+  "steps": [
+    { "kind": "proposal", "proposal_id": "prop-test-77" },
+    { "kind": "confirm", "proposal_id": "prop-test-77" },
+    { "kind": "openemr_write", "proposal_id": "prop-test-77" }
+  ]
+}

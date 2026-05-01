@@ -150,13 +150,60 @@ final class ChartContextGate
             $pid = \is_numeric($pRow['pid']) ? (int) $pRow['pid'] : 0;
         }
 
+        // S2S calls have no browser cookie, so the active session has no `authUser`.
+        // OpenEMR core services (e.g. EncounterService::updateEncounter → AclMain::aclCheckCore('sensitivities', …))
+        // fall back to $session->get('authUser') when no $user arg is passed; without hydration the ACL fails and
+        // the method returns a literal "You are not authorized to see this encounter." string instead of a
+        // ProcessingResult, which then surfaces to the user as a misleading "encounter not found".
+        $authProvider = self::resolvePrimaryGroup($authUser);
+        self::hydrateAgentSession(
+            SessionWrapperFactory::getInstance()->getActiveSession(),
+            $authUser,
+            $claims['user_id'],
+            $authProvider,
+        );
+
         return [
             'claims' => $claims,
             'auth_user' => $authUser,
-            'auth_provider' => 'Agent-API',
+            'auth_provider' => $authProvider,
             'user_id' => $claims['user_id'],
             'pid' => $pid,
         ];
+    }
+
+    /**
+     * Mirror a verified trusted-agent identity into the OpenEMR session wrapper so core services
+     * that consult $session->get('authUser') (notably AclMain::aclCheckCore default-arg path) see the
+     * authenticated clinician. Pure write-through; no I/O. Public for unit testability.
+     */
+    public static function hydrateAgentSession(
+        SessionInterface $session,
+        string $authUser,
+        int $userId,
+        string $authProvider,
+    ): void {
+        $session->set('authUser', $authUser);
+        $session->set('authUserID', $userId);
+        $session->set('authProvider', $authProvider);
+    }
+
+    /**
+     * Resolve the user's primary OpenEMR group name. Used both as the ACL group hydrated into the
+     * session and as the `groupname` written to form_encounter on confirmed writes — so the chart
+     * history reflects the real clinician group, not an opaque sentinel.
+     */
+    private static function resolvePrimaryGroup(string $authUser): string
+    {
+        $row = \sqlQuery(
+            'SELECT `name` FROM `groups` WHERE `user` = ? ORDER BY `id` ASC LIMIT 1',
+            [$authUser],
+        );
+        if (\is_array($row) && isset($row['name']) && \is_string($row['name']) && $row['name'] !== '') {
+            return $row['name'];
+        }
+
+        return 'Default';
     }
 
     private static function sessionString(SessionInterface $session, string $key): string

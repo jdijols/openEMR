@@ -2,11 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../../src/app.js';
 import { createObservability } from '../../src/observability/index.js';
 import { testEnv } from '../helpers/env-fixture.js';
+import { createStubPgPool } from '../helpers/stub-pg-pool.js';
 
 describe('error normalization (PRD §5.11, S6)', () => {
   it('returns generic internal_error with correlation_id and no stack or SQL in body', async () => {
     const env = testEnv();
-    const app = buildApp(env, createObservability(env));
+    const app = buildApp(env, createObservability(env), createStubPgPool());
     app.get('/boom', () => {
       throw new Error(
         'SQLSTATE[42S02] Base table or view not found; stack at /app/x.php Jane Doe DOB 1980-01-01',

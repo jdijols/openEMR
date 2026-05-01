@@ -1,4 +1,60 @@
-import type { ChatBlock, ChatResponse, RedeemResponse } from '../types/chat.js';
+import type { RecapListItem, RedeemResponse } from '../types/chat.js';
+
+/** Thrown when /chat or /present-patient fails (transport, HTTP, or malformed JSON). Inspect `kind` + `correlationId` for UX. */
+export type AgentForgeDeliveryKind =
+  | 'misconfigured_llm'
+  | 'network_unreachable'
+  | 'bad_request'
+  | 'backend_error'
+  | 'invalid_success_response';
+
+export class AgentForgeDeliveryError extends Error {
+  constructor(
+    readonly kind: AgentForgeDeliveryKind,
+    readonly correlationId?: string,
+  ) {
+    const suffix = correlationId !== undefined ? ` (${correlationId})` : '';
+    super(`${kind}${suffix}`);
+    this.name = 'AgentForgeDeliveryError';
+  }
+}
+
+function readFailBody(json: unknown): { serverError?: string; correlationId?: string } {
+  if (json === null || typeof json !== 'object') {
+    return {};
+  }
+  const o = json as { error?: unknown; correlation_id?: unknown };
+  const out: { serverError?: string; correlationId?: string } = {};
+
+  if (typeof o.error === 'string') {
+    const t = o.error.trim();
+    if (t !== '') {
+      out.serverError = t;
+    }
+  }
+  if (typeof o.correlation_id === 'string') {
+    const t = o.correlation_id.trim();
+    if (t !== '') {
+      out.correlationId = t;
+    }
+  }
+
+  return out;
+}
+
+/** Map non-OK Agent API responses to typed delivery errors with optional correlation ids for support. */
+export function deliveryErrorFromAgentResponse(status: number, json: unknown): AgentForgeDeliveryError {
+  const { serverError, correlationId } = readFailBody(json);
+  if (status === 501) {
+    return new AgentForgeDeliveryError('misconfigured_llm', correlationId);
+  }
+
+  const looksClientFault =
+    status === 400 || serverError === 'invalid_request' || serverError === 'bad_request';
+  const kind = looksClientFault ? 'bad_request' : 'backend_error';
+
+  return new AgentForgeDeliveryError(kind, correlationId);
+}
 
 function stripBase(base: string): string {
   return base.replace(/\/$/, '');
@@ -41,7 +97,16 @@ async function redeemHandshakeRequest(apiBase: string, launchCode: string): Prom
     throw new Error('handshake_invalid_response');
   }
 
-  return json as RedeemResponse;
+  const idRaw = json as RedeemResponse;
+  if (
+    !idRaw.identity ||
+    typeof idRaw.identity !== 'object' ||
+    typeof idRaw.identity.patient_uuid_present !== 'boolean'
+  ) {
+    throw new Error('handshake_invalid_response');
+  }
+
+  return idRaw as RedeemResponse;
 }
 
 /**
@@ -70,30 +135,40 @@ export async function postChat(
   sessionToken: string,
   patientUuid: string,
   message: string,
-): Promise<{ blocks: ChatBlock[]; correlationId: string }> {
+  opts?: Readonly<{ conversation_id?: string }>,
+): Promise<{
+  blocks: ChatBlock[];
+  correlationId: string;
+  citation_navigation: Record<string, CitationNavigationHint>;
+  conversationId: string | null;
+}> {
   const base = stripBase(apiBase);
   const correlationId = randomCorrelationId();
-  const res = await fetch(`${base}/chat`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Correlation-Id': correlationId,
-    },
-    body: JSON.stringify({
-      session_token: sessionToken,
-      patient_uuid: patientUuid,
-      message,
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${base}/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Correlation-Id': correlationId,
+      },
+      body: JSON.stringify({
+        session_token: sessionToken,
+        patient_uuid: patientUuid,
+        message,
+        ...(opts?.conversation_id !== undefined && opts.conversation_id !== '' ?
+          { conversation_id: opts.conversation_id }
+        : {}),
+      }),
+    });
+  } catch {
+    throw new AgentForgeDeliveryError('network_unreachable');
+  }
 
   const json: unknown = await res.json().catch(() => null);
 
-  if (res.status === 501) {
-    throw new Error('api_misconfigured_llm');
-  }
-
   if (!res.ok) {
-    throw new Error('chat_failed');
+    throw deliveryErrorFromAgentResponse(res.status, json);
   }
 
   if (
@@ -102,9 +177,180 @@ export async function postChat(
     (json as { ok?: unknown }).ok !== true ||
     !Array.isArray((json as ChatResponse).blocks)
   ) {
-    throw new Error('chat_invalid_response');
+    throw new AgentForgeDeliveryError('invalid_success_response', correlationId);
   }
 
   const body = json as ChatResponse;
-  return { blocks: body.blocks, correlationId: body.correlation_id ?? correlationId };
+  const citation_navigation =
+    body.citation_navigation !== undefined &&
+    typeof body.citation_navigation === 'object' &&
+    body.citation_navigation !== null ?
+      body.citation_navigation
+    : {};
+  return {
+    blocks: body.blocks,
+    correlationId: body.correlation_id ?? correlationId,
+    citation_navigation,
+    conversationId: typeof body.conversation_id === 'string' ? body.conversation_id : null,
+  };
+}
+
+export async function postProposalConfirm(
+  apiBase: string,
+  sessionToken: string,
+  patientUuid: string,
+  conversationExternalId: string,
+  proposalId: string,
+): Promise<{ accepted: boolean; reason?: string }> {
+  const base = stripBase(apiBase);
+  const correlationId = randomCorrelationId();
+  const cid = encodeURIComponent(conversationExternalId);
+  const res = await fetch(`${base}/conversations/${cid}/confirm`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Correlation-Id': correlationId,
+    },
+    body: JSON.stringify({
+      session_token: sessionToken,
+      patient_uuid: patientUuid,
+      proposal_id: proposalId,
+    }),
+  });
+
+  const json: unknown = await res.json().catch(() => null);
+  if (!res.ok || !json || typeof json !== 'object' || (json as { ok?: unknown }).ok !== true) {
+    throw new Error('proposal_confirm_failed');
+  }
+
+  const body = json as { accepted?: unknown; reason?: unknown };
+  return {
+    accepted: body.accepted === true,
+    ...(typeof body.reason === 'string' ? { reason: body.reason } : {}),
+  };
+}
+
+export async function postProposalReject(
+  apiBase: string,
+  sessionToken: string,
+  patientUuid: string,
+  conversationExternalId: string,
+  proposalId: string,
+): Promise<void> {
+  const base = stripBase(apiBase);
+  const correlationId = randomCorrelationId();
+  const cid = encodeURIComponent(conversationExternalId);
+  const res = await fetch(`${base}/conversations/${cid}/reject`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Correlation-Id': correlationId,
+    },
+    body: JSON.stringify({
+      session_token: sessionToken,
+      patient_uuid: patientUuid,
+      proposal_id: proposalId,
+    }),
+  });
+
+  const json: unknown = await res.json().catch(() => null);
+  if (!res.ok || !json || typeof json !== 'object' || (json as { ok?: unknown }).ok !== true) {
+    throw new Error('proposal_reject_failed');
+  }
+}
+
+export async function getConversationRecap(
+  apiBase: string,
+  sessionToken: string,
+  patientUuid: string,
+  conversationExternalId: string,
+): Promise<{ items: RecapListItem[]; counts: Record<string, number>; correlationId: string }> {
+  const base = stripBase(apiBase);
+  const correlationId = randomCorrelationId();
+  const cid = encodeURIComponent(conversationExternalId);
+  let res: Response;
+  try {
+    res = await fetch(`${base}/conversations/${cid}/recap`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${sessionToken}`,
+        'X-Patient-Uuid': patientUuid,
+        'X-Correlation-Id': correlationId,
+      },
+    });
+  } catch {
+    throw new AgentForgeDeliveryError('network_unreachable');
+  }
+
+  const json: unknown = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw deliveryErrorFromAgentResponse(res.status, json);
+  }
+
+  if (
+    !json ||
+    typeof json !== 'object' ||
+    (json as { ok?: unknown }).ok !== true ||
+    !Array.isArray((json as { items?: unknown }).items)
+  ) {
+    throw new AgentForgeDeliveryError('invalid_success_response', correlationId);
+  }
+
+  const body = json as { items: RecapListItem[]; counts?: Record<string, number>; correlation_id?: string };
+  return {
+    items: body.items,
+    counts: body.counts ?? {},
+    correlationId: typeof body.correlation_id === 'string' ? body.correlation_id : correlationId,
+  };
+}
+
+export async function postPresentPatient(
+  apiBase: string,
+  sessionToken: string,
+  patientUuid: string,
+  forceRefresh = false,
+): Promise<{ blocks: ChatBlock[]; correlationId: string; citation_navigation: Record<string, CitationNavigationHint> }> {
+  const base = stripBase(apiBase);
+  const correlationId = randomCorrelationId();
+  let res: Response;
+  try {
+    res = await fetch(`${base}/present-patient`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Correlation-Id': correlationId,
+      },
+      body: JSON.stringify({
+        session_token: sessionToken,
+        patient_uuid: patientUuid,
+        ...(forceRefresh ? { force_refresh: true } : {}),
+      }),
+    });
+  } catch {
+    throw new AgentForgeDeliveryError('network_unreachable');
+  }
+
+  const json: unknown = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    throw deliveryErrorFromAgentResponse(res.status, json);
+  }
+
+  if (
+    !json ||
+    typeof json !== 'object' ||
+    (json as { ok?: unknown }).ok !== true ||
+    !Array.isArray((json as ChatResponse).blocks)
+  ) {
+    throw new AgentForgeDeliveryError('invalid_success_response', correlationId);
+  }
+
+  const body = json as ChatResponse;
+  const citation_navigation =
+    body.citation_navigation !== undefined &&
+    typeof body.citation_navigation === 'object' &&
+    body.citation_navigation !== null ?
+      body.citation_navigation
+    : {};
+  return { blocks: body.blocks, correlationId: body.correlation_id ?? correlationId, citation_navigation };
 }

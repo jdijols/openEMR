@@ -5,7 +5,7 @@ export function testEnv(overrides: Partial<Record<string, string>> = {}): Env {
   const base: NodeJS.ProcessEnv = {
     LLM_PROVIDER: 'anthropic',
     LLM_API_KEY: 'test-llm-key',
-    STT_PROVIDER: 'deepgram',
+    STT_PROVIDER: 'mock',
     STT_API_KEY: 'test-stt-key',
     OPENEMR_MODULE_BASE_URL: 'http://localhost:8300',
     OPENEMR_MODULE_SHARED_SECRET: 'test-shared-secret',

@@ -29,5 +29,8 @@ final class AgentForgeModuleSchemaTest extends TestCase
         self::assertStringContainsString('`issued_at`', $sql);
         self::assertStringContainsString('`redeemed_at`', $sql);
         self::assertStringContainsString('correlation_id', $sql);
+        self::assertStringContainsString('agentforge_completed_write_proposal', $sql);
+        self::assertStringContainsString('`proposal_id`', $sql);
+        self::assertStringContainsString('`write_target`', $sql);
     }
 }

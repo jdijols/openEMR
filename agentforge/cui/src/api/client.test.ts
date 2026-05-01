@@ -5,7 +5,7 @@
  * correlation-id round trip (client-generated → header → server may echo).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { postChat, redeemHandshake } from './client.js';
+import { AgentForgeDeliveryError, getConversationRecap, postChat, postPresentPatient, redeemHandshake } from './client.js';
 
 const ORIGINAL_FETCH = globalThis.fetch;
 
@@ -91,6 +91,8 @@ describe('postChat (G2-11 / PRD §6.2)', () => {
 
     expect(out.blocks).toEqual([{ type: 'text', text: 'No allergies on file.' }]);
     expect(out.correlationId).toBe('server-echo-id');
+    expect(out.citation_navigation).toEqual({});
+    expect(out.conversationId).toBeNull();
 
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('http://api.local/chat');
@@ -103,17 +105,149 @@ describe('postChat (G2-11 / PRD §6.2)', () => {
     });
   });
 
-  it('throws api_misconfigured_llm on 501 from server', async () => {
+  it('round-trips conversation_id when provided and echoes back from Agent API', async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          ok: true,
+          blocks: [{ type: 'text', text: 'Echo.' }],
+          correlation_id: 'c2',
+          conversation_id: '00000000-0000-4000-a000-0000000000cc',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    const out = await postChat('http://api.local', 'tok', 'pat-1', 'hello', {
+      conversation_id: '00000000-0000-4000-a000-0000000000bb',
+    });
+    expect(out.conversationId).toBe('00000000-0000-4000-a000-0000000000cc');
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      session_token: 'tok',
+      patient_uuid: 'pat-1',
+      message: 'hello',
+      conversation_id: '00000000-0000-4000-a000-0000000000bb',
+    });
+  });
+
+  it('parses citation_navigation map when returned by Agent API', async () => {
+    globalThis.fetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          ok: true,
+          blocks: [{ type: 'text', text: 'See chart.' }],
+          correlation_id: 'cmap-id',
+          citation_navigation: {
+            'eu-u': { kind: 'encounter', params: { encounter_id: 9 } },
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    ) as typeof fetch;
+
+    const out = await postChat('http://api.local', 'tok', 'pat-1', 'x');
+    expect(out.citation_navigation['eu-u']).toEqual({
+      kind: 'encounter',
+      params: { encounter_id: 9 },
+    });
+  });
+
+  it('throws AgentForgeDeliveryError misconfigured_llm on 501 from server', async () => {
     globalThis.fetch = vi.fn(async () =>
       new Response(JSON.stringify({ error: 'misconfigured' }), { status: 501 }),
     ) as typeof fetch;
-    await expect(postChat('http://api.local', 't', 'p', 'm')).rejects.toThrow('api_misconfigured_llm');
+
+    await expect(postChat('http://api.local', 't', 'p', 'm')).rejects.toMatchObject({
+      name: 'AgentForgeDeliveryError',
+      kind: 'misconfigured_llm',
+    });
   });
 
-  it('throws chat_failed on generic 5xx', async () => {
+  it('throws AgentForgeDeliveryError backend_error with correlation id on generic 5xx', async () => {
     globalThis.fetch = vi.fn(async () =>
-      new Response(JSON.stringify({ error: 'internal_error' }), { status: 500 }),
+      new Response(
+        JSON.stringify({ error: 'internal_error', correlation_id: 'abc-uuid' }),
+        { status: 500 },
+      ),
     ) as typeof fetch;
-    await expect(postChat('http://api.local', 't', 'p', 'm')).rejects.toThrow('chat_failed');
+
+    const errUnknown = await postChat('http://api.local', 't', 'p', 'm').catch((e): unknown => e);
+    expect(errUnknown).toBeInstanceOf(AgentForgeDeliveryError);
+    const err = errUnknown as AgentForgeDeliveryError;
+    expect(err.kind).toBe('backend_error');
+    expect(err.correlationId).toBe('abc-uuid');
+  });
+
+  it('throws network_unreachable when fetch rejects', async () => {
+    globalThis.fetch = vi.fn(async (): Promise<Response> =>
+      Promise.reject(new TypeError('Failed to fetch')),
+    ) as typeof fetch;
+
+    const errUnknown = await postChat('http://api.local', 't', 'p', 'm').catch((e): unknown => e);
+    expect(errUnknown).toBeInstanceOf(AgentForgeDeliveryError);
+    expect((errUnknown as AgentForgeDeliveryError).kind).toBe('network_unreachable');
+  });
+});
+
+describe('postPresentPatient (G3-11 case presentation)', () => {
+  it('POSTs /present-patient with optional force_refresh', async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          ok: true,
+          blocks: [{ type: 'text', text: 'Case overview: demo.' }],
+          correlation_id: 'cp-1',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    const out = await postPresentPatient('http://api.local', 'tok', 'pat-1', true);
+
+    expect(out.blocks[0]).toEqual({ type: 'text', text: 'Case overview: demo.' });
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({
+      session_token: 'tok',
+      patient_uuid: 'pat-1',
+      force_refresh: true,
+    });
+  });
+});
+
+describe('getConversationRecap (Gate 5 / UC-C)', () => {
+  it('GETs recap with Bearer session and X-Patient-Uuid', async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          ok: true,
+          items: [
+            { id: '1', classification: 'confirmed', summary: 'CC saved', write_target: 'chief_complaint' },
+          ],
+          counts: { confirmed: 1, rejected: 0, unresolved: 0, refusal: 0 },
+          correlation_id: 'r1',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    const out = await getConversationRecap(
+      'http://api.local/',
+      'sess.tok',
+      'patient-uu',
+      '00000000-0000-4000-8000-00000000c0de',
+    );
+
+    expect(out.items[0]?.classification).toBe('confirmed');
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toContain('/conversations/');
+    expect(url).toContain('recap');
+    const headers = new Headers(init.headers as Record<string, string>);
+    expect(headers.get('Authorization')).toBe('Bearer sess.tok');
+    expect(headers.get('X-Patient-Uuid')).toBe('patient-uu');
   });
 });

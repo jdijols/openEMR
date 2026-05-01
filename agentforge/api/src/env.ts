@@ -6,7 +6,7 @@ import { z } from 'zod';
 export const envSchema = z.object({
   LLM_PROVIDER: z.string().min(1),
   LLM_API_KEY: z.string().min(1),
-  STT_PROVIDER: z.string().min(1),
+  STT_PROVIDER: z.enum(['deepgram', 'assemblyai', 'mock']),
   STT_API_KEY: z.string().min(1),
   OPENEMR_MODULE_BASE_URL: z.string().url(),
   OPENEMR_MODULE_SHARED_SECRET: z.string().min(1),

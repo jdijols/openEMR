@@ -17,3 +17,12 @@ CREATE TABLE `agentforge_launch_code` (
 #IfMissingColumn log correlation_id
 ALTER TABLE `log` ADD COLUMN `correlation_id` VARCHAR(64) NOT NULL DEFAULT '';
 #EndIf
+
+#IfNotTable agentforge_completed_write_proposal
+CREATE TABLE `agentforge_completed_write_proposal` (
+    `proposal_id` VARCHAR(191) NOT NULL,
+    `write_target` VARCHAR(64) NOT NULL,
+    `recorded_at` DATETIME NOT NULL,
+    PRIMARY KEY (`proposal_id`)
+) ENGINE=InnoDB;
+#EndIf

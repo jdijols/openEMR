@@ -76,6 +76,7 @@ Pulled verbatim from [`USERS.md` §7.1](USERS.md). The agent must **refuse or de
 - Capture patient audio or retain audio files.
 - Write without an explicit physician confirm.
 - Bypass the active OpenEMR session, chart binding, or ACLs that would govern the same action in the normal UI.
+- **Case presentation (outpatient UC-A):** the auto "Visit topics" section must list only items already evidenced by chart context payloads. It must **not** invent new orders, prescriptions, diagnoses, imaging, or billing actions that are not already documented in the chart data returned by the Context Service for that turn.
 
 The full refusal list and degraded-behavior expectations are in [`USERS.md` §7.2-§7.3](USERS.md). The Verification section §9 enforces them in code; the Eval section §10 measures them.
 
@@ -85,7 +86,7 @@ The full refusal list and degraded-behavior expectations are in [`USERS.md` §7.
 
 - [ ] Live HTTPS URL serves the OpenEMR shell with the AgentForge module installed and the chat icon visible in the header.
 - [ ] Active-chart binding works: opening a chart, opening the rail, and asking a chart-scoped question returns a source-cited answer for that patient and only that patient.
-- [ ] UC-A briefing renders for at least 3 of the 5 demo storyboard charts in §12.4 with cited claims and at least one "what changed" item.
+- [ ] **UC-A — Auto case presentation:** opening an active-patient chart **automatically opens the rail** and delivers a compact, source-cited outpatient case presentation (SOAP-style: one-liner + interval + objective + assessment + documented visit topics). The same pipeline is re-runnable via "Brief me" / refresh controls without inventing new orders or diagnoses (§1.3). Demo rehearsal: **≥3** storyboard charts from §12.4, each showing **≥1** interval or problem-status item with valid `claim` citations.
 - [ ] UC-B can capture a transcript, propose at least one write per write target (chief complaint, vitals incl. pain/H/W, tobacco, allergy add), and execute the write after explicit confirm. The Loom demonstrates **at least one full propose→confirm→write→accept** loop end-to-end.
 - [ ] UC-C continues the same thread after "end transcript," summarizes confirmed/rejected proposals, and refuses any silent write.
 - [ ] Eval harness §10 runs locally with at least the deterministic checks from §10.2 passing (citation enforcement, refusal paths, forbidden outputs).
@@ -266,6 +267,7 @@ This section operationalizes the OpenEMR-side of [`ARCHITECTURE.md` "Three parts
 
 - `templates/header_icon.html.twig` injects a single chat icon button into the OpenEMR global header, near search/profile controls. Click toggles rail visibility.
 - `templates/rail_container.html.twig` renders a fixed-width right rail (recommended width: 420px, configurable via a `data-` attribute). The iframe inside loads `public/panel.php`.
+- **Gate 3 (UC-A):** when the OpenEMR active patient (`pid`) transitions to a non-empty bound chart, the shell **opens the rail automatically** (CSS toggle) and loads `panel.php`. After the iframe loads, the shell posts `postMessage({ type: 'AGENTFORGE_PRESENT_PATIENT' }, origin)` so the CUI can request `POST /present-patient` (agent API) and render the compact case presentation. Patient switches still blank/reload the iframe per active-chart sync; the CUI must not show the prior patient's thread.
 - `public/panel.php` validates the active OpenEMR session, mints a launch code via §4.3, and serves the CUI build's `index.html` (or a thin wrapper that injects the launch code as a `data-launch-code` attribute on the root element).
 - The iframe **stays mounted** when the rail is hidden (CSS `display:none` toggle, not unmount). Per [`ARCHITECTURE.md` "Host UX integration"](ARCHITECTURE.md), this preserves chat state across header toggles.
 - If the current OpenEMR shell screen has fixed-width content that would create horizontal scroll, the rail must overlay (raise `z-index` above shell) instead of pushing content. Detect via a check on the main content's natural width vs viewport width minus rail width.
@@ -971,7 +973,7 @@ Security-critical. Includes Given/When/Then.
 
 - On mount, `src/handshake/useHandshake.ts` reads the launch code from a `data-launch-code` attribute on `<html>` (delivered by `panel.php` per §4.3) OR awaits a `LAUNCH_CODE` postMessage from the parent shell. The first source to arrive wins.
 - Calls `agentforge-api` `POST /handshake/redeem` with the code. On success, stores `session_token` in React state (memory only; never `localStorage`/`sessionStorage`).
-- Listens for parent shell messages: `PATIENT_SWITCH` (resets state), `RAIL_HIDDEN` (no-op for state), `RAIL_SHOWN` (no-op for state). Origin validation: only messages from the OpenEMR shell origin (configured via build-time env or via the launch code redemption response) are accepted.
+- Listens for parent shell messages: `PATIENT_SWITCH` (resets state), `RAIL_HIDDEN` (no-op for state), `RAIL_SHOWN` (no-op for state), **`AGENTFORGE_PRESENT_PATIENT`** (triggers `POST /present-patient` after handshake ready — auto case presentation on chart open). Origin validation: only messages from the OpenEMR shell origin (configured via build-time env or via the launch code redemption response) are accepted.
 - On a hard reload (`F5`), the CUI obtains a new launch code by reloading `panel.php`. Transcript and conversation history reload from the agent API via §6.8.
 
 #### 6.2.2 Done means
@@ -1157,6 +1159,8 @@ Security-critical (host integration). Includes Given/When/Then.
 - Unsupported `kind` values fall back to chart-level navigation (just open the chart summary). The CUI surfaces "Limited navigation available for this source" when this fallback fires.
 
 #### 6.7.2 Done means
+
+> **Implementation note (Gate G3-10 — task list precedence):** MVP ships **encounter** citation deep-links first via `NAV_REQUEST` + host routing; other `navigation_hint.kind` values route to chart-summary fallback with “limited navigation” CUI copy until additional surfaces are wired (PRD baseline still targets two kinds over time — see checklist below).
 
 - [ ] At least two `kind` values are wired (`encounter`, `problem` recommended).
 - [ ] Patient mismatch on navigation is refused.

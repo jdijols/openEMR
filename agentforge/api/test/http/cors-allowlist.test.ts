@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { buildApp } from '../../src/app.js';
 import { createObservability } from '../../src/observability/index.js';
 import { testEnv } from '../helpers/env-fixture.js';
+import { createStubPgPool } from '../helpers/stub-pg-pool.js';
 
 describe('CORS allowlist (PRD §8.4)', () => {
   it('does not set Access-Control-Allow-Origin for disallowed origins', async () => {
     const env = testEnv({ CUI_ALLOWED_ORIGINS: 'http://allowed.example' });
-    const app = buildApp(env, createObservability(env));
+    const app = buildApp(env, createObservability(env), createStubPgPool());
     const res = await app.request('http://localhost/handshake/redeem', {
       method: 'OPTIONS',
       headers: {
@@ -20,7 +21,7 @@ describe('CORS allowlist (PRD §8.4)', () => {
 
   it('sets ACAO for allowed origin', async () => {
     const env = testEnv({ CUI_ALLOWED_ORIGINS: 'http://allowed.example' });
-    const app = buildApp(env, createObservability(env));
+    const app = buildApp(env, createObservability(env), createStubPgPool());
     const res = await app.request('http://localhost/health', {
       headers: { Origin: 'http://allowed.example' },
     });
