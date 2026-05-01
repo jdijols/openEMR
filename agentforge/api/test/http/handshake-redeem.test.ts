@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { buildApp } from '../../src/app.js';
+import { verifySessionToken } from '../../src/handshake/sessionToken.js';
 import { createObservability } from '../../src/observability/index.js';
 import { testEnv } from '../helpers/env-fixture.js';
 import { createStubPgPool } from '../helpers/stub-pg-pool.js';
@@ -66,6 +67,62 @@ describe('POST /handshake/redeem', () => {
       patient_uuid_present: true,
       encounter_id_present: true,
     });
+  });
+
+  it('round-trips facility_tz from module response into the minted session token (P2 fix)', async () => {
+    const env = testEnv();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            user_id: 7,
+            patient_uuid: 'pat-tz',
+            encounter_id: null,
+            facility_tz: 'America/New_York',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      ),
+    );
+
+    const app = buildApp(env, createObservability(env), createStubPgPool());
+    const res = await app.request('/handshake/redeem', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ launch_code: 'tz-launch' }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { session_token: string };
+    const claims = verifySessionToken(body.session_token, env.SESSION_TOKEN_SECRET);
+    expect(claims).not.toBeNull();
+    expect(claims?.facility_tz).toBe('America/New_York');
+  });
+
+  it('mints a token with facility_tz=null when the module omits the field (back-compat)', async () => {
+    const env = testEnv();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({ user_id: 7, patient_uuid: 'pat-no-tz', encounter_id: null }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      ),
+    );
+
+    const app = buildApp(env, createObservability(env), createStubPgPool());
+    const res = await app.request('/handshake/redeem', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ launch_code: 'no-tz-launch' }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { session_token: string };
+    const claims = verifySessionToken(body.session_token, env.SESSION_TOKEN_SECRET);
+    expect(claims?.facility_tz).toBeNull();
   });
 
   it('maps module auth failures to generic 401', async () => {

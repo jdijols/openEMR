@@ -22,7 +22,7 @@ final class SessionTokenVerifier
     }
 
     /**
-     * @return ?array{user_id:int, patient_uuid:?string, encounter_id:?int, iat:int, exp:int}
+     * @return ?array{user_id:int, patient_uuid:?string, encounter_id:?int, facility_tz:?string, iat:int, exp:int}
      */
     public function verify(string $token): ?array
     {
@@ -70,6 +70,13 @@ final class SessionTokenVerifier
             return null;
         }
 
+        // Post-deploy P2: optional + nullable for backward compatibility with
+        // tokens minted before the facility-tz pipe-through landed.
+        $facilityTz = array_key_exists('facility_tz', $data) ? $data['facility_tz'] : null;
+        if ($facilityTz !== null && !is_string($facilityTz)) {
+            return null;
+        }
+
         $now = time();
         if ($now < $data['iat'] || $now > $data['exp']) {
             return null;
@@ -79,6 +86,7 @@ final class SessionTokenVerifier
             'user_id' => $data['user_id'],
             'patient_uuid' => $patientUuid,
             'encounter_id' => $encounterId,
+            'facility_tz' => $facilityTz,
             'iat' => $data['iat'],
             'exp' => $data['exp'],
         ];

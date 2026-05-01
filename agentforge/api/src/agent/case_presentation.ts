@@ -1,5 +1,6 @@
 import { generateText } from 'ai';
 import type { Env } from '../env.js';
+import { verifySessionToken } from '../handshake/sessionToken.js';
 import { OpenEmrCallError } from '../openemr/client.js';
 import type { Observability } from '../observability/index.js';
 import { assertBoundPatient } from '../tools/_binding.js';
@@ -99,9 +100,14 @@ async function runCasePresentationUncached(
   const trace = await observability.traceTurn({ correlationId, turnName: 'case_presentation' });
   const ctx = { sessionToken, correlationId };
 
+  // P2 fix: format the brief's `today` in the operator's facility tz, not UTC.
+  // Token validity (signature, expiry, patient binding) is already gated by
+  // `assertBoundPatient` above; this re-verify is just to read the claim.
+  const facilityTz = verifySessionToken(sessionToken, env.SESSION_TOKEN_SECRET)?.facility_tz ?? null;
+
   let fetched;
   try {
-    fetched = await fetchCasePresentationData(env, ctx, patientUuid);
+    fetched = await fetchCasePresentationData(env, ctx, patientUuid, facilityTz);
   } catch (e) {
     if (e instanceof OpenEmrCallError) {
       return { blocks: [{ type: 'refusal', reason: 'chart_read_failed' }], citation_navigation: {} };

@@ -287,7 +287,35 @@
             return inp && inp.value ? String(inp.value) : '';
         }
 
+        // Post-deploy P2 fix: also probe the active encounter id from the same
+        // top-level OpenEMR view-model so the rail re-mints the launch code
+        // (and therefore the JWT's encounter_id claim) when the operator saves
+        // a new encounter mid-session. Before this, the JWT was frozen at the
+        // value of $_SESSION['encounter'] at handshake and the agent kept
+        // refusing dictation with "no recent encounter for today".
+        function readEncounterProbe() {
+            try {
+                var appPatient =
+                    window.top &&
+                    window.top.app_view_model &&
+                    window.top.app_view_model.application_data &&
+                    window.top.app_view_model.application_data.patient &&
+                    window.top.app_view_model.application_data.patient();
+                if (appPatient && typeof appPatient.selectedEncounterID === 'function') {
+                    var raw = appPatient.selectedEncounterID();
+                    if (raw !== null && raw !== undefined && String(raw) !== '') {
+                        return String(raw);
+                    }
+                }
+            } catch (ignored) {
+                // Cross-frame errors should not break the rail; missing encounter id is fine.
+            }
+
+            return '';
+        }
+
         var prevPid = readPidProbe();
+        var prevEncounter = readEncounterProbe();
 
         function postPresentPatientToFrame() {
             if (!frame || !frame.contentWindow) {
@@ -320,8 +348,14 @@
 
         setInterval(function () {
             var cur = readPidProbe();
-            if (cur !== prevPid) {
+            var curEnc = readEncounterProbe();
+            // Pid change OR encounter change re-mints the launch code via the
+            // panel reload — both are reasons the JWT's bound chart context is
+            // now stale. Encounter change alone (P2 fix) is the common case
+            // when the operator clicks "Save Encounter" mid-rail-session.
+            if (cur !== prevPid || curEnc !== prevEncounter) {
                 prevPid = cur;
+                prevEncounter = curEnc;
                 blankPanelIframe();
                 if (cur !== '' && !rail.classList.contains('agentforge-rail--collapsed')) {
                     ensurePanelLoaded();

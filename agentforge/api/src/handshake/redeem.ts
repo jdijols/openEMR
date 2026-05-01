@@ -10,6 +10,13 @@ const moduleOkSchema = z.object({
   user_id: z.number(),
   patient_uuid: z.string().nullable(),
   encounter_id: z.number().nullable().optional(),
+  /**
+   * OpenEMR-configured facility timezone (`gbl_time_zone`), captured at
+   * handshake so the agent's "today" is the operator's local calendar date,
+   * not UTC. Nullable so the module may omit it on installs without
+   * `gbl_time_zone` set; the agent then falls back to UTC.
+   */
+  facility_tz: z.string().min(1).nullable().optional(),
 });
 
 export async function redeemLaunchCode(
@@ -68,6 +75,7 @@ export async function redeemLaunchCode(
       user_id: json.user_id,
       patient_uuid: json.patient_uuid,
       encounter_id: json.encounter_id ?? null,
+      facility_tz: json.facility_tz ?? null,
     },
     env.SESSION_TOKEN_SECRET,
     now,

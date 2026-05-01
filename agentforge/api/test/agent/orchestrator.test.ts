@@ -590,6 +590,87 @@ describe('runChatTurn (PRD §5.7 wiring)', () => {
     expect(out.conversation_id).toBe(CONVERSATION_EXTERNAL_ID);
   });
 
+  it('formats server_today in the JWT facility_tz, not UTC (P2 fix)', async () => {
+    // Reproducer: 1:30 AM UTC May 1 = 9:30 PM Eastern Apr 30. Pre-fix the
+    // prompt header carried "server_today: 2026-05-01" and the model refused
+    // dictation against the operator-saved encounter on Apr 30. With the
+    // facility_tz claim populated the header now carries Apr 30 and the model
+    // can bind to that encounter.
+    vi.setSystemTime(new Date('2026-05-01T01:30:00Z'));
+
+    const env = testEnv();
+    const { obs } = recordingObs();
+    generateTextMock.mockResolvedValueOnce({
+      text: JSON.stringify({ blocks: [{ type: 'text', text: 'ack' }] }),
+      staticToolResults: [],
+    });
+
+    const nowSec = Math.floor(new Date('2026-05-01T01:30:00Z').getTime() / 1000);
+    const sessionToken = mintSessionToken(
+      { user_id: 1, patient_uuid: 'pat-1', encounter_id: 295, facility_tz: 'America/New_York' },
+      env.SESSION_TOKEN_SECRET,
+      nowSec,
+      600,
+    );
+
+    await runChatTurn(
+      env,
+      obs,
+      {
+        sessionToken,
+        patientUuid: 'pat-1',
+        userMessage: 'BP 132 over 84.',
+        conversation_id: CONVERSATION_EXTERNAL_ID,
+      },
+      'corr-tz',
+      { pool },
+    );
+
+    const args = generateTextMock.mock.calls[0]?.[0] as { prompt: string };
+    expect(args.prompt).toContain('server_today: 2026-04-30');
+    expect(args.prompt).not.toContain('server_today: 2026-05-01');
+    expect(args.prompt).toContain('active_encounter_id for this turn: 295');
+
+    vi.useRealTimers();
+  });
+
+  it('falls back to UTC server_today when JWT has no facility_tz claim (back-compat)', async () => {
+    vi.setSystemTime(new Date('2026-05-01T01:30:00Z'));
+
+    const env = testEnv();
+    const { obs } = recordingObs();
+    generateTextMock.mockResolvedValueOnce({
+      text: JSON.stringify({ blocks: [{ type: 'text', text: 'ack' }] }),
+      staticToolResults: [],
+    });
+
+    const nowSec = Math.floor(new Date('2026-05-01T01:30:00Z').getTime() / 1000);
+    const sessionToken = mintSessionToken(
+      { user_id: 1, patient_uuid: 'pat-1', encounter_id: null },
+      env.SESSION_TOKEN_SECRET,
+      nowSec,
+      600,
+    );
+
+    await runChatTurn(
+      env,
+      obs,
+      {
+        sessionToken,
+        patientUuid: 'pat-1',
+        userMessage: 'hi',
+        conversation_id: CONVERSATION_EXTERNAL_ID,
+      },
+      'corr-tz-fallback',
+      { pool },
+    );
+
+    const args = generateTextMock.mock.calls[0]?.[0] as { prompt: string };
+    expect(args.prompt).toContain('server_today: 2026-05-01');
+
+    vi.useRealTimers();
+  });
+
   it('uses step-level tool results for verification evidence', async () => {
     const env = testEnv();
     const { obs } = recordingObs();

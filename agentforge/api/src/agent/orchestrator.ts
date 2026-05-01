@@ -12,6 +12,7 @@ import { createGetAllergiesTool } from '../tools/get_allergies.js';
 import { createGetIdentityTool } from '../tools/get_identity.js';
 import { createProposeWriteTools } from '../tools/propose_writes.js';
 import { estimateUsdForProviderTokens } from './cost_estimate.js';
+import { todayInFacilityTz } from './local_date.js';
 import { CLINICAL_SYSTEM_PROMPT } from './system_prompt.js';
 import { getChatModel } from './model.js';
 import { buildCitationNavigationIndex, buildClinicalToolEvidence, type CitationNavigationHint } from './toolEvidence.js';
@@ -630,7 +631,10 @@ export async function runChatTurn(
       sessionClaims.encounter_id
     : null;
 
-  const today = new Date().toISOString().slice(0, 10);
+  // P2 fix: format `server_today` in OpenEMR's configured facility timezone
+  // (carried in the JWT `facility_tz` claim) so the model's "today" matches
+  // the operator's wall clock, not UTC. Falls back to UTC when claim absent.
+  const today = todayInFacilityTz(new Date(), sessionClaims?.facility_tz ?? null);
   const turnHeader =
     boundEncounterId !== null ?
       `patient_uuid for this turn: ${input.patientUuid}\nactive_encounter_id for this turn: ${boundEncounterId}\nserver_today: ${today}\n\nUser: ${input.userMessage}`

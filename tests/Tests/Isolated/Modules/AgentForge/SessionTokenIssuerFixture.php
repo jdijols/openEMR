@@ -15,7 +15,7 @@ namespace OpenEMR\Tests\Isolated\Modules\AgentForge;
 final class SessionTokenIssuerFixture
 {
     /**
-     * @param array{user_id:int, patient_uuid:?string, encounter_id:?int, iat:int, exp:int} $payload
+     * @param array{user_id:int, patient_uuid:?string, encounter_id:?int, iat:int, exp:int, facility_tz?:?string} $payload
      */
     public static function mint(string $secret, array $payload): string
     {

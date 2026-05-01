@@ -39,4 +39,67 @@ final class SessionTokenInteropTest extends TestCase
         self::assertSame('uuid-1', $claims['patient_uuid']);
         self::assertSame(5, $claims['encounter_id']);
     }
+
+    public function testVerifierStillAcceptsLegacyTokenWithoutFacilityTz(): void
+    {
+        // Post-deploy P2: facility_tz was added to the JWT after Gates 3-5 shipped.
+        // Tokens minted before that fix must still verify (backward compatibility) —
+        // verifier returns null facility_tz for them.
+        $secret = '0123456789abcdef0123456789abcdef';
+        $now = time();
+        $token = SessionTokenIssuerFixture::mint($secret, [
+            'user_id' => 7,
+            'patient_uuid' => 'uuid-legacy',
+            'encounter_id' => null,
+            'iat' => $now - 5,
+            'exp' => $now + 1000,
+        ]);
+
+        $verifier = new SessionTokenVerifier($secret);
+        $claims = $verifier->verify($token);
+        self::assertNotNull($claims);
+        self::assertNull($claims['facility_tz']);
+    }
+
+    public function testVerifierRoundTripsFacilityTzClaim(): void
+    {
+        // Post-deploy P2 fix: facility tz captured from OpenEMR `gbl_time_zone`
+        // at handshake must round-trip through the JWT so the agent can format
+        // `server_today` in the operator's local clock.
+        $secret = '0123456789abcdef0123456789abcdef';
+        $now = time();
+        $token = SessionTokenIssuerFixture::mint($secret, [
+            'user_id' => 12,
+            'patient_uuid' => 'uuid-tz',
+            'encounter_id' => 42,
+            'iat' => $now - 5,
+            'exp' => $now + 1000,
+            'facility_tz' => 'America/New_York',
+        ]);
+
+        $verifier = new SessionTokenVerifier($secret);
+        $claims = $verifier->verify($token);
+        self::assertNotNull($claims);
+        self::assertSame('America/New_York', $claims['facility_tz']);
+    }
+
+    public function testVerifierRejectsMalformedFacilityTzClaim(): void
+    {
+        // Defensive: a non-string facility_tz should fail validation rather
+        // than silently degrade to UTC at the agent.
+        $secret = '0123456789abcdef0123456789abcdef';
+        $now = time();
+        $token = SessionTokenIssuerFixture::mint($secret, [
+            'user_id' => 12,
+            'patient_uuid' => 'uuid-bad-tz',
+            'encounter_id' => null,
+            'iat' => $now - 5,
+            'exp' => $now + 1000,
+            // @phpstan-ignore-next-line — intentionally wrong type for negative test
+            'facility_tz' => 12345,
+        ]);
+
+        $verifier = new SessionTokenVerifier($secret);
+        self::assertNull($verifier->verify($token));
+    }
 }

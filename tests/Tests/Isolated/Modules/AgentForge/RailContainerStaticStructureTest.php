@@ -56,5 +56,13 @@ final class RailContainerStaticStructureTest extends TestCase
         self::assertStringContainsString('setCollapsed', $contents);
         self::assertStringContainsString('agentforge.rail.collapsed', $contents);
         self::assertStringContainsString('agentforge.rail.width', $contents);
+
+        // Post-deploy P2 fix — also poll the active encounter id so the rail re-mints
+        // the launch code (refreshing the JWT's encounter_id) when the operator saves
+        // a new encounter mid-session. Without this, the agent kept refusing dictation
+        // with "no recent encounter for today" even after the encounter was saved.
+        self::assertStringContainsString('readEncounterProbe', $contents);
+        self::assertStringContainsString('selectedEncounterID', $contents);
+        self::assertStringContainsString('cur !== prevPid || curEnc !== prevEncounter', $contents);
     }
 }

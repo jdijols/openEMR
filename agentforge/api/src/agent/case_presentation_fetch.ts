@@ -7,6 +7,7 @@ import {
   type OpenEmrClientContext,
 } from '../openemr/client.js';
 import type { AllergyRow, ContextRow, IdentityDataRow } from '../openemr/types.js';
+import { todayInFacilityTz } from './local_date.js';
 
 /**
  * Read DOB from an identity row in either casing PHP/PatientService may emit
@@ -51,12 +52,6 @@ export function computeAgeYears(dob: string, today: Date): number | null {
   return age >= 0 && age < 130 ? age : null;
 }
 
-function todayIsoDate(now: Date): string {
-  const y = now.getUTCFullYear().toString().padStart(4, '0');
-  const m = (now.getUTCMonth() + 1).toString().padStart(2, '0');
-  const d = now.getUTCDate().toString().padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
 
 type AiToolResultLike = {
   readonly type: 'tool-result';
@@ -120,11 +115,17 @@ const clamp = <T>(arr: readonly T[], n: number): readonly T[] => (arr.length <= 
 
 /**
  * Parallel bounded reads for case presentation; identity must succeed (caller handles throw).
+ *
+ * `facilityTz` (optional) is the OpenEMR `gbl_time_zone` carried through the
+ * session token; the bundle's `today` is formatted in that zone so the model's
+ * "today" matches the operator's wall clock instead of UTC. Falls back to UTC
+ * when null/empty.
  */
 export async function fetchCasePresentationData(
   env: Env,
   ctx: OpenEmrClientContext,
   patientUuid: string,
+  facilityTz: string | null = null,
 ): Promise<CasePresentationFetched> {
   const identity = await getIdentity(env, ctx, patientUuid);
 
@@ -201,7 +202,7 @@ export async function fetchCasePresentationData(
   // patient_data 'date' column (row create/update timestamp) was a known foot-gun
   // — strip it from the identity sent to the LLM so it cannot be mistaken for today.
   const now = new Date();
-  const today = todayIsoDate(now);
+  const today = todayInFacilityTz(now, facilityTz);
   const dob = readDob(identity);
   const ageYears = dob !== null ? computeAgeYears(dob, now) : null;
   const identityForLlm: Record<string, unknown> = { ...identity };

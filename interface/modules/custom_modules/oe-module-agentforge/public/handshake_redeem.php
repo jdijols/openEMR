@@ -14,6 +14,7 @@ require_once __DIR__ . '/agentforge_common.php';
 
 agentforge_require_globals(ignoreAuthForRequest: true);
 
+use OpenEMR\Core\OEGlobalsBag;
 use OpenEMR\Modules\AgentForge\Install\AgentForgeAclInstaller;
 use OpenEMR\Modules\AgentForge\Security\LaunchCode;
 use OpenEMR\Modules\AgentForge\Security\OpenEmrLaunchCodeStore;
@@ -36,8 +37,18 @@ if ($payload === null) {
     \agentforge_emit_json(401, ['error' => 'invalid_launch_code']);
 }
 
+// Post-deploy P2 fix: capture the OpenEMR-configured facility timezone here so
+// the agent can format `server_today` in the operator's local clock instead of
+// UTC. Falls back to PHP's date.timezone when `gbl_time_zone` is unset (matches
+// OpenEMR's own globals.inc.php fallback note).
+$facilityTzRaw = OEGlobalsBag::getInstance()->get('gbl_time_zone');
+$facilityTz = (\is_string($facilityTzRaw) && $facilityTzRaw !== '')
+    ? $facilityTzRaw
+    : \date_default_timezone_get();
+
 \agentforge_emit_json(200, [
     'user_id' => $payload->userId,
     'patient_uuid' => $payload->patientUuid,
     'encounter_id' => $payload->encounterId,
+    'facility_tz' => $facilityTz !== '' ? $facilityTz : null,
 ]);

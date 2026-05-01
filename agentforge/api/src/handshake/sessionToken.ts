@@ -1,5 +1,10 @@
 /**
  * HMAC session token — must match `OpenEMR\Modules\AgentForge\Security\SessionTokenVerifier` (PRD §5.2).
+ *
+ * `facility_tz` was added in the post-deploy P2 fix: the OpenEMR-configured
+ * `gbl_time_zone` is captured at handshake time and carried through every turn
+ * so the agent's "today" calendar date matches the operator's local clock
+ * instead of UTC. Optional + nullable so old tokens (and tests) still verify.
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
@@ -7,9 +12,11 @@ export type SessionTokenIdentity = {
   user_id: number;
   patient_uuid: string | null;
   encounter_id: number | null;
+  facility_tz?: string | null;
 };
 
-export type SessionTokenPayload = SessionTokenIdentity & {
+export type SessionTokenPayload = Required<Pick<SessionTokenIdentity, 'user_id' | 'patient_uuid' | 'encounter_id'>> & {
+  facility_tz: string | null;
   iat: number;
   exp: number;
 };
@@ -39,6 +46,7 @@ export function mintSessionToken(
     user_id: identity.user_id,
     patient_uuid: identity.patient_uuid,
     encounter_id: identity.encounter_id,
+    facility_tz: identity.facility_tz ?? null,
     iat: nowSec,
     exp: nowSec + ttlSec,
   };
@@ -84,10 +92,23 @@ export function verifySessionToken(token: string, secret: string): SessionTokenP
   if (now < o.iat || now > o.exp) {
     return null;
   }
+  // facility_tz is optional + nullable for backward compatibility with tokens
+  // minted before the post-deploy P2 fix; reject only when present-but-malformed.
+  let facility_tz: string | null = null;
+  if ('facility_tz' in o) {
+    if (o.facility_tz === null) {
+      facility_tz = null;
+    } else if (typeof o.facility_tz === 'string') {
+      facility_tz = o.facility_tz;
+    } else {
+      return null;
+    }
+  }
   return {
     user_id: o.user_id,
     patient_uuid: o.patient_uuid as string | null,
     encounter_id: o.encounter_id as number | null,
+    facility_tz,
     iat: o.iat,
     exp: o.exp,
   };
