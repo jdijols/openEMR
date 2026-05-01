@@ -33,6 +33,53 @@ function readPackageVersion(): string {
   return pkg.version ?? '0.0.0';
 }
 
+async function probePostgres(pgPool: Pool): Promise<'ok' | 'degraded'> {
+  try {
+    await pgPool.query('SELECT 1 FROM agentforge.conversations LIMIT 1');
+    return 'ok';
+  } catch {
+    return 'degraded';
+  }
+}
+
+/**
+ * Post-deploy P1 hardening: round-trip the shared secret to the OpenEMR module.
+ * Distinguishes `secret_mismatch` (containers running with drifted env) from
+ * `unreachable` (network/DNS/down) so the operator can grep `/health` instead
+ * of waiting for a confirmed-write to fail in the rail.
+ */
+const OPENEMR_HEALTH_PROBE_TIMEOUT_MS = 2000;
+
+async function probeOpenEmrModule(env: Env): Promise<'ok' | 'secret_mismatch' | 'unreachable'> {
+  const base = env.OPENEMR_MODULE_BASE_URL.replace(/\/$/, '');
+  const url = `${base}/health/internal_auth.php`;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), OPENEMR_HEALTH_PROBE_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'X-Internal-Auth': env.OPENEMR_MODULE_SHARED_SECRET,
+      },
+      body: '{}',
+      signal: controller.signal,
+    });
+  } catch {
+    return 'unreachable';
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (res.status === 200) return 'ok';
+  if (res.status === 401) return 'secret_mismatch';
+  return 'unreachable';
+}
+
 const chatRequestSchema = z.object({
   session_token: z.string().min(1),
   patient_uuid: z.string().min(1),
@@ -74,20 +121,17 @@ export function buildApp(
   app.use('*', corsAllowlistMiddleware(env));
 
   app.get('/health', async (c) => {
-    let postgres_probe: 'ok' | 'degraded';
-    try {
-      await pgPool.query('SELECT 1 FROM agentforge.conversations LIMIT 1');
-      postgres_probe = 'ok';
-    } catch {
-      postgres_probe = 'degraded';
-    }
+    const [postgres_probe, openemr_module_probe] = await Promise.all([
+      probePostgres(pgPool),
+      probeOpenEmrModule(env),
+    ]);
 
     return c.json({
-      ok: postgres_probe === 'ok',
+      ok: postgres_probe === 'ok' && openemr_module_probe === 'ok',
       version: readPackageVersion(),
       providers: { llm: env.LLM_PROVIDER, stt: env.STT_PROVIDER },
       deps: {
-        openemr_module: 'unknown',
+        openemr_module: openemr_module_probe,
         postgres: postgres_probe === 'ok' ? 'reachable' : 'degraded_chat_requires_migrations_or_url',
         langfuse: 'unknown',
       },
