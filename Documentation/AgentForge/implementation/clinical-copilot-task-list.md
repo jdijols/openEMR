@@ -268,7 +268,7 @@ This gate is **test-first** for every row marked `test-first` in the table.
 
 ## Gate 5 — STT + UC-C
 
-**Status:** `[x]` **CLOSED** (2026-04-30) for engineering (**G5-01..G5-07**). **G5-08** remains **`[~]`** until the engineer completes manual smoke + marks **`[x]`** in this table (checklist: [`0430-T2145-gate5-stt-uc-c-manual-smoke.md`](../process/journal/week-1/0430-T2145-gate5-stt-uc-c-manual-smoke.md)).
+**Status:** `[x]` **CLOSED** (2026-04-30) for engineering (**G5-01..G5-07**). **G5-08** remains **`[~]`** until the engineer completes manual smoke + marks **`[x]`** in this table (checklist: [`0430-T2145-gate5-stt-uc-c-manual-smoke.md`](../process/journal/week-1/0430-T2145-gate5-stt-uc-c-manual-smoke.md)). **2026-05-01:** P2 blocker (`server_today` UTC + stale handshake encounter id) shipped in `20dd57f32` per [`post-deploy-bug-log.md`](./post-deploy-bug-log.md); awaiting prod re-smoke before promoting `[~]` → `[x]`. Closure journal: [`0501-T1430-post-deploy-bugs-p1-p3-closed.md`](../process/journal/week-1/0501-T1430-post-deploy-bugs-p1-p3-closed.md).
 
 **Exit criteria:** transcript stream runs without persisting any audio; transcript text persisted to Postgres; UC-C recap correctly classifies confirmed/rejected/unresolved/**refusal** (four recap taxa).
 
