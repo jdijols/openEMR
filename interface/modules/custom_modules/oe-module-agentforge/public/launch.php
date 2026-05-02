@@ -14,9 +14,9 @@ require_once __DIR__ . '/agentforge_common.php';
 
 agentforge_require_globals();
 
-use OpenEMR\Common\Acl\AclMain;
 use OpenEMR\Common\Session\SessionWrapperFactory;
 use OpenEMR\Modules\AgentForge\Acl\AclMap;
+use OpenEMR\Modules\AgentForge\Context\AppointmentEncounterBinder;
 use OpenEMR\Modules\AgentForge\Install\AgentForgeAclInstaller;
 use OpenEMR\Modules\AgentForge\Security\LaunchCode;
 use OpenEMR\Modules\AgentForge\Security\OpenEmrLaunchCodeStore;
@@ -34,14 +34,13 @@ if ($userId <= 0) {
     agentforge_emit_json(401, ['error' => 'unauthenticated']);
 }
 
-if (!AclMain::aclCheckCore(AclMap::CHART_READ_SECTION, AclMap::CHART_READ_VALUE, $authUser)) {
+if (!AclMap::userPassesAgentForgeReadGate($authUser)) {
     agentforge_emit_json(403, ['error' => 'acl_denied']);
 }
 
 $pid = (int) ($session->get('pid') ?? 0);
 $patientUuid = \agentforge_pid_to_uuid_string($pid);
-$encounter = $session->get('encounter');
-$encounterId = \is_numeric($encounter) ? (int) $encounter : null;
+$encounterId = (new AppointmentEncounterBinder())->bindForCurrentPatient($pid)->encounterId;
 
 $service = new LaunchCode(new OpenEmrLaunchCodeStore());
 $code = $service->mint($userId, $patientUuid, $encounterId, new \DateTimeImmutable('now'));

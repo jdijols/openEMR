@@ -142,6 +142,64 @@ function agentforge_pid_to_uuid_string(int $pid): ?string
 }
 
 /**
+ * One-line label for the CUI header when a chart is open: "First Last, 9F".
+ *
+ * Age is whole years from DOB to today; sex suffix is M or F when `sex` is
+ * clearly male or female (as stored in patient_data / list options).
+ *
+ * @return non-empty-string|null Null when pid is invalid, row missing, or name empty.
+ */
+function agentforge_patient_copilot_header_title(int $pid): ?string
+{
+    if ($pid <= 0) {
+        return null;
+    }
+
+    $row = \sqlQuery(
+        'SELECT `fname`, `lname`, `DOB`, `sex` FROM `patient_data` WHERE `pid` = ?',
+        [$pid],
+    );
+    if ($row === false) {
+        return null;
+    }
+
+    $fname = \trim((string) ($row['fname'] ?? ''));
+    $lname = \trim((string) ($row['lname'] ?? ''));
+    $name = \trim(\preg_replace('/\s+/', ' ', $fname . ' ' . $lname) ?? '');
+    if ($name === '') {
+        return null;
+    }
+
+    $ageDigits = '';
+    $dobRaw = $row['DOB'] ?? '';
+    if (\is_string($dobRaw) && $dobRaw !== '') {
+        try {
+            $dob = new \DateTimeImmutable($dobRaw);
+            $today = new \DateTimeImmutable('today');
+            $ageDigits = (string) $dob->diff($today)->y;
+        } catch (\Throwable) {
+            $ageDigits = '';
+        }
+    }
+
+    $sexRaw = $row['sex'] ?? null;
+    $sexStr = \is_string($sexRaw) ? \strtolower(\trim($sexRaw)) : '';
+    $sexSuffix = '';
+    if ($sexStr !== '' && \str_starts_with($sexStr, 'f')) {
+        $sexSuffix = 'F';
+    } elseif ($sexStr !== '' && \str_starts_with($sexStr, 'm')) {
+        $sexSuffix = 'M';
+    }
+
+    $tail = $ageDigits . $sexSuffix;
+    if ($tail === '') {
+        return $name;
+    }
+
+    return $name . ', ' . $tail;
+}
+
+/**
  * Gate 3 — shared Context Service ingress: JSON body parse, correlation id, ChartContextGate bind, PID resolution,
  * capped window.limit (defaults 10, max 50).
  *

@@ -18,7 +18,6 @@ require_once __DIR__ . '/../agentforge_common.php';
 agentforge_require_globals(ignoreAuthForRequest: true);
 agentforge_require_post();
 
-use OpenEMR\Common\Acl\AclMain;
 use OpenEMR\Common\Session\SessionWrapperFactory;
 use OpenEMR\Modules\AgentForge\Acl\AclMap;
 use OpenEMR\Modules\AgentForge\Audit\AgentAuditLogger;
@@ -95,7 +94,7 @@ try {
     agentforge_emit_json($e->httpStatus, ['error' => $e->errorCode, 'correlation_id' => $correlationId]);
 }
 
-if (!AclMain::aclCheckCore(AclMap::MODULE_SECTION, AclMap::PROPOSE_WRITE, $ctx['auth_user'])) {
+if (!AclMap::userPassesAgentForgeProposeWriteGate($ctx['auth_user'])) {
     AgentAuditLogger::recordAgentEvent(
         $ctx['auth_user'],
         $ctx['auth_provider'],

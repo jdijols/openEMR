@@ -11,13 +11,19 @@ import MicControl from './recording/MicControl.js';
 import { readApiBase } from './config.js';
 import type { ProposalResolution } from './types/chat.js';
 
-function readDocumentHints(): { launchCode: string | null; patientUuid: string | null } {
+function readDocumentHints(): {
+  launchCode: string | null;
+  patientUuid: string | null;
+  copilotTitle: string | null;
+} {
   const root = document.documentElement;
   const launch = root.getAttribute('data-launch-code');
   const patient = root.getAttribute('data-patient-uuid');
+  const title = root.getAttribute('data-patient-copilot-title');
   return {
     launchCode: launch !== null && launch !== '' ? launch : null,
     patientUuid: patient !== null && patient !== '' ? patient : null,
+    copilotTitle: title !== null && title !== '' ? title : null,
   };
 }
 
@@ -103,9 +109,12 @@ function IconPanelSync(): ReactElement {
   );
 }
 
+const DEFAULT_COPILOT_HEADER = 'Clinical Co-Pilot';
+
 export default function App(): ReactElement {
-  const { launchCode, patientUuid } = useMemo(() => readDocumentHints(), []);
+  const { launchCode, patientUuid, copilotTitle } = useMemo(() => readDocumentHints(), []);
   const handshake = useHandshake(launchCode, patientUuid);
+  const headerTitle = copilotTitle ?? DEFAULT_COPILOT_HEADER;
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationExternalId, setConversationExternalId] = useState<string | null>(null);
@@ -467,10 +476,11 @@ export default function App(): ReactElement {
   }
 
   /**
-   * Header chrome bar — gray bar with title everywhere. Refresh is omitted
-   * only for the chart-required empty screen (no_chart / no patient
-   * context): there is nothing to refresh yet, and removing the secondary
-   * action keeps parity with PR5 chrome + white canvas framing.
+   * Header chrome bar — gray bar with title everywhere. On the chart-required
+   * empty screen (no_chart / no patient context) the refresh control is
+   * omitted (nothing to refresh yet), but we still reserve the same action
+   * column width/height as the real button so the header bar does not jump
+   * when a patient becomes active.
    *
    * When the control is shown: handshake-ready uses cache-busting
    * `refreshChartBinding`; loading / handshake error uses plain
@@ -480,8 +490,8 @@ export default function App(): ReactElement {
   const headerIsReady = handshake.status === 'ready';
   const renderPanelHeader = (showRefresh: boolean): ReactElement => (
     <header className="agentforge-cui__header">
-      <h1 className="agentforge-cui__title">Clinical Co-Pilot</h1>
-      {showRefresh ? (
+      <h1 className="agentforge-cui__title">{headerTitle}</h1>
+      {showRefresh ?
         <button
           type="button"
           className="agentforge-cui__refresh"
@@ -490,7 +500,7 @@ export default function App(): ReactElement {
         >
           <IconPanelSync />
         </button>
-      ) : null}
+      : <span className="agentforge-cui__header-action-slot" aria-hidden="true" />}
     </header>
   );
 

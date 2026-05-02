@@ -29,6 +29,7 @@ function setDocumentHints(launchCode: string, patientUuid: string): void {
 function clearDocumentHints(): void {
   document.documentElement.removeAttribute('data-launch-code');
   document.documentElement.removeAttribute('data-patient-uuid');
+  document.documentElement.removeAttribute('data-patient-copilot-title');
 }
 
 beforeEach(() => {
@@ -98,6 +99,18 @@ function presentPatientCalls(
     }))
     .filter(({ url }) => url.endsWith('/present-patient'));
 }
+
+describe('App — header title', () => {
+  it('uses data-patient-copilot-title when set on the document', () => {
+    document.documentElement.setAttribute('data-patient-copilot-title', 'Olivia Tran, 9F');
+    const fetchMock = makeBriefFetch({});
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    render(<App />);
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Olivia Tran, 9F');
+  });
+});
 
 describe('App — panel refresh control (P3 cache-bust)', () => {
   it('fires postPresentPatient with force_refresh: true before reloading the iframe', async () => {
@@ -283,6 +296,8 @@ describe('App — brief auto-trigger (G3-11 v2)', () => {
     // The chart-required UI surfaces; the brief must NOT auto-fire.
     await screen.findByText(/Open a patient chart to begin/);
     expect(presentPatientCalls(fetchMock)).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: /refresh clinical co-pilot/i })).not.toBeInTheDocument();
+    expect(document.querySelector('.agentforge-cui__header-action-slot')).not.toBeNull();
   });
 });
 

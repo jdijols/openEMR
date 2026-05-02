@@ -1,4 +1,5 @@
 import { generateText } from 'ai';
+import { z } from 'zod';
 import type { Env } from '../env.js';
 import { verifySessionToken } from '../handshake/sessionToken.js';
 import { OpenEmrCallError } from '../openemr/client.js';
@@ -7,9 +8,15 @@ import { assertBoundPatient } from '../tools/_binding.js';
 import { estimateUsdForProviderTokens } from './cost_estimate.js';
 import { fetchCasePresentationData } from './case_presentation_fetch.js';
 import { casePresentationCacheGet, casePresentationCacheSet } from './case_presentation_cache.js';
-import { CASE_PRESENTATION_SYSTEM_PROMPT } from './case_presentation_prompt.js';
-import { getChatModel } from './model.js';
-import { parseBlocksFromModelText } from './orchestrator.js';
+import {
+  buildPriorVisitSummaryInput,
+  buildSimplifiedCasePresentationBlocks,
+  findCurrentEncounter,
+  previousEncounters,
+  type PriorVisitSummary,
+} from './case_presentation_format.js';
+import { CASE_PRESENTATION_PRIOR_VISIT_SUMMARY_PROMPT } from './case_presentation_prompt.js';
+import { getChatModel, getProviderModelId } from './model.js';
 import { buildCitationNavigationIndex, buildClinicalToolEvidence, type CitationNavigationHint } from './toolEvidence.js';
 import { verifyClinicalBlocks } from './verification.js';
 import type { ChatBlock } from '../openemr/types.js';
@@ -38,6 +45,15 @@ type CasePresentationResult = {
  */
 const inflight = new Map<string, Promise<CasePresentationResult>>();
 
+const priorVisitSummariesSchema = z.object({
+  previous_visits: z.array(
+    z.object({
+      citation_uuid: z.string().min(1),
+      summary: z.string(),
+    }),
+  ),
+});
+
 function inflightKey(sessionToken: string, patientUuid: string, encounterId: number | null): string {
   const enc = encounterId === null ? 'none' : String(encounterId);
   return `${patientUuid}\0${enc}\0${sessionToken}`;
@@ -61,6 +77,30 @@ function isCacheable(blocks: readonly ChatBlock[]): boolean {
 /** Test-only: clear in-flight de-dup map. */
 export function __resetCasePresentationInflightForTests(): void {
   inflight.clear();
+}
+
+function parsePriorVisitSummaries(
+  modelText: string,
+  allowedCitationUuids: ReadonlySet<string>,
+): readonly PriorVisitSummary[] {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(modelText);
+  } catch {
+    return [];
+  }
+
+  const parsed = priorVisitSummariesSchema.safeParse(raw);
+  if (!parsed.success) {
+    return [];
+  }
+
+  return parsed.data.previous_visits
+    .filter((summary) => allowedCitationUuids.has(summary.citation_uuid))
+    .map((summary) => ({
+      citationUuid: summary.citation_uuid,
+      summary: summary.summary,
+    }));
 }
 
 export async function runCasePresentation(
@@ -87,9 +127,9 @@ export async function runCasePresentation(
   if (!forceRefresh) {
     const cached = casePresentationCacheGet(sessionToken, patientUuid, encounterId);
     if (cached !== null) {
-      await observability.recordToolCall({
+      await observability.recordEvent({
         correlationId,
-        toolName: 'case_presentation',
+        name: 'case_presentation.cache_hit',
         meta: { cache_hit: true },
       });
       return cached;
@@ -98,9 +138,9 @@ export async function runCasePresentation(
     const key = inflightKey(sessionToken, patientUuid, encounterId);
     const pending = inflight.get(key);
     if (pending !== undefined) {
-      await observability.recordToolCall({
+      await observability.recordEvent({
         correlationId,
-        toolName: 'case_presentation',
+        name: 'case_presentation.inflight_coalesced',
         meta: { inflight_coalesced: true },
       });
       return pending;
@@ -150,35 +190,53 @@ async function runCasePresentationUncached(
     throw e;
   }
 
+  const today = typeof fetched.bundleForLlm['today'] === 'string' ? fetched.bundleForLlm['today'] : '';
+  const currentEncounter = findCurrentEncounter(fetched.encounters, encounterId, today);
+  const previous = previousEncounters(fetched.encounters, currentEncounter);
+  const previousVisitInput = buildPriorVisitSummaryInput(fetched, previous);
   const model = getChatModel(env);
-  const userPrompt = `Chart context (JSON) for bound patient_uuid=${patientUuid}:\n${JSON.stringify(fetched.bundleForLlm)}`;
+  const providerModelId = getProviderModelId(env);
+  const userPrompt = `Previous visit context (JSON) for bound patient_uuid=${patientUuid}:\n${JSON.stringify({
+    patient_uuid: patientUuid,
+    today,
+    previous_visits: previousVisitInput,
+  })}`;
 
   await observability.recordLlmCall({
     correlationId,
-    providerModel: env.LLM_PROVIDER,
+    providerModel: providerModelId,
     meta: { phase: 'case_presentation_request' },
   });
 
+  const llmStartedAtMs = Date.now();
   const result = await generateText({
     model,
-    system: CASE_PRESENTATION_SYSTEM_PROMPT,
+    system: CASE_PRESENTATION_PRIOR_VISIT_SUMMARY_PROMPT,
     prompt: userPrompt,
   });
 
   const evidence = buildClinicalToolEvidence(patientUuid, fetched.toolResults);
-  let blocks = parseBlocksFromModelText(result.text);
+  const allowedPriorCitationUuids = new Set(previousVisitInput.map((visit) => visit.citation_uuid));
+  const priorSummaries = parsePriorVisitSummaries(result.text, allowedPriorCitationUuids);
+  let blocks = buildSimplifiedCasePresentationBlocks(fetched, encounterId, priorSummaries);
   blocks = await verifyClinicalBlocks(observability, correlationId, blocks, evidence);
 
   const usage = result.totalUsage;
   const costUsd = estimateUsdForProviderTokens(env.LLM_PROVIDER, usage?.inputTokens, usage?.outputTokens) ?? null;
   const costMeta =
     usage === undefined ?
-      { phase: 'case_presentation_completed', traceId: trace.id, cost_usd: null as number | null }
+      {
+        phase: 'case_presentation_completed',
+        traceId: trace.id,
+        start_time_ms: llmStartedAtMs,
+        cost_usd: null as number | null,
+      }
     : {
         phase: 'case_presentation_completed',
         traceId: trace.id,
         correlation_id: correlationId,
         provider: env.LLM_PROVIDER,
+        start_time_ms: llmStartedAtMs,
         input_tokens: usage.inputTokens ?? null,
         output_tokens: usage.outputTokens ?? null,
         cost_usd: costUsd ?? null,
@@ -188,7 +246,7 @@ async function runCasePresentationUncached(
 
   await observability.recordLlmCall({
     correlationId,
-    providerModel: env.LLM_PROVIDER,
+    providerModel: providerModelId,
     meta: costMeta as Record<string, unknown>,
   });
 

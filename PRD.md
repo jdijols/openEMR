@@ -602,15 +602,17 @@ Scenario: OpenEMR rejects the write
 #### 4.9.1 Implementation surface
 
 - `OpenEMR\Modules\AgentForge\Acl\AclMap` centralizes the ACL specs used by the module:
-  - chart read / rail launch uses the existing OpenEMR chart-read permission `patients/demo`, so users who can open the chart in the UI can open the co-pilot.
-  - module-owned `agentforge` ACOs remain available for module administration and optional write-proposal entitlement, but they are not a second chart-read gate.
-- Each endpoint's request handler calls `AclMain::aclCheckCore('<section>', '<value>')` with a non-empty spec. This closes the [`AUDIT.md` Security-10](AUDIT.md#security-10-gacl-semantics-superuser-bypass-and-fail-open-caller-bugs) "empty ACO spec → fail-open" hole.
+  - **Chart floor:** read paths (`Context Service`), rail launch (`panel.php`/`launch.php`), and header chrome remain gated first on OpenEMR chart-demographics ACL `patients/demo` ("can this session see demographics for the active chart" — identical floor to ordinary chart workflows).
+  - **Product entitlement:** the Clinical Co-Pilot UX additionally requires module-owned **`agentforge` / `use`**. Opens with `patients/demo` alone (but without `agentforge/use`) therefore stay denied unless an admin assigns the AgentForge ACO via GACL — e.g. default seed grants `agentforge/use` + `agentforge/propose_write` to stock groups **Administrators, Physicians, Clinicians**, and **Emergency Login** only; Accounting and Front Office are not seeded.
+  - **Writes:** UC-B endpoints require **`agentforge` / `propose_write`** on top of Context Service ingress (chart floor + product use + binding + tokens); `AclMap::userPassesAgentForgeProposeWriteGate()` folds the stack for write scripts.
+  - Module-owned **`agentforge` / `module_admin`** remains available for future module administration tooling; it is distinct from Runtime read/write gates.
+- Each authorization decision is expressed through `AclMain::aclCheckCore('<section>', '<value>')` (or helpers that compose only non-empty specs). This closes the [`AUDIT.md` Security-10](AUDIT.md#security-10-gacl-semantics-superuser-bypass-and-fail-open-caller-bugs) "empty ACO spec → fail-open" hole.
 - `admin/super` users are allowed to launch and use the co-pilot under the same OpenEMR session semantics as physicians. The accepted risk is that `admin/super` bypasses normal GACL, so role-scoped ACL guarantees do not apply to that account class; active-chart binding, launch-code/token hygiene, explicit-confirm writes, and V1 write-target limits still apply.
 - The co-pilot is not a parallel privilege plane: if OpenEMR would deny an action for the current session, the module denies it too; if OpenEMR grants it (including superuser grant), the co-pilot may use it within V1 scope.
 
 #### 4.9.2 Done means
 
-- [ ] Every read/write endpoint calls `aclCheckCore('agentforge', '<value>')` with a non-empty spec.
+- [ ] Context ingress and write surfaces enforce the chart floor + product/read gate (`AclMap::userPassesAgentForgeReadGate` or equivalent composed `aclCheckCore` pairs); UC-B surfaces additionally enforce **`agentforge` / `propose_write`**. No handler uses an empty ACO spec.
 - [ ] `admin/super` can launch when authenticated, but receives no special bypass beyond the normal OpenEMR superuser model.
 - [ ] Module README records the accepted-risk note and the “same session, no parallel privilege plane” rule.
 

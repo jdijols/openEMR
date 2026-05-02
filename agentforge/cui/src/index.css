@@ -92,6 +92,9 @@
   --af-s5: 20px;
   --af-s6: 24px;
 
+  /* Compose footer: horizontal inset = textarea↔actions gap = Send↔dictation gap. */
+  --af-cui-inline-rhythm: var(--af-s2);
+
   /* Type scale — tight because the rail is narrow (min 320 px). */
   --af-text-body: 0.875rem;     /* 14 px */
   --af-text-small: 0.8125rem;   /* 13 px */
@@ -167,14 +170,18 @@ body {
 }
 
 .agentforge-cui__header {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--af-s2);
+  height: 64px;
   padding: var(--af-s3) var(--af-s4);
   background: var(--af-surface-alt);
   border-bottom: 1px solid var(--af-border);
-  flex: 0 0 auto;
+  flex: 0 0 64px;
+  min-height: 64px;
+  max-height: 64px;
 }
 
 .agentforge-cui__title {
@@ -183,16 +190,21 @@ body {
   letter-spacing: -0.01em;
   color: var(--af-text);
   margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Icon-only refresh control (OpenEMR-tab-style circular arrows) — outline
    chrome matches the gray header bar; square touch target ≥ 2.25 rem. */
 .agentforge-cui__refresh {
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-width: 2.25rem;
   min-height: 2.25rem;
+  flex-shrink: 0;
   padding: var(--af-s1);
   line-height: 0;
   border: 1px solid var(--af-border-strong);
@@ -216,6 +228,25 @@ body {
 .agentforge-cui__refresh:focus-visible {
   outline: none;
   box-shadow: var(--af-focus-ring);
+}
+
+/*
+ * Mirrors `.agentforge-cui__refresh` border-box sizing when refresh is omitted
+ * (no chart yet) so the header strip height stays aligned with loading/active.
+ */
+.agentforge-cui__header-action-slot {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  padding: var(--af-s1);
+  box-sizing: border-box;
+  line-height: 0;
+  border: 1px solid transparent;
+  border-radius: var(--af-radius-control);
+  pointer-events: none;
 }
 
 .agentforge-cui__subtitle {
@@ -851,8 +882,8 @@ body {
   display: flex;
   flex-direction: row;
   align-items: stretch;
-  gap: var(--af-s2);
-  padding: var(--af-s3) var(--af-s4);
+  gap: var(--af-cui-inline-rhythm);
+  padding: var(--af-s3) var(--af-cui-inline-rhythm);
   background: var(--af-surface-alt);
   border-top: 1px solid var(--af-border);
   flex: 0 0 auto;
@@ -883,7 +914,7 @@ body {
 .agentforge-cui__compose-actions {
   display: flex;
   flex-direction: column;
-  gap: var(--af-s2);
+  gap: var(--af-cui-inline-rhythm);
   flex: 0 0 auto;
   align-self: stretch;
   min-width: 9rem;

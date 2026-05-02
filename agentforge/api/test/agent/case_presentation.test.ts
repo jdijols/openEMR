@@ -33,6 +33,7 @@ import { __resetCasePresentationCacheForTests } from '../../src/agent/case_prese
 import * as openemr from '../../src/openemr/client.js';
 import { mintSessionToken } from '../../src/handshake/sessionToken.js';
 import type { Observability } from '../../src/observability/index.js';
+import type { ContextRow } from '../../src/openemr/types.js';
 import { testEnv } from '../helpers/env-fixture.js';
 
 const SAMPLE_SOURCE_PACK = {
@@ -44,6 +45,71 @@ const SAMPLE_SOURCE_PACK = {
   retrieval_path: 'PatientService',
   navigation_hint: { kind: 'chart_section', params: { section: 'demographics' } },
 };
+
+function sourcePack(
+  resourceFamily: string,
+  rowId: number,
+  uuid: string,
+  asOf: string,
+  navigationHint: { kind: string; params: Record<string, unknown> },
+) {
+  return {
+    resource_family: resourceFamily,
+    table: resourceFamily === 'encounter' ? 'form_encounter' : `form_${resourceFamily}`,
+    row_id: rowId,
+    uuid,
+    as_of: asOf,
+    retrieval_path: 'test',
+    navigation_hint: navigationHint,
+  };
+}
+
+function encounterRow(eid: number, date: string, reason: string) {
+  return {
+    eid,
+    euuid: `enc-${eid}`,
+    date,
+    reason,
+    visit_category: 'Office Visit',
+    visit_class_title: '',
+    source_pack: sourcePack('encounter', eid, `sp-enc-${eid}`, `${date.slice(0, 10)}T00:00:00Z`, {
+      kind: 'encounter',
+      params: { encounter_id: eid },
+    }),
+  };
+}
+
+function vitalRow(id: number, recordedAt: string, encounterId?: number) {
+  return {
+    ...(encounterId !== undefined ? { encounter_id: encounterId } : {}),
+    recorded_at: recordedAt,
+    bps: '128',
+    bpd: '82',
+    pulse: '74',
+    respiration: '16',
+    temperature: '98.6',
+    oxygen_saturation: '98',
+    pain: '',
+    weight: '180',
+    height: '70',
+    BMI: '25.8',
+    note: '',
+    source_pack: sourcePack('vital', id, `sp-vital-${id}`, `${recordedAt.slice(0, 10)}T00:00:00Z`, {
+      kind: 'chart_section',
+      params: { section: 'vitals' },
+    }),
+  };
+}
+
+function mockContextRows(rows: Record<string, ContextRow[]>) {
+  vi.mocked(openemr.getChartContextRows).mockImplementation(async (_env, _ctx, _patient, path) => {
+    return rows[path] ?? [];
+  });
+}
+
+function priorSummaryResponse(summaries: Array<{ citation_uuid: string; summary: string }> = []) {
+  return JSON.stringify({ previous_visits: summaries });
+}
 
 function recordingObs(): {
   obs: Observability;
@@ -63,6 +129,14 @@ function recordingObs(): {
             ? { name: `tool:${toolName}`, correlationId }
             : { name: `tool:${toolName}`, correlationId, meta },
         );
+        return { end: async () => {} };
+      },
+      async recordEvent({ correlationId, name, meta }) {
+        events.push(
+          meta === undefined
+            ? { name: `event:${name}`, correlationId }
+            : { name: `event:${name}`, correlationId, meta },
+        );
       },
       async recordLlmCall({ correlationId, providerModel, meta }) {
         events.push(
@@ -71,6 +145,7 @@ function recordingObs(): {
             : { name: `llm:${providerModel}`, correlationId, meta },
         );
       },
+      async shutdown() {},
     },
   };
 }
@@ -123,22 +198,80 @@ describe('runCasePresentation', () => {
     expect(generateTextMock).not.toHaveBeenCalled();
   });
 
-  it('runs one-shot generateText and returns verified claims', async () => {
+  it('runs one-shot generateText and returns the simplified three-section brief', async () => {
     const env = testEnv();
     const { obs } = recordingObs();
-    const tok = sessionForPatient(env, 'pat-1');
+    const today = new Date().toISOString().slice(0, 10);
+    const tok = sessionForPatientWithEncounter(env, 'pat-1', 100);
+    mockContextRows({
+      'context/encounters.php': [
+        encounterRow(100, `${today} 09:00:00`, 'Sore throat x2 days'),
+        encounterRow(90, '2026-04-15 09:00:00', 'Cough follow-up'),
+      ],
+      'context/vitals.php': [vitalRow(10, `${today} 09:05:00`, 100)],
+    });
     generateTextMock.mockResolvedValue({
-      text: JSON.stringify({
-        blocks: [{ type: 'claim', text: 'Patient is Female.', citation_ids: ['sp-ident'] }],
-      }),
+      text: priorSummaryResponse([{ citation_uuid: 'sp-enc-90', summary: 'Cough had improved; no acute findings documented.' }]),
       totalUsage: { inputTokens: 5, outputTokens: 5, totalTokens: 10 },
     });
 
     const out = await runCasePresentation(env, obs, { sessionToken: tok, patientUuid: 'pat-1' }, 'c2');
 
     expect(generateTextMock).toHaveBeenCalledTimes(1);
-    expect(out.blocks[0]).toMatchObject({ type: 'claim', citation_ids: ['sp-ident'] });
-    expect(out.citation_navigation['sp-ident']).toBeDefined();
+    expect(out.blocks[0]).toEqual({ type: 'text', text: '### Reason for visit' });
+    expect(out.blocks[1]).toMatchObject({
+      type: 'claim',
+      segments: [{ type: 'cite', text: 'Sore throat x2 days', citation_id: 'sp-enc-100' }],
+    });
+    expect(out.blocks[2]).toEqual({ type: 'text', text: '### Recorded most recently' });
+    expect(out.blocks[3]).toMatchObject({
+      type: 'claim',
+      segments: expect.arrayContaining([
+        { type: 'cite', text: 'BP 128/82', citation_id: 'sp-vital-10' },
+        { type: 'cite', text: 'HR 74', citation_id: 'sp-vital-10' },
+      ]),
+    });
+    expect(out.blocks[4]).toEqual({ type: 'text', text: '### Previous visits' });
+    expect(out.blocks[5]).toMatchObject({
+      type: 'claim',
+      segments: [
+        { type: 'cite', text: '2026-04-15', citation_id: 'sp-enc-90' },
+        { type: 'text', text: ' - Cough had improved; no acute findings documented.' },
+      ],
+    });
+    expect(out.citation_navigation['sp-enc-100']).toEqual({
+      kind: 'encounter',
+      params: { encounter_id: 100 },
+    });
+  });
+
+  it('includes vitals for the open encounter when the visit date is not calendar today', async () => {
+    const env = testEnv();
+    const { obs } = recordingObs();
+    const visitDate = '2026-05-01';
+    const tok = sessionForPatientWithEncounter(env, 'pat-past-visit', 540);
+    mockContextRows({
+      'context/encounters.php': [encounterRow(540, `${visitDate} 10:00:00`, 'Annual preventive visit')],
+      'context/vitals.php': [vitalRow(77, `${visitDate} 11:05:00`, 540)],
+    });
+    generateTextMock.mockResolvedValue({
+      text: priorSummaryResponse(),
+      totalUsage: { inputTokens: 5, outputTokens: 5, totalTokens: 10 },
+    });
+
+    const out = await runCasePresentation(env, obs, { sessionToken: tok, patientUuid: 'pat-past-visit' }, 'c2b');
+
+    expect(out.blocks).toContainEqual({ type: 'text', text: '### Recorded most recently' });
+    expect(out.blocks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'claim',
+          segments: expect.arrayContaining([
+            { type: 'cite', text: 'BP 128/82', citation_id: 'sp-vital-77' },
+          ]),
+        }),
+      ]),
+    );
   });
 
   it('serves cache on second call without invoking LLM', async () => {
@@ -146,9 +279,7 @@ describe('runCasePresentation', () => {
     const { obs } = recordingObs();
     const tok = sessionForPatient(env, 'pat-1');
     generateTextMock.mockResolvedValue({
-      text: JSON.stringify({
-        blocks: [{ type: 'claim', text: 'Patient is Female.', citation_ids: ['sp-ident'] }],
-      }),
+      text: priorSummaryResponse(),
       totalUsage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
     });
 
@@ -162,7 +293,7 @@ describe('runCasePresentation', () => {
     );
 
     expect(generateTextMock).not.toHaveBeenCalled();
-    expect(out2.blocks[0]).toMatchObject({ type: 'claim' });
+    expect(out2.blocks[0]).toEqual({ type: 'text', text: '### Reason for visit' });
   });
 
   it('bypasses cache when forceRefresh is true', async () => {
@@ -170,9 +301,7 @@ describe('runCasePresentation', () => {
     const { obs } = recordingObs();
     const tok = sessionForPatient(env, 'pat-1');
     generateTextMock.mockResolvedValue({
-      text: JSON.stringify({
-        blocks: [{ type: 'claim', text: 'Patient is Female.', citation_ids: ['sp-ident'] }],
-      }),
+      text: priorSummaryResponse(),
       totalUsage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
     });
 
@@ -197,15 +326,14 @@ describe('runCasePresentation', () => {
     expect(generateTextMock).not.toHaveBeenCalled();
   });
 
-  it('injects deterministic identity.age_years and today into the LLM prompt so the model cannot guess age', async () => {
+  it('sends only previous-visit context and today into the summary prompt', async () => {
     const env = testEnv();
     const { obs } = recordingObs();
-    const tok = sessionForPatient(env, 'pat-age');
+    const today = new Date().toISOString().slice(0, 10);
+    const tok = sessionForPatientWithEncounter(env, 'pat-age', 101);
 
-    // 'DOB' uppercase mirrors what PatientService::getOne returns from
-    // patient_data; the helper accepts either casing. 'date' is the
-    // patient_data row's last-update timestamp — must NOT leak through to
-    // the prompt or the model will treat it as today.
+    // The prior-summary prompt should not expose identity demographics or the
+    // stale patient_data 'date' column that previously confused the case brief.
     vi.mocked(openemr.getIdentity).mockResolvedValue({
       fname: 'Raymond',
       lname: 'Cooper',
@@ -214,9 +342,15 @@ describe('runCasePresentation', () => {
       date: '2020-01-02 00:00:00',
       source_pack: SAMPLE_SOURCE_PACK,
     });
+    mockContextRows({
+      'context/encounters.php': [
+        encounterRow(101, `${today} 10:00:00`, 'Annual wellness'),
+        encounterRow(99, '2026-04-01 09:00:00', 'Blood pressure follow-up'),
+      ],
+    });
 
     generateTextMock.mockResolvedValue({
-      text: JSON.stringify({ blocks: [{ type: 'text', text: 'ok' }] }),
+      text: priorSummaryResponse(),
       totalUsage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
     });
 
@@ -227,20 +361,15 @@ describe('runCasePresentation', () => {
     const jsonStart = call.prompt.indexOf('{');
     const bundle = JSON.parse(call.prompt.slice(jsonStart)) as {
       today: string;
-      identity: Record<string, unknown>;
+      identity?: Record<string, unknown>;
+      previous_visits: Array<{ citation_uuid: string; reason: string }>;
     };
 
     expect(bundle.today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    const parts = bundle.today.split('-').map(Number);
-    const yy = parts[0] ?? 0;
-    const mm = parts[1] ?? 0;
-    const dd = parts[2] ?? 0;
-    let expectedAge = yy - 1965;
-    if (mm < 6 || (mm === 6 && dd < 15)) expectedAge -= 1;
-    expect(bundle.identity.age_years).toBe(expectedAge);
-    // Stale 'date' must be stripped — it had been mistaken for "today" upstream.
-    expect(bundle.identity.date).toBeUndefined();
-    expect(bundle.identity.DOB).toBe('1965-06-15');
+    expect(bundle.identity).toBeUndefined();
+    expect(bundle.previous_visits).toMatchObject([
+      { citation_uuid: 'sp-enc-99', reason: 'Blood pressure follow-up' },
+    ]);
   });
 
   it('coalesces concurrent calls for the same chart into a single LLM call', async () => {
@@ -275,7 +404,7 @@ describe('runCasePresentation', () => {
     expect(generateTextMock).toHaveBeenCalledTimes(1);
 
     resolveLlm({
-      text: JSON.stringify({ blocks: [{ type: 'text', text: 'shared' }] }),
+      text: priorSummaryResponse(),
       totalUsage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
     });
 
@@ -294,19 +423,22 @@ describe('runCasePresentation', () => {
   it('does not serve a cached brief across two encounters on the same patient (P3)', async () => {
     const env = testEnv();
     const { obs } = recordingObs();
+    const today = new Date().toISOString().slice(0, 10);
     const tokA = sessionForPatientWithEncounter(env, 'pat-shared', 100);
     const tokB = sessionForPatientWithEncounter(env, 'pat-shared', 200);
+    mockContextRows({
+      'context/encounters.php': [
+        encounterRow(200, `${today} 11:00:00`, 'Encounter B reason'),
+        encounterRow(100, `${today} 09:00:00`, 'Encounter A reason'),
+      ],
+    });
 
     generateTextMock.mockResolvedValueOnce({
-      text: JSON.stringify({
-        blocks: [{ type: 'claim', text: 'Brief for encounter 100.', citation_ids: ['sp-ident'] }],
-      }),
+      text: priorSummaryResponse(),
       totalUsage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
     });
     generateTextMock.mockResolvedValueOnce({
-      text: JSON.stringify({
-        blocks: [{ type: 'claim', text: 'Brief for encounter 200.', citation_ids: ['sp-ident'] }],
-      }),
+      text: priorSummaryResponse(),
       totalUsage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
     });
 
@@ -314,75 +446,89 @@ describe('runCasePresentation', () => {
     const briefB = await runCasePresentation(env, obs, { sessionToken: tokB, patientUuid: 'pat-shared' }, 'p3-b');
 
     expect(generateTextMock).toHaveBeenCalledTimes(2);
-    const blockA = briefA.blocks[0] as { type: string; text?: string };
-    const blockB = briefB.blocks[0] as { type: string; text?: string };
-    expect(blockA.text).toBe('Brief for encounter 100.');
-    expect(blockB.text).toBe('Brief for encounter 200.');
+    expect(briefA.blocks[1]).toMatchObject({
+      type: 'claim',
+      segments: [{ type: 'cite', text: 'Encounter A reason', citation_id: 'sp-enc-100' }],
+    });
+    expect(briefB.blocks[1]).toMatchObject({
+      type: 'claim',
+      segments: [{ type: 'cite', text: 'Encounter B reason', citation_id: 'sp-enc-200' }],
+    });
   });
 
-  /**
-   * P3 fix — when the model returns zero blocks, the verification step
-   * synthesizes an `insufficient_evidence_after_verification` refusal. Pre-fix
-   * that refusal landed in the cache, so a transient empty-brief hiccup
-   * pinned the operator to a blank rail for the full 2-hour TTL. Post-fix the
-   * second call fires a fresh LLM attempt and recovers.
-   */
-  it('does not cache an empty-brief result transformed to refusal by verification (P3)', async () => {
+  it('falls back to deterministic previous-visit text when the summary JSON is invalid', async () => {
     const env = testEnv();
     const { obs } = recordingObs();
-    const tok = sessionForPatient(env, 'pat-empty');
+    const today = new Date().toISOString().slice(0, 10);
+    const tok = sessionForPatientWithEncounter(env, 'pat-empty', 100);
+    mockContextRows({
+      'context/encounters.php': [
+        encounterRow(100, `${today} 09:00:00`, 'Follow-up today'),
+        encounterRow(90, '2026-04-01 09:00:00', 'Prior cough visit'),
+      ],
+    });
 
-    generateTextMock.mockResolvedValueOnce({
+    generateTextMock.mockResolvedValue({
       text: JSON.stringify({ blocks: [] }),
       totalUsage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
     });
-    generateTextMock.mockResolvedValueOnce({
-      text: JSON.stringify({
-        blocks: [{ type: 'claim', text: 'Recovered brief.', citation_ids: ['sp-ident'] }],
-      }),
-      totalUsage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+
+    const out = await runCasePresentation(env, obs, { sessionToken: tok, patientUuid: 'pat-empty' }, 'p3-empty');
+    expect(out.blocks).toContainEqual({ type: 'text', text: '### Previous visits' });
+    expect(out.blocks.at(-1)).toMatchObject({
+      type: 'claim',
+      segments: [
+        { type: 'cite', text: '2026-04-01', citation_id: 'sp-enc-90' },
+        { type: 'text', text: ' - Prior cough visit' },
+      ],
     });
-
-    const first = await runCasePresentation(env, obs, { sessionToken: tok, patientUuid: 'pat-empty' }, 'p3-empty');
-    const firstBlock = first.blocks[0] as { type: string; reason?: string };
-    expect(firstBlock.type).toBe('refusal');
-    expect(firstBlock.reason).toBe('insufficient_evidence_after_verification');
-
-    const second = await runCasePresentation(env, obs, { sessionToken: tok, patientUuid: 'pat-empty' }, 'p3-second');
-    expect(generateTextMock).toHaveBeenCalledTimes(2);
-    const recovered = second.blocks[0] as { type: string; text?: string };
-    expect(recovered.text).toBe('Recovered brief.');
   });
 
-  /**
-   * P3 fix — refusal-only result blocks are NOT written to cache for the
-   * same reason: a model refusal (e.g. policy issue, no_recent_encounter)
-   * should not silence subsequent attempts after the underlying state
-   * changes.
-   */
-  it('does not cache a refusal-only blocks result (P3)', async () => {
+  it('shows placeholders and caps previous visits at three', async () => {
     const env = testEnv();
     const { obs } = recordingObs();
-    const tok = sessionForPatient(env, 'pat-refusal');
+    const today = new Date().toISOString().slice(0, 10);
+    const tok = sessionForPatientWithEncounter(env, 'pat-prior', 500);
+    mockContextRows({
+      'context/encounters.php': [
+        encounterRow(500, `${today} 09:00:00`, ''),
+        encounterRow(400, '2026-04-04 09:00:00', 'Fourth prior'),
+        encounterRow(300, '2026-04-03 09:00:00', 'Third prior'),
+        encounterRow(200, '2026-04-02 09:00:00', 'Second prior'),
+        encounterRow(100, '2026-04-01 09:00:00', 'Oldest prior'),
+      ],
+    });
 
-    generateTextMock.mockResolvedValueOnce({
-      text: JSON.stringify({ blocks: [{ type: 'refusal', reason: 'no_recent_encounter' }] }),
+    generateTextMock.mockResolvedValue({
+      text: priorSummaryResponse([
+        { citation_uuid: 'sp-enc-400', summary: 'Fourth prior summary.' },
+        { citation_uuid: 'sp-enc-300', summary: 'Third prior summary.' },
+        { citation_uuid: 'sp-enc-200', summary: 'Second prior summary.' },
+        { citation_uuid: 'sp-enc-100', summary: 'Should be ignored.' },
+      ]),
       totalUsage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
     });
-    generateTextMock.mockResolvedValueOnce({
-      text: JSON.stringify({
-        blocks: [{ type: 'claim', text: 'Now we have a brief.', citation_ids: ['sp-ident'] }],
-      }),
-      totalUsage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+
+    const out = await runCasePresentation(env, obs, { sessionToken: tok, patientUuid: 'pat-prior' }, 'p3-r1');
+    expect(out.blocks).toContainEqual({ type: 'text', text: 'No reason for visit recorded.' });
+    expect(out.blocks).toContainEqual({ type: 'text', text: 'None recorded for this visit.' });
+    const previousClaims = out.blocks.filter(
+      (block) =>
+        block.type === 'claim' &&
+        block.segments?.some((segment) => segment.type === 'cite' && segment.citation_id.startsWith('sp-enc-')) === true,
+    );
+    expect(previousClaims).toHaveLength(3);
+    expect(previousClaims[0]).toMatchObject({
+      segments: [
+        { type: 'cite', text: '2026-04-04', citation_id: 'sp-enc-400' },
+        { type: 'text', text: ' - Fourth prior summary.' },
+      ],
     });
-
-    const refused = await runCasePresentation(env, obs, { sessionToken: tok, patientUuid: 'pat-refusal' }, 'p3-r1');
-    expect((refused.blocks[0] as { type: string }).type).toBe('refusal');
-
-    const recovered = await runCasePresentation(env, obs, { sessionToken: tok, patientUuid: 'pat-refusal' }, 'p3-r2');
-    expect(generateTextMock).toHaveBeenCalledTimes(2);
-    const block = recovered.blocks[0] as { type: string; text?: string };
-    expect(block.type).toBe('claim');
-    expect(block.text).toBe('Now we have a brief.');
+    expect(previousClaims[2]).toMatchObject({
+      segments: [
+        { type: 'cite', text: '2026-04-02', citation_id: 'sp-enc-200' },
+        { type: 'text', text: ' - Second prior summary.' },
+      ],
+    });
   });
 });

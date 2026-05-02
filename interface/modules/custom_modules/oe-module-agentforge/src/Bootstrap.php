@@ -12,7 +12,6 @@ declare(strict_types=1);
 
 namespace OpenEMR\Modules\AgentForge;
 
-use OpenEMR\Common\Acl\AclMain;
 use OpenEMR\Common\Session\SessionWrapperFactory;
 use OpenEMR\Common\Twig\TwigContainer;
 use OpenEMR\Core\OEGlobalsBag;
@@ -39,21 +38,21 @@ final class Bootstrap
 
     public function injectHeaderIcon(): void
     {
+        AgentForgeAclInstaller::ensureRegistered();
         if (!$this->shouldShowChrome()) {
             return;
         }
 
-        AgentForgeAclInstaller::ensureRegistered();
         echo $this->twig()->render('header_icon.html.twig', []);
     }
 
     public function injectRailContainer(): void
     {
+        AgentForgeAclInstaller::ensureRegistered();
         if (!$this->shouldShowChrome()) {
             return;
         }
 
-        AgentForgeAclInstaller::ensureRegistered();
         $globals = OEGlobalsBag::getInstance();
         $webroot = $globals->getWebRoot();
         $panelSrc = $webroot . '/interface/modules/custom_modules/oe-module-agentforge/public/panel.php';
@@ -84,7 +83,7 @@ final class Bootstrap
             return false;
         }
 
-        return AclMain::aclCheckCore(AclMap::CHART_READ_SECTION, AclMap::CHART_READ_VALUE, $authUser);
+        return AclMap::userPassesAgentForgeReadGate($authUser);
     }
 
     private function twig(): Environment

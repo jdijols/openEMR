@@ -14,10 +14,10 @@ require_once __DIR__ . '/agentforge_common.php';
 
 agentforge_require_globals();
 
-use OpenEMR\Common\Acl\AclMain;
 use OpenEMR\Common\Session\SessionWrapperFactory;
 use OpenEMR\Core\OEGlobalsBag;
 use OpenEMR\Modules\AgentForge\Acl\AclMap;
+use OpenEMR\Modules\AgentForge\Context\AppointmentEncounterBinder;
 use OpenEMR\Modules\AgentForge\Install\AgentForgeAclInstaller;
 use OpenEMR\Modules\AgentForge\Security\LaunchCode;
 use OpenEMR\Modules\AgentForge\Security\OpenEmrLaunchCodeStore;
@@ -35,14 +35,14 @@ if ($userId <= 0) {
     agentforge_emit_json(401, ['error' => 'unauthenticated']);
 }
 
-if (!AclMain::aclCheckCore(AclMap::CHART_READ_SECTION, AclMap::CHART_READ_VALUE, $authUser)) {
+if (!AclMap::userPassesAgentForgeReadGate($authUser)) {
     agentforge_emit_json(403, ['error' => 'acl_denied']);
 }
 
 $pid = (int) ($session->get('pid') ?? 0);
 $patientUuid = \agentforge_pid_to_uuid_string($pid);
-$encounter = $session->get('encounter');
-$encounterId = \is_numeric($encounter) ? (int) $encounter : null;
+$encounterBinding = (new AppointmentEncounterBinder())->bindForCurrentPatient($pid);
+$encounterId = $encounterBinding->encounterId;
 
 $service = new LaunchCode(new OpenEmrLaunchCodeStore());
 $code = $service->mint($userId, $patientUuid, $encounterId, new \DateTimeImmutable('now'));
@@ -51,6 +51,21 @@ $attr = \htmlspecialchars($code, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8');
 $patientAttr = $patientUuid !== null && $patientUuid !== ''
     ? \htmlspecialchars($patientUuid, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8')
     : '';
+
+$copilotHeaderTitle = $pid > 0 ? \agentforge_patient_copilot_header_title($pid) : null;
+$copilotTitleAttr = ($copilotHeaderTitle !== null && $copilotHeaderTitle !== '')
+    ? \htmlspecialchars($copilotHeaderTitle, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8')
+    : '';
+$encounterAttr = $encounterId !== null && $encounterId > 0
+    ? \htmlspecialchars((string) $encounterId, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8')
+    : '';
+$encounterDateAttr = $encounterBinding->encounterDate !== ''
+    ? \htmlspecialchars($encounterBinding->encounterDate, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8')
+    : '';
+$encounterCategoryAttr = $encounterBinding->encounterCategory !== ''
+    ? \htmlspecialchars($encounterBinding->encounterCategory, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8')
+    : '';
+$encounterCreatedAttr = $encounterBinding->created ? '1' : '0';
 
 $apiPublic = \getenv('AGENTFORGE_API_PUBLIC_URL');
 $apiPublicStr = (\is_string($apiPublic) && $apiPublic !== '') ? $apiPublic : '';
@@ -87,7 +102,9 @@ $styleHref = \htmlspecialchars(
 );
 
 $html = '<!DOCTYPE html><html lang="en" data-launch-code="' . $attr . '" data-patient-uuid="' . $patientAttr
-    . '"><head><meta charset="utf-8"><title>AgentForge panel</title>'
+    . '" data-patient-copilot-title="' . $copilotTitleAttr . '" data-bound-encounter-id="' . $encounterAttr
+    . '" data-bound-encounter-date="' . $encounterDateAttr . '" data-bound-encounter-category="' . $encounterCategoryAttr
+    . '" data-bound-encounter-created="' . $encounterCreatedAttr . '"><head><meta charset="utf-8"><title>AgentForge panel</title>'
     . '<link rel="stylesheet" href="' . $styleHref . '">'
     . '<script>window.__AGENTFORGE_CUI__={apiBase:' . $apiPublicJson . '};</script>'
     . '</head><body><div id="agentforge-panel-root"></div>'
