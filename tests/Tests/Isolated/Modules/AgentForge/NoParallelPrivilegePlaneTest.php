@@ -40,5 +40,6 @@ final class NoParallelPrivilegePlaneTest extends TestCase
         self::assertNotFalse($aclMap);
         self::assertStringContainsString("CHART_READ_SECTION = 'patients'", $aclMap);
         self::assertStringContainsString("CHART_READ_VALUE = 'demo'", $aclMap);
+        self::assertStringContainsString("USE_COPILOT = 'use'", $aclMap);
     }
 }

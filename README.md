@@ -22,7 +22,7 @@
 
 ### Gauntlet AgentForge (this fork)
 
-This repository includes **course process documentation** for the Gauntlet AI Clinical Co-Pilot / AgentForge work: case-study notes, tooling setup, and pre-code checklists. See **[Documentation/AgentForge/README.md](Documentation/AgentForge/README.md)** for the process trail and references (not part of upstream OpenEMR’s main documentation tree).
+This repository includes **course process documentation** for the Gauntlet AI Clinical Co-Pilot / AgentForge work: case-study notes, tooling setup, and pre-code checklists. See **[Documentation/AgentForge/README.md](Documentation/AgentForge/README.md)** for the process trail and references (not part of upstream OpenEMR’s main documentation tree). **Clinical Co-Pilot permissioning** (who has access vs Front Office / Accounting by default): **[Documentation/AgentForge/process/16-clinical-copilot-acl-role-gate.md](Documentation/AgentForge/process/16-clinical-copilot-acl-role-gate.md)**.
 
 ### Contributing
 

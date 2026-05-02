@@ -6,6 +6,14 @@ course-start: 2026-04-27
 
 This folder holds **course and process documentation** for the Clinical Co-Pilot / AgentForge work on this OpenEMR fork. It is separate from upstream OpenEMR’s `Documentation/` tree.
 
+## Clinical Co-Pilot access control (instructor grading)
+
+**Who gets the Clinical Co-Pilot rail, Context Service, and confirmed writes—and who does not—is defined in OpenEMR GACL**, not environmental toggles alone. Canonical summary for examiners:
+
+- **[process/16-clinical-copilot-acl-role-gate.md](process/16-clinical-copilot-acl-role-gate.md)** — policy table (**`patients/demo`** floor + **`agentforge/use`** + **`agentforge/propose_write`**), **default-seeded groups** (`admin`, `doc`, `clin`, `breakglass`) vs **explicitly excluded** preset roles (`front`, `back`, parent `users` without assignment), **`admin/super`** caveat, implementation links.
+- **[Journal 0501-T2135](process/journal/week-1/0501-T2135-clinical-copilot-acl-role-gate.md)** — session decisions (GACL-only model, Emergency Login inclusion, Front Office / Accounting exclusion).
+- Spec: **`PRD.md`** §4.9; implementation: **`interface/modules/custom_modules/oe-module-agentforge/README.md`** §4.9.
+
 ## Process trail (read in order)
 
 
@@ -26,13 +34,15 @@ This folder holds **course and process documentation** for the Clinical Co-Pilot
 | 13  | [process/13-gate3-complete.md](process/13-gate3-complete.md)                 | Gate 3 UC-A read completeness closed; case presentation + verification; handoff to Gate 4 |
 | 14  | [process/14-gate4-complete.md](process/14-gate4-complete.md)                 | Gate 4 UC-B confirmed writes closed; G4-10 chief-complaint E2E + `log_from='agent'` audit; handoff to Gate 5 |
 | 15  | [process/15-gate6-complete.md](process/15-gate6-complete.md)                 | Gate 6 eval + observability + deploy closed (G6-01..G6-18 + G6-20); LLM provider swap + eval-runner refactor + Context HTTP-matrix backfill; handoff to Gate 7 |
+| 16  | [process/16-clinical-copilot-acl-role-gate.md](process/16-clinical-copilot-acl-role-gate.md) | **Access control:** who may use Clinical Co-Pilot (`agentforge/use`, `propose_write`) vs excluded preset roles; GACL layering; examiner links |
+| 17  | [process/17-encounter-scoped-chart-bind-and-brief.md](process/17-encounter-scoped-chart-bind-and-brief.md) | **Open encounter scope:** appointment click context → session + AgentForge binder; brief vitals + Context `encounter_id` (not calendar “today”) |
 
 Dated entries under `process/journal/week-N/` are session journals between milestones; they are not listed in the table.
 
 
 ## Demo data seeding (local Docker)
 
-Synthetic primary-care **demo calendar** for AgentForge uses **2026-05-04 (Monday) and 2026-05-05 (Tuesday)** only. Each **patient appears at most once** across those two days; extra template slots are skipped so the schedule stays realistic. After a DB reset / demo install, run the seeders **in order** (from `docker/development-easy/`):
+Synthetic primary-care **demo calendar** for AgentForge uses **2026-05-04 (Monday) and 2026-05-05 (Tuesday)** only. Each of the **28 demo patients appears exactly once** across those two days; extra template slots are skipped so the schedule stays realistic. After a DB reset / demo install, run the seeders **in order** (from `docker/development-easy/`):
 
 ```bash
 docker compose exec openemr php /var/www/localhost/htdocs/openemr/contrib/util/agentforge/seed_cohort.php
@@ -41,7 +51,7 @@ docker compose exec openemr php /var/www/localhost/htdocs/openemr/contrib/util/a
 ```
 
 - [`seed_appointments.php`](../../contrib/util/agentforge/seed_appointments.php) writes [`cohort/appointments.md`](cohort/appointments.md).
-- [`seed_visit_intake.php`](../../contrib/util/agentforge/seed_visit_intake.php) creates a same-day **intake encounter** per seeded appointment (reason prefixed `[AgentForge Intake]`, MA vitals, nursing note, social-history touch-up). It also **deletes** any prior `[AgentForge Intake]` encounters (idempotent) and removes encounters dated **2026-04-29–2026-05-01** for demo patients (stock, cohort, scheduled) to clear the old rolling-window artifacts.
+- [`seed_visit_intake.php`](../../contrib/util/agentforge/seed_visit_intake.php) creates exactly one same-day **intake encounter** per seeded appointment (reason prefixed `[AgentForge Intake]`, MA vitals, nursing note, social-history touch-up). It also **deletes** any prior `[AgentForge Intake]` encounters (idempotent) and removes encounters dated **2026-04-28–2026-05-02** for demo patients (stock, cohort, scheduled) to clear the old rolling-window artifacts.
 
 ## References
 
@@ -49,7 +59,7 @@ docker compose exec openemr php /var/www/localhost/htdocs/openemr/contrib/util/a
 
 ## How to extend this folder
 
-1. Add the next milestone as `process/15-<short-slug>.md` (next index **after `14`** in the table above).
+1. Add the next milestone as `process/18-<short-slug>.md` (next index **after `17`** in the table above).
 2. Update the table above so the index stays the single map of the trail.
 3. For working notes between milestones, add dated entries as `process/journal/week-N/MMDD-THHMM-topic.md`. The skill computes `N` from `course-start` in this README's frontmatter; create `week-N/` lazily if missing. Link decisions worth surfacing back into the relevant numbered process file.
 4. If `02-tooling-and-skills.md` grows too long, split changelogs into `02b-skills-changelog.md`.
