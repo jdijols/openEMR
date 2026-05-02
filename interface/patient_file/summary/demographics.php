@@ -83,6 +83,22 @@ if (isset($_GET['set_pid'])) {
     $ptService = new PatientService();
     $newPatient = $ptService->findByPid($pid);
     $ptService->touchRecentPatientList($newPatient);
+    $agentForgeAppointmentContextKeys = [
+        'agentforge_appointment_context_pid',
+        'agentforge_appointment_context_eid',
+        'agentforge_appointment_context_date',
+    ];
+    $agentForgeAppointmentId = isset($_GET['af_appointment_id']) ? (int) $_GET['af_appointment_id'] : 0;
+    $agentForgeAppointmentDate = \is_string($_GET['af_appointment_date'] ?? null)
+        ? \trim($_GET['af_appointment_date'])
+        : '';
+    if ($agentForgeAppointmentId > 0 || $agentForgeAppointmentDate !== '') {
+        SessionUtil::setSession('agentforge_appointment_context_pid', (int) $pid);
+        SessionUtil::setSession('agentforge_appointment_context_eid', $agentForgeAppointmentId);
+        SessionUtil::setSession('agentforge_appointment_context_date', $agentForgeAppointmentDate);
+    } else {
+        SessionUtil::unsetSession($agentForgeAppointmentContextKeys);
+    }
     if (isset($_GET['set_encounterid']) && ((int)$_GET['set_encounterid'] > 0)) {
         $encounter = (int)$_GET['set_encounterid'];
         SessionUtil::setSession('encounter', $encounter);

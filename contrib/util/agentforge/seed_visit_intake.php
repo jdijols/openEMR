@@ -40,12 +40,15 @@ final class AgentForgeVisitIntakeSeeder
 
     /** @var list<string> */
     private const DEMO_WEEKDAY_DATES = [
+        '2026-05-01',
+        '2026-05-02',
+        '2026-05-03',
         '2026-05-04',
-        '2026-05-05',
     ];
 
-    private const LEGACY_DELETE_START = '2026-04-29';
-    private const LEGACY_DELETE_END = '2026-05-01';
+    private const EXPECTED_DEMO_PATIENT_COUNT = 28;
+    private const LEGACY_DELETE_START = '2026-05-01';
+    private const LEGACY_DELETE_END = '2026-05-04';
 
     private const COHORT_MARKER_NAME = 'AgentForge Cohort ID';
     private const COHORT_PREFIX = 'AF-COHORT-';
@@ -81,20 +84,25 @@ final class AgentForgeVisitIntakeSeeder
         if ($demoPids === []) {
             throw new RuntimeException('No AgentForge demo patients found (stock, cohort, or scheduled).');
         }
+        $this->assertDemoPatientCount($demoPids);
+        $this->ensureDemoPatientUuids($demoPids);
 
         $this->purgeEncountersInDateRange($demoPids, self::LEGACY_DELETE_START, self::LEGACY_DELETE_END);
+        $this->assertLegacyEncounterWindowIsEmpty($demoPids);
         $this->purgeAgentForgeIntakeEncounters($demoPids);
 
         $appts = $this->loadAgentForgeAppointments();
+        $this->assertAppointmentRoster($appts, $demoPids);
         $created = 0;
         foreach ($appts as $row) {
             $this->seedIntakeForAppointment($row, $demoPids);
             $created++;
         }
+        $this->assertOneEncounterPerAppointment($appts);
 
         echo "\nAgentForge visit intake seed complete.\n";
         printf("Appointments processed: %d\n\n", $created);
-        echo "Sanity: SELECT encounter, pid, date, reason FROM form_encounter WHERE reason LIKE '[AgentForge Intake]%' ORDER BY date, pid LIMIT 20;\n";
+        echo "Sanity: SELECT encounter, pid, date, reason FROM form_encounter WHERE reason LIKE '[AgentForge Intake]%' ORDER BY date, pid LIMIT 28;\n";
     }
 
     /**
@@ -127,6 +135,30 @@ final class AgentForgeVisitIntakeSeeder
     /**
      * @param list<int> $demoPids
      */
+    private function assertDemoPatientCount(array $demoPids): void
+    {
+        if (count($demoPids) !== self::EXPECTED_DEMO_PATIENT_COUNT) {
+            throw new RuntimeException(sprintf(
+                'Expected exactly %d AgentForge demo patients, found %d.',
+                self::EXPECTED_DEMO_PATIENT_COUNT,
+                count($demoPids)
+            ));
+        }
+    }
+
+    /**
+     * @param list<int> $demoPids
+     */
+    private function ensureDemoPatientUuids(array $demoPids): void
+    {
+        foreach ($demoPids as $pid) {
+            UuidRegistry::createMissingUuidForRow('patient_data', 'pid', $pid);
+        }
+    }
+
+    /**
+     * @param list<int> $demoPids
+     */
     private function purgeEncountersInDateRange(array $demoPids, string $startYmd, string $endYmd): void
     {
         if ($demoPids === []) {
@@ -147,6 +179,31 @@ final class AgentForgeVisitIntakeSeeder
 
         if ($rows !== []) {
             printf("Removed %d encounter(s) dated %s–%s for demo patients.\n", count($rows), $startYmd, $endYmd);
+        }
+    }
+
+    /**
+     * @param list<int> $demoPids
+     */
+    private function assertLegacyEncounterWindowIsEmpty(array $demoPids): void
+    {
+        $remaining = QueryUtils::fetchSingleValue(
+            "SELECT COUNT(*) AS total
+             FROM form_encounter
+             WHERE pid IN (" . $this->placeholders($demoPids) . ")
+             AND DATE(`date`) >= ?
+             AND DATE(`date`) <= ?",
+            'total',
+            array_merge($demoPids, [self::LEGACY_DELETE_START, self::LEGACY_DELETE_END])
+        );
+
+        if ((int)$remaining > 0) {
+            throw new RuntimeException(sprintf(
+                'Expected no demo-patient encounters dated %s-%s after purge, found %d.',
+                self::LEGACY_DELETE_START,
+                self::LEGACY_DELETE_END,
+                (int)$remaining
+            ));
         }
     }
 
@@ -221,6 +278,39 @@ final class AgentForgeVisitIntakeSeeder
     }
 
     /**
+     * @param list<array<string, mixed>> $appts
+     * @param list<int> $demoPids
+     */
+    private function assertAppointmentRoster(array $appts, array $demoPids): void
+    {
+        if (count($appts) !== self::EXPECTED_DEMO_PATIENT_COUNT) {
+            throw new RuntimeException(sprintf(
+                'Expected exactly %d AgentForge appointments before seeding intake, found %d.',
+                self::EXPECTED_DEMO_PATIENT_COUNT,
+                count($appts)
+            ));
+        }
+
+        $appointmentPids = array_map(static fn(array $appt): int => (int)$appt['pc_pid'], $appts);
+        $uniqueAppointmentPids = array_values(array_unique($appointmentPids));
+        if (count($appointmentPids) !== count($uniqueAppointmentPids)) {
+            throw new RuntimeException('AgentForge appointment roster contains duplicate patient appointments.');
+        }
+
+        sort($demoPids);
+        sort($uniqueAppointmentPids);
+        if ($uniqueAppointmentPids !== $demoPids) {
+            $missing = array_diff($demoPids, $uniqueAppointmentPids);
+            $unexpected = array_diff($uniqueAppointmentPids, $demoPids);
+            throw new RuntimeException(sprintf(
+                'AgentForge appointments do not match the demo patient roster. Missing pids: [%s]. Unexpected pids: [%s].',
+                implode(', ', $missing),
+                implode(', ', $unexpected)
+            ));
+        }
+    }
+
+    /**
      * @param array<string, mixed> $appt
      * @param list<int> $demoPids
      */
@@ -284,6 +374,54 @@ final class AgentForgeVisitIntakeSeeder
 
         $this->createMaIntakeNote($pid, $eid, $username, $eventDate, $chief);
         $this->ensureSocialHistoryDemoSlice($pid);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $appts
+     */
+    private function assertOneEncounterPerAppointment(array $appts): void
+    {
+        $expected = [];
+        $pids = [];
+        foreach ($appts as $appt) {
+            $pid = (int)$appt['pc_pid'];
+            $date = (string)$appt['pc_eventDate'];
+            $expected[$pid . '|' . $date] = true;
+            $pids[] = $pid;
+        }
+
+        $rows = QueryUtils::fetchRecords(
+            "SELECT pid, DATE(`date`) AS encounter_date, COUNT(*) AS total
+             FROM form_encounter
+             WHERE pid IN (" . $this->placeholders($pids) . ")
+             AND reason LIKE ?
+             AND DATE(`date`) IN (" . $this->placeholders(self::DEMO_WEEKDAY_DATES) . ")
+             GROUP BY pid, DATE(`date`)",
+            array_merge($pids, [self::INTAKE_REASON_PREFIX . '%'], self::DEMO_WEEKDAY_DATES)
+        );
+
+        $actual = [];
+        foreach ($rows as $row) {
+            $actual[(int)$row['pid'] . '|' . (string)$row['encounter_date']] = (int)$row['total'];
+        }
+
+        foreach (array_keys($expected) as $key) {
+            if (($actual[$key] ?? 0) !== 1) {
+                throw new RuntimeException(sprintf(
+                    'Expected exactly one AgentForge intake encounter for appointment %s, found %d.',
+                    $key,
+                    $actual[$key] ?? 0
+                ));
+            }
+        }
+
+        if (count($actual) !== count($expected)) {
+            throw new RuntimeException(sprintf(
+                'Expected %d appointment-day intake encounter groups, found %d.',
+                count($expected),
+                count($actual)
+            ));
+        }
     }
 
     private function intakeVitalsTime(string $hhmmss): string

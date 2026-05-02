@@ -57,11 +57,13 @@ $chevron_icon_right = $language_direction == 'ltr' ? 'fa-chevron-circle-right' :
   dlgopen('add_edit_event.php?group=true&date=' + encodeURIComponent(eventdate) + '&eid=' + encodeURIComponent(eventid) + '&prov=' + encodeURIComponent(pccattype), '_blank', 780, 675);
  }
 
- function goPid(pid) {
+ function goPid(pid, appointmentDate, appointmentId) {
   top.restoreSession();
 [-php-]
 		 echo "  top.RTop.location = '../../patient_file/summary/demographics.php' " .
-		   "+ '?set_pid=' + encodeURIComponent(pid);\n";
+		   "+ '?set_pid=' + encodeURIComponent(pid)" .
+           "+ (appointmentDate ? '&af_appointment_date=' + encodeURIComponent(appointmentDate) : '')" .
+           "+ (appointmentId ? '&af_appointment_id=' + encodeURIComponent(appointmentId) : '');\n";
 [-/php-]
  }
 
@@ -772,7 +774,7 @@ foreach ($providers as $provider) {
                     // note we don't escape comment as its already been escaped in pnuserapi
                     $link_title .= xla('Age') . ": " . attr($patient_age) . "\n" . xla('DOB') . ": " . attr($patient_dob) . " $comment" . "\n";
                     $link_title .= "(" . xla('Click to view') . ")";
-                    $content .= "<a class='link_title' data-pid='". attr($patientid) . "' href='javascript:goPid(" . attr_js($patientid) . ")' title='" . $link_title . "'>";
+                    $content .= "<a class='link_title' data-pid='". attr($patientid) . "' href='javascript:goPid(" . attr_js($patientid) . "," . attr_js($eventdate) . "," . attr_js($eventid) . ")' title='" . $link_title . "'>";
                     $content .= "<i class='fas fa-user text-success' onmouseover=\"javascript:ShowImage(" . attr_js($GLOBALS['webroot']."/controller.php?document&retrieve&patient_id=".urlencode($patientid)."&document_id=-1&as_file=false&original_file=true&disable_exit=false&show_original=true&context=patient_picture") . ");\" onmouseout=\"javascript:HideImage();\" title='". $link_title . "'></i>";
 
                     if ($catid == 1) $content .= "<s>";

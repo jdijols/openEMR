@@ -31,15 +31,18 @@ require_once $fileRoot . '/interface/globals.php';
 final class AgentForgeAppointmentSeeder
 {
     /**
-     * Fixed two-day demo window (Mon–Tue). Each patient is scheduled at most once across these days; dev/demo only.
+     * Fixed four-day demo window. Each demo patient is scheduled exactly once across these days; dev/demo only.
      *
      * @var list<string>
      */
     private const DEMO_WEEKDAY_DATES = [
+        '2026-05-01',
+        '2026-05-02',
+        '2026-05-03',
         '2026-05-04',
-        '2026-05-05',
     ];
 
+    private const EXPECTED_DEMO_PATIENT_COUNT = 28;
     private const APPOINTMENT_MARKER = '[AgentForge Appointment Seed]';
     private const SCHEDULED_PATIENT_MARKER_NAME = 'AgentForge Scheduled Patient ID';
     private const SCHEDULED_PATIENT_PREFIX = 'AF-SCHEDULED-';
@@ -87,12 +90,16 @@ final class AgentForgeAppointmentSeeder
         $stockPatients = $this->loadStockPatients();
         $cohortPatients = $this->loadCohortPatients();
         $establishedPatients = array_merge($stockPatients, $cohortPatients);
+        $demoPatients = array_merge($establishedPatients, $scheduledPatients);
+        $this->assignDemoPatientsToAppointmentProvider($demoPatients);
 
         if ($establishedPatients === []) {
             throw new RuntimeException('Need at least one stock or AgentForge cohort patient for established-patient appointments.');
         }
 
+        $this->assertDemoPatientRoster($demoPatients);
         $appointments = $this->seedAppointments($establishedPatients, $scheduledPatients);
+        $this->assertAppointmentCoverage($appointments, $demoPatients);
         $this->writeManifest($appointments, $stockPatients, $cohortPatients, $scheduledPatients);
         $this->printSummary($appointments, $stockPatients, $cohortPatients, $scheduledPatients);
         $this->printSanityQueries();
@@ -100,8 +107,8 @@ final class AgentForgeAppointmentSeeder
 
     private function assertBaseline(): void
     {
-        if (count($this->providers) < 3) {
-            throw new RuntimeException('Need at least three active authorized users/providers before seeding AgentForge appointments.');
+        if (count($this->providers) < 1) {
+            throw new RuntimeException('Need Donna Lee or the physician user to be active and authorized before seeding AgentForge appointments.');
         }
 
         if ($this->facility['id'] <= 0) {
@@ -124,17 +131,19 @@ final class AgentForgeAppointmentSeeder
             "SELECT id, username, fname, lname
              FROM users
              WHERE authorized = 1 AND active = 1
-             ORDER BY CASE username
+             AND ((fname = ? AND lname = ?) OR username = ?)
+             ORDER BY CASE WHEN fname = ? AND lname = ? THEN 1 ELSE 2 END,
+             CASE username
                 WHEN 'physician' THEN 1
-                WHEN 'clinician' THEN 2
-                WHEN 'admin' THEN 3
                 ELSE 4
-             END, id
-             LIMIT 3"
+             END,
+             id
+             LIMIT 1",
+            ['Donna', 'Lee', 'physician', 'Donna', 'Lee']
         );
 
         $providers = [];
-        $keys = ['A', 'B', 'C'];
+        $keys = ['A'];
         foreach ($rows as $index => $row) {
             $providers[$keys[$index]] = [
                 'id' => (int)$row['id'],
@@ -405,6 +414,20 @@ final class AgentForgeAppointmentSeeder
     }
 
     /**
+     * @param list<array{pid:int, pubpid:string, name:string, source:string, primary_provider:string}> $demoPatients
+     */
+    private function assignDemoPatientsToAppointmentProvider(array $demoPatients): void
+    {
+        $provider = $this->providers['A'];
+        foreach ($demoPatients as $patient) {
+            QueryUtils::sqlStatementThrowException(
+                "UPDATE patient_data SET providerID = ? WHERE pid = ?",
+                [(int)$provider['id'], (int)$patient['pid']]
+            );
+        }
+    }
+
+    /**
      * @param list<array{pid:int, pubpid:string, name:string, source:string, primary_provider:string}> $establishedPatients
      * @param list<array{pid:int, pubpid:string, name:string, source:string, primary_provider:string}> $newPatients
      * @return list<array<string, mixed>>
@@ -512,7 +535,59 @@ final class AgentForgeAppointmentSeeder
     }
 
     /**
-     * Place any demo patient who did not receive a template slot into a short Tuesday overflow visit
+     * @param list<array{pid:int, pubpid:string, name:string, source:string, primary_provider:string}> $demoPatients
+     */
+    private function assertDemoPatientRoster(array $demoPatients): void
+    {
+        $pids = array_map(static fn(array $patient): int => (int)$patient['pid'], $demoPatients);
+        $uniquePids = array_values(array_unique($pids));
+        if (count($uniquePids) !== self::EXPECTED_DEMO_PATIENT_COUNT) {
+            throw new RuntimeException(sprintf(
+                'Expected exactly %d AgentForge demo patients before scheduling, found %d.',
+                self::EXPECTED_DEMO_PATIENT_COUNT,
+                count($uniquePids)
+            ));
+        }
+    }
+
+    /**
+     * @param list<array<string, mixed>> $appointments
+     * @param list<array{pid:int, pubpid:string, name:string, source:string, primary_provider:string}> $demoPatients
+     */
+    private function assertAppointmentCoverage(array $appointments, array $demoPatients): void
+    {
+        $expectedPids = array_map(static fn(array $patient): int => (int)$patient['pid'], $demoPatients);
+        sort($expectedPids);
+
+        $appointmentPids = array_map(static fn(array $appointment): int => (int)$appointment['pid'], $appointments);
+        $uniqueAppointmentPids = array_values(array_unique($appointmentPids));
+        sort($uniqueAppointmentPids);
+
+        if (count($appointments) !== self::EXPECTED_DEMO_PATIENT_COUNT) {
+            throw new RuntimeException(sprintf(
+                'Expected exactly %d AgentForge appointments across the four-day demo window, created %d.',
+                self::EXPECTED_DEMO_PATIENT_COUNT,
+                count($appointments)
+            ));
+        }
+
+        if (count($appointmentPids) !== count($uniqueAppointmentPids)) {
+            throw new RuntimeException('AgentForge appointment seed produced duplicate patient appointments.');
+        }
+
+        if ($uniqueAppointmentPids !== $expectedPids) {
+            $missing = array_diff($expectedPids, $uniqueAppointmentPids);
+            $unexpected = array_diff($uniqueAppointmentPids, $expectedPids);
+            throw new RuntimeException(sprintf(
+                'AgentForge appointment seed did not cover the exact demo roster. Missing pids: [%s]. Unexpected pids: [%s].',
+                implode(', ', $missing),
+                implode(', ', $unexpected)
+            ));
+        }
+    }
+
+    /**
+     * Place any demo patient who did not receive a template slot into a short final-day overflow visit
      * so the cohort is fully represented on the calendar.
      *
      * @param list<array<string, mixed>> $appointments
@@ -618,7 +693,7 @@ final class AgentForgeAppointmentSeeder
             }
 
             if (!$placed) {
-                fwrite(STDERR, "AgentForge appointments: could not place overflow slot for pid {$pid} ({$patient['name']}).\n");
+                throw new RuntimeException("AgentForge appointments: could not place overflow slot for pid {$pid} ({$patient['name']}).");
             }
         }
     }
@@ -627,80 +702,48 @@ final class AgentForgeAppointmentSeeder
     {
         return [
             [
-                'A' => array_merge(
-                    $this->block('08:30', [['established', 15], ['established', 15], ['new', 30], ['established', 15], ['established', 15], ['established', 15]]),
-                    $this->block('13:15', [['established', 15], ['new', 30], ['established', 15], ['established', 15], ['established', 15], ['established', 15]])
-                ),
-                'B' => array_merge(
-                    $this->block('09:00', [['new', 30], ['established', 15], ['established', 15], ['established', 15], ['established', 15], ['established', 15]]),
-                    $this->block('14:00', [['established', 15], ['established', 15], ['new', 30], ['established', 15], ['established', 15]])
-                ),
-                'C' => array_merge(
-                    $this->block('08:00', [['established', 15], ['established', 15], ['established', 15], ['established', 15], ['new', 30]]),
-                    $this->block('11:00', [['established', 15], ['established', 15], ['established', 15], ['established', 15]]),
-                    $this->block('15:00', [['new', 30], ['established', 15], ['established', 15]])
-                ),
+                'A' => $this->block('08:30', [
+                    ['established', 15],
+                    ['established', 15],
+                    ['new', 30],
+                    ['established', 15],
+                    ['established', 15],
+                    ['new', 30],
+                    ['established', 15],
+                ]),
             ],
             [
-                'A' => array_merge(
-                    $this->block('09:15', [['established', 15], ['established', 15], ['established', 15], ['new', 30], ['established', 15]]),
-                    $this->block('11:30', [['established', 15], ['established', 15], ['established', 15]]),
-                    $this->block('14:15', [['established', 15], ['new', 30], ['established', 15], ['established', 15]])
-                ),
-                'B' => array_merge(
-                    $this->block('08:15', [['established', 15], ['new', 30], ['established', 15], ['established', 15], ['established', 15], ['established', 15]]),
-                    $this->block('13:00', [['established', 15], ['established', 15], ['established', 15], ['new', 30], ['established', 15]])
-                ),
-                'C' => array_merge(
-                    $this->block('10:00', [['new', 30], ['established', 15], ['established', 15], ['established', 15]]),
-                    $this->block('13:30', [['established', 15], ['established', 15], ['established', 15], ['established', 15], ['new', 30], ['established', 15]])
-                ),
+                'A' => $this->block('08:30', [
+                    ['new', 30],
+                    ['established', 15],
+                    ['new', 30],
+                    ['established', 15],
+                    ['new', 30],
+                    ['established', 15],
+                    ['new', 30],
+                ]),
             ],
             [
-                'A' => array_merge(
-                    $this->block('08:00', [['new', 30], ['established', 15], ['established', 15], ['established', 15], ['established', 15]]),
-                    $this->block('10:30', [['established', 15], ['established', 15], ['established', 15]]),
-                    $this->block('13:45', [['new', 30], ['established', 15], ['established', 15], ['established', 15]])
-                ),
-                'B' => array_merge(
-                    $this->block('09:30', [['established', 15], ['established', 15], ['new', 30], ['established', 15], ['established', 15]]),
-                    $this->block('13:15', [['established', 15], ['established', 15], ['established', 15], ['established', 15], ['new', 30]])
-                ),
-                'C' => array_merge(
-                    $this->block('08:45', [['established', 15], ['established', 15], ['established', 15], ['established', 15], ['new', 30], ['established', 15]]),
-                    $this->block('14:30', [['established', 15], ['new', 30], ['established', 15], ['established', 15]])
-                ),
+                'A' => $this->block('08:30', [
+                    ['established', 15],
+                    ['new', 30],
+                    ['established', 15],
+                    ['new', 30],
+                    ['established', 15],
+                    ['new', 30],
+                    ['new', 30],
+                ]),
             ],
             [
-                'A' => array_merge(
-                    $this->block('10:00', [['established', 15], ['new', 30], ['established', 15], ['established', 15], ['established', 15]]),
-                    $this->block('13:00', [['established', 15], ['established', 15], ['new', 30], ['established', 15], ['established', 15], ['established', 15]])
-                ),
-                'B' => array_merge(
-                    $this->block('08:00', [['established', 15], ['established', 15], ['established', 15], ['new', 30], ['established', 15], ['established', 15]]),
-                    $this->block('11:15', [['established', 15], ['established', 15]]),
-                    $this->block('14:00', [['new', 30], ['established', 15], ['established', 15]])
-                ),
-                'C' => array_merge(
-                    $this->block('09:00', [['established', 15], ['established', 15], ['new', 30], ['established', 15], ['established', 15]]),
-                    $this->block('13:15', [['established', 15], ['established', 15], ['established', 15], ['new', 30], ['established', 15]])
-                ),
-            ],
-            [
-                'A' => array_merge(
-                    $this->block('08:30', [['established', 15], ['established', 15], ['established', 15], ['established', 15], ['new', 30], ['established', 15]]),
-                    $this->block('12:45', [['established', 15], ['established', 15], ['established', 15]]),
-                    $this->block('15:00', [['new', 30], ['established', 15], ['established', 15]])
-                ),
-                'B' => array_merge(
-                    $this->block('09:00', [['established', 15], ['new', 30], ['established', 15], ['established', 15], ['established', 15]]),
-                    $this->block('13:30', [['established', 15], ['established', 15], ['established', 15], ['new', 30], ['established', 15]])
-                ),
-                'C' => array_merge(
-                    $this->block('08:15', [['new', 30], ['established', 15], ['established', 15], ['established', 15], ['established', 15], ['established', 15]]),
-                    $this->block('11:00', [['established', 15], ['established', 15]]),
-                    $this->block('13:45', [['established', 15], ['new', 30], ['established', 15], ['established', 15]])
-                ),
+                'A' => $this->block('08:30', [
+                    ['new', 30],
+                    ['new', 30],
+                    ['new', 30],
+                    ['established', 15],
+                    ['new', 30],
+                    ['new', 30],
+                    ['established', 15],
+                ]),
             ],
         ];
     }
@@ -866,7 +909,7 @@ final class AgentForgeAppointmentSeeder
             '',
             'All appointments and scheduled-patient records are fabricated synthetic data for demo and evaluation use only.',
             '',
-            '**Demo window:** **Monday 2026-05-04 and Tuesday 2026-05-05** only. Each patient appears **at most once** across both days (remaining template slots are skipped).',
+            '**Demo window:** **Friday 2026-05-01 through Monday 2026-05-04** only. Each of the 28 demo patients appears **exactly once** across the four-day Donna Lee schedule.',
             'Run `contrib/util/agentforge/seed_visit_intake.php` after this script to create same-day intake encounters.',
             '',
             '## Patient Sources',
@@ -1062,20 +1105,20 @@ function af_scheduled_patient(string $provider, string $fname, string $lname, st
 
 $scheduledPatients = [
     af_scheduled_patient('A', 'Avery', 'Wells', '1992-05-04', 'Female', '2040 Kalmia Street'),
-    af_scheduled_patient('B', 'Jordan', 'Price', '1988-09-21', 'Male', '7719 Bayview Drive'),
-    af_scheduled_patient('C', 'Camila', 'Nguyen', '1979-02-14', 'Female', '3610 Citrus Avenue'),
+    af_scheduled_patient('A', 'Jordan', 'Price', '1988-09-21', 'Male', '7719 Bayview Drive'),
+    af_scheduled_patient('A', 'Camila', 'Nguyen', '1979-02-14', 'Female', '3610 Citrus Avenue'),
     af_scheduled_patient('A', 'Logan', 'Carter', '2006-12-03', 'Male', '9551 Mesa Brook Lane'),
-    af_scheduled_patient('B', 'Priya', 'Shah', '1968-07-29', 'Female', '1428 Laurel Canyon Road'),
-    af_scheduled_patient('C', 'Noah', 'Bennett', '1958-01-18', 'Male', '8172 Harbor Point'),
+    af_scheduled_patient('A', 'Priya', 'Shah', '1968-07-29', 'Female', '1428 Laurel Canyon Road'),
+    af_scheduled_patient('A', 'Noah', 'Bennett', '1958-01-18', 'Male', '8172 Harbor Point'),
     af_scheduled_patient('A', 'Elena', 'Morales', '1999-03-09', 'Female', '4309 Juniper Terrace'),
-    af_scheduled_patient('B', 'Miles', 'Reed', '1981-11-17', 'Male', '2636 Mission Park Way'),
-    af_scheduled_patient('C', 'Talia', 'Brooks', '1975-06-25', 'Female', '6405 Palm Grove Court'),
+    af_scheduled_patient('A', 'Miles', 'Reed', '1981-11-17', 'Male', '2636 Mission Park Way'),
+    af_scheduled_patient('A', 'Talia', 'Brooks', '1975-06-25', 'Female', '6405 Palm Grove Court'),
     af_scheduled_patient('A', 'Owen', 'Foster', '2013-10-08', 'Male', '1297 Redwood Circle'),
-    af_scheduled_patient('B', 'Mei', 'Chen', '1949-04-30', 'Female', '5308 Vista Meadow Drive'),
-    af_scheduled_patient('C', 'Isaac', 'Turner', '1962-08-12', 'Male', '9074 Seabreeze Avenue'),
+    af_scheduled_patient('A', 'Mei', 'Chen', '1949-04-30', 'Female', '5308 Vista Meadow Drive'),
+    af_scheduled_patient('A', 'Isaac', 'Turner', '1962-08-12', 'Male', '9074 Seabreeze Avenue'),
     af_scheduled_patient('A', 'Rina', 'Kapoor', '1986-02-02', 'Female', '7780 Mesa Verde Lane'),
-    af_scheduled_patient('B', 'Caleb', 'Morgan', '1994-09-13', 'Male', '3180 Laurel Street'),
-    af_scheduled_patient('C', 'Amara', 'Cole', '2002-05-22', 'Female', '6042 Harbor View Road'),
+    af_scheduled_patient('A', 'Caleb', 'Morgan', '1994-09-13', 'Male', '3180 Laurel Street'),
+    af_scheduled_patient('A', 'Amara', 'Cole', '2002-05-22', 'Female', '6042 Harbor View Road'),
 ];
 
 try {

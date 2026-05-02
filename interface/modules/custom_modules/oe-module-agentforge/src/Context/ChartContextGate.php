@@ -12,7 +12,6 @@ declare(strict_types=1);
 
 namespace OpenEMR\Modules\AgentForge\Context;
 
-use OpenEMR\Common\Acl\AclMain;
 use OpenEMR\Common\Session\SessionWrapperFactory;
 use OpenEMR\Common\Uuid\UuidRegistry;
 use OpenEMR\Modules\AgentForge\Acl\AclMap;
@@ -52,7 +51,7 @@ final class ChartContextGate
             throw new ChartContextAuthorizationException(401, 'unauthenticated');
         }
 
-        if (!AclMain::aclCheckCore(AclMap::CHART_READ_SECTION, AclMap::CHART_READ_VALUE, $authUser)) {
+        if (!AclMap::userPassesAgentForgeReadGate($authUser)) {
             throw new ChartContextAuthorizationException(403, 'acl_denied');
         }
 
@@ -115,7 +114,7 @@ final class ChartContextGate
         }
 
         $authUser = $userRow['username'];
-        if (!AclMain::aclCheckCore(AclMap::CHART_READ_SECTION, AclMap::CHART_READ_VALUE, $authUser)) {
+        if (!AclMap::userPassesAgentForgeReadGate($authUser)) {
             throw new ChartContextAuthorizationException(403, 'acl_denied');
         }
 

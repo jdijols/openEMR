@@ -67,5 +67,13 @@ final class RailContainerStaticStructureTest extends TestCase
         self::assertStringContainsString('readEncounterProbe', $contents);
         self::assertStringContainsString('selectedEncounterID', $contents);
         self::assertStringContainsString('cur !== prevPid || curEnc !== prevEncounter', $contents);
+
+        // Auto-bind the appointment-context encounter: panel.php binds/creates
+        // the encounter before minting the launch code, then exposes the bound
+        // id for the host shell to update OpenEMR's visible "Open Encounter".
+        self::assertStringContainsString('syncBoundEncounterFromFrame', $contents);
+        self::assertStringContainsString('data-bound-encounter-id', $contents);
+        self::assertStringContainsString('new topWin.encounter_data', $contents);
+        self::assertStringContainsString('appPatient.selectedEncounterID(encString)', $contents);
     }
 }

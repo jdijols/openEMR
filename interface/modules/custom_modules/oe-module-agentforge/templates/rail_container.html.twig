@@ -317,6 +317,68 @@
         var prevPid = readPidProbe();
         var prevEncounter = readEncounterProbe();
 
+        function syncBoundEncounterInChrome(encId, encounterDate, encounterCategory) {
+            var topWin = window.top;
+            try {
+                var appPatient =
+                    topWin &&
+                    topWin.app_view_model &&
+                    topWin.app_view_model.application_data &&
+                    topWin.app_view_model.application_data.patient &&
+                    topWin.app_view_model.application_data.patient();
+                if (!appPatient || typeof appPatient.selectedEncounterID !== 'function') {
+                    return;
+                }
+
+                var encString = String(encId);
+                if (typeof appPatient.encounterArray === 'function') {
+                    var encounters = appPatient.encounterArray();
+                    var found = false;
+                    for (var i = 0; i < encounters.length; i++) {
+                        var cur = encounters[i];
+                        if (cur && cur.id && String(cur.id()) === encString) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found && encounterDate !== '' && typeof topWin.encounter_data === 'function') {
+                        appPatient.encounterArray.push(new topWin.encounter_data(encString, encounterDate, encounterCategory));
+                    }
+                }
+
+                appPatient.selectedEncounterID(encString);
+                prevEncounter = encString;
+            } catch (ignored) {
+                // Host encounter sync is best-effort; the server session/token are already bound.
+            }
+        }
+
+        function syncBoundEncounterFromFrame() {
+            if (!frame) {
+                return;
+            }
+            var doc = null;
+            try {
+                doc = frame.contentDocument;
+            } catch (ignored) {
+                return;
+            }
+            var root = doc ? doc.documentElement : null;
+            if (!root) {
+                return;
+            }
+            var rawEnc = root.getAttribute('data-bound-encounter-id') || '';
+            var encId = parseInt(rawEnc, 10);
+            if (!(encId > 0)) {
+                return;
+            }
+            syncBoundEncounterInChrome(
+                encId,
+                root.getAttribute('data-bound-encounter-date') || '',
+                root.getAttribute('data-bound-encounter-category') || ''
+            );
+        }
+
         // Brief auto-trigger lives inside the CUI now (App.tsx state machine).
         // The host previously fired a present-patient postMessage on iframe
         // load / pid-poll / setCollapsed (with a 200ms setTimeout race window)
@@ -354,6 +416,10 @@
                 }
             }
         }, 1500);
+
+        if (frame) {
+            frame.addEventListener('load', syncBoundEncounterFromFrame);
+        }
 
         window.addEventListener('message', function (ev) {
             if (!frame || ev.source !== frame.contentWindow) {

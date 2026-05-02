@@ -74,6 +74,11 @@ if (\is_array($rows)) {
         $idRaw = $raw['form_id'] ?? $raw['id'] ?? null;
         $vitalsPk = \is_int($idRaw) ? $idRaw : (\is_numeric($idRaw) ? (int) $idRaw : 0);
 
+        $encounterIdRaw = $raw['eid'] ?? null;
+        $encounterId = \is_int($encounterIdRaw) ?
+            $encounterIdRaw
+            : (\is_numeric($encounterIdRaw) ? (int) $encounterIdRaw : 0);
+
         $dateStr = isset($raw['date']) ? (string) $raw['date'] : '';
         $asOf = new \DateTimeImmutable('now');
         if ($dateStr !== '') {
@@ -92,6 +97,7 @@ if (\is_array($rows)) {
         $packUuid = $vitalsUuidStr !== '' ? $vitalsUuidStr : ('v-' . ($dateStr !== '' ? $dateStr : 'na'));
 
         $out[] = [
+            'encounter_id' => $encounterId > 0 ? $encounterId : null,
             'recorded_at' => $dateStr,
             'bps' => isset($raw['bps']) ? (string) $raw['bps'] : '',
             'bpd' => isset($raw['bpd']) ? (string) $raw['bpd'] : '',

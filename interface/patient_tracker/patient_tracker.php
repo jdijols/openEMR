@@ -607,6 +607,7 @@ if (!($_REQUEST['flb_table'] ?? null)) {
                         $appt_enc = $appointment['encounter'];
                         $appt_eid = (!empty($appointment['eid'])) ? $appointment['eid'] : $appointment['pc_eid'];
                         $appt_pid = (!empty($appointment['pid'])) ? $appointment['pid'] : $appointment['pc_pid'];
+                        $appt_date = (!empty($appointment['apptdate'])) ? $appointment['apptdate'] : $appointment['pc_eventDate'];
                         if ($appt_pid == 0) {
                             continue; // skip when $appt_pid = 0, since this means it is not a patient specific appt slot
                         }
@@ -652,12 +653,12 @@ if (!($_REQUEST['flb_table'] ?? null)) {
 
                         ?>
                         <td class="detail text-center" name="kiosk_hide">
-                            <a href="#" onclick="return topatient(<?php echo attr_js($appt_pid); ?>,<?php echo attr_js($appt_enc); ?>)">
+                            <a href="#" onclick="return topatient(<?php echo attr_js($appt_pid); ?>,<?php echo attr_js($appt_enc); ?>,<?php echo attr_js($appt_date); ?>,<?php echo attr_js($appt_eid); ?>)">
                                 <?php echo text($ptname); ?></a>
                         </td>
 
                         <td class="detail text-center" style="white-space: normal;" name="kiosk_show">
-                            <a href="#" onclick="return topatient(<?php echo attr_js($appt_pid); ?>,<?php echo attr_js($appt_enc); ?>)">
+                            <a href="#" onclick="return topatient(<?php echo attr_js($appt_pid); ?>,<?php echo attr_js($appt_enc); ?>,<?php echo attr_js($appt_date); ?>,<?php echo attr_js($appt_eid); ?>)">
                                 <?php echo text($ptname_short); ?></a>
                         </td>
 
@@ -1005,17 +1006,19 @@ function myLocalJS(SessionInterface $session): void
         }
 
         // used to display the patient demographic and encounter screens
-        function topatient(newpid, enc) {
+        function topatient(newpid, enc, appointmentDate, appointmentId) {
             if ($('#setting_new_window').val() === 'checked') {
                 openNewTopWindow(newpid, enc);
             }
             else {
                 top.restoreSession();
+                const apptContext = (appointmentDate ? "&af_appointment_date=" + encodeURIComponent(appointmentDate) : "") +
+                    (appointmentId ? "&af_appointment_id=" + encodeURIComponent(appointmentId) : "");
                 if (enc > 0) {
-                    top.RTop.location = "<?php echo OEGlobalsBag::getInstance()->getWebRoot(); ?>/interface/patient_file/summary/demographics.php?set_pid=" + encodeURIComponent(newpid) + "&set_encounterid=" + encodeURIComponent(enc);
+                    top.RTop.location = "<?php echo OEGlobalsBag::getInstance()->getWebRoot(); ?>/interface/patient_file/summary/demographics.php?set_pid=" + encodeURIComponent(newpid) + "&set_encounterid=" + encodeURIComponent(enc) + apptContext;
                 }
                 else {
-                    top.RTop.location = "<?php echo OEGlobalsBag::getInstance()->getWebRoot(); ?>/interface/patient_file/summary/demographics.php?set_pid=" + encodeURIComponent(newpid);
+                    top.RTop.location = "<?php echo OEGlobalsBag::getInstance()->getWebRoot(); ?>/interface/patient_file/summary/demographics.php?set_pid=" + encodeURIComponent(newpid) + apptContext;
                 }
             }
         }
