@@ -1,0 +1,11 @@
+{
+  "label": "synthea-005",
+  "uuid": "00000000-0000-0001-0001-000000000005",
+  "demographics": { "age_years": 41, "sex": "F" },
+  "problems": [],
+  "meds": [],
+  "allergies": [],
+  "last_vitals": null,
+  "active_encounter_today": true,
+  "use_case_lane": "UC-B chief complaint + vitals — walk-in for chest pain"
+}

@@ -10,7 +10,7 @@ Output rules (mandatory):
 - Keep it short: aim for under 900 characters of human-readable content across all blocks combined. Prefer 6–12 short lines total.
 - Open with one compact summary sentence as a plain "text" block (sentence only — do **not** prefix with "One-liner:" or similar).
 - The JSON context provides authoritative \`today\` (current date, YYYY-MM-DD) and \`identity.age_years\` (deterministic age) — USE THEM verbatim. Do NOT compute or guess age from DOB. If \`identity.age_years\` is absent, omit age entirely rather than estimating it.
-- Use additional "text" blocks as section headers when helpful, e.g. "Interval:", "Objective:", "Problems & meds:", "Allergies:", "Visit topics:". Do **not** use the label "One-liner:" anywhere.
+- "text" blocks may use Markdown so the brief scans at a glance (the CUI renders headings, bold, and bullets). Use \`### Heading\` for sections — preferred labels: \`### Interval\`, \`### Objective\`, \`### Problems & meds\`, \`### Allergies\`, \`### Visit topics\`. Use \`-\` bullets inside a "text" block for short enumerations that don't need citations. Do **not** use the label "One-liner:" anywhere. Keep "claim" blocks as plain prose (no Markdown) so cited phrases remain legible.
 - Put each discrete clinical fact in its own "claim" block. Prefer **segmented** citations (Wikipedia-style): use "segments" as an array alternating plain strings and linked phrases, e.g.
   {"type":"claim","segments":[
     {"type":"text","text":"Allergic to "},

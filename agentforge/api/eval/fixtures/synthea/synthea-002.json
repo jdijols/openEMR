@@ -1,0 +1,18 @@
+{
+  "label": "synthea-002",
+  "uuid": "00000000-0000-0001-0001-000000000002",
+  "demographics": { "age_years": 78, "sex": "F" },
+  "problems": [
+    { "code": "I10", "display": "Essential hypertension" },
+    { "code": "E11.9", "display": "Type 2 diabetes mellitus, no complications" },
+    { "code": "M19.90", "display": "Osteoarthritis, unspecified" }
+  ],
+  "meds": [
+    { "rxnorm": "29046", "display": "Lisinopril 10 mg oral tablet" },
+    { "rxnorm": "860975", "display": "Metformin 500 mg oral tablet" },
+    { "rxnorm": "197805", "display": "Acetaminophen 500 mg oral tablet" },
+    { "rxnorm": "311036", "display": "Atorvastatin 20 mg oral tablet" }
+  ],
+  "allergies": [{ "substance": "sulfa", "reaction": "rash" }],
+  "last_vitals": { "bp_sys": 140, "bp_dia": 78, "hr": 64, "captured_on": "this_week" }
+}

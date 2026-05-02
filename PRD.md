@@ -86,7 +86,7 @@ The full refusal list and degraded-behavior expectations are in [`USERS.md` §7.
 
 - [ ] Live HTTPS URL serves the OpenEMR shell with the AgentForge module installed and the chat icon visible in the header.
 - [ ] Active-chart binding works: opening a chart, opening the rail, and asking a chart-scoped question returns a source-cited answer for that patient and only that patient.
-- [ ] **UC-A — Auto case presentation:** opening an active-patient chart **automatically opens the rail** and delivers a compact, source-cited outpatient case presentation (SOAP-style: one-liner + interval + objective + assessment + documented visit topics). The same pipeline is re-runnable via "Brief me" / refresh controls without inventing new orders or diagnoses (§1.3). Demo rehearsal: **≥3** storyboard charts from §12.4, each showing **≥1** interval or problem-status item with valid `claim` citations.
+- [ ] **UC-A — Auto case presentation:** opening an active-patient chart **automatically opens the rail** and delivers a compact, source-cited outpatient case presentation (SOAP-style: one-liner + interval + objective + assessment + documented visit topics). The pipeline is the singular path — auto-fired exactly once per `(user_id, patient_uuid)` per 30-min cache window, with the **Refresh chart** button the only re-run control (force-refresh bypass). The "Brief me" chat trigger and "what did we capture" recap were cut 2026-05-01; an inline **Retry brief** button handles transient fetch failure (§1.3). Demo rehearsal: **≥3** storyboard charts from §12.4, each showing **≥1** interval or problem-status item with valid `claim` citations.
 - [ ] UC-B can capture a transcript, propose at least one write per write target (chief complaint, vitals incl. pain/H/W, tobacco, allergy add), and execute the write after explicit confirm. The Loom demonstrates **at least one full propose→confirm→write→accept** loop end-to-end.
 - [ ] UC-C continues the same thread after "end transcript," summarizes confirmed/rejected proposals, and refuses any silent write.
 - [ ] Eval harness §10 runs locally with at least the deterministic checks from §10.2 passing (citation enforcement, refusal paths, forbidden outputs).
@@ -896,7 +896,7 @@ Scenario: Hold-to-talk captures a segment
   - `conversations` (`id`, `physician_user_id`, `patient_uuid`, `started_at`, `ended_at`).
   - `turns` (`id`, `conversation_id`, `seq`, `role` enum {`user`,`assistant`,`tool_call`,`tool_result`,`proposal`,`confirmation`,`write_result`,`refusal`}, `body_jsonb`, `created_at`, `correlation_id`).
 - A conversation is created on first user message after handshake. Switching patient ends the current conversation (binds to `ended_at`) and starts a new one bound to the new UUID.
-- UC-C "what did we capture" recap is computed from `turns` filtered by `role IN ('proposal','confirmation','write_result','refusal')`, in seq order.
+- ~~UC-C "what did we capture" recap~~ **CUT 2026-05-01.** The `/conversations/{id}/recap` endpoint, `recap` block kind, and recap chat trigger were removed; the auto-brief on chart open replaces it. Underlying `conversations` / `turns` tables remain — they back proposal / confirmation / write audit trails (UC-B) and refusal mining for evals.
 
 #### 5.9.2 Done means
 
@@ -1989,11 +1989,11 @@ At least 3, ideally 5, of the live OpenEMR cohort patients are pre-selected as t
 
 Section 1 — **Architecture** (~2 min). Walk the [`ARCHITECTURE.md`](ARCHITECTURE.md) system diagram. Call out: VPS + Compose, PHP module + Node API split, BAA egress, self-hosted Langfuse.
 
-Section 2 — **UC-A pre-room briefing** (~2 min). Open the briefing patient. Toggle the rail. Ask "Brief me." Show source-cited claims, the "what changed" item, and click a citation to navigate.
+Section 2 — **UC-A pre-room briefing** (~2 min). Open the briefing patient. The rail auto-opens and the brief auto-fires once. Show source-cited claims, the "what changed" item, and click a citation to navigate. Mention the cache: closing the chart and re-opening replays the cached brief — no second LLM call.
 
 Section 3 — **UC-B in-room writes** (~3-4 min). Open the vitals patient. Start transcript (tap mode). Dictate a chief complaint, vitals (incl. pain/H/W), tobacco status, and an allergy add. Confirm each. Show one rejection path (decline a proposal) and one OpenEMR-rejected path if available. Show the audit row in MariaDB or in OpenEMR's log surface.
 
-Section 4 — **UC-C post-room** (~1-2 min). End transcript. Ask "what did we capture?" Show the recap. Show that a new write requires a fresh confirm.
+Section 4 — **UC-B post-room confirm trail** (~1-2 min). End transcript. Walk through the confirmed proposals + audit rows in MariaDB to demonstrate that every write traces back to an explicit physician confirm. (UC-C "what did we capture" recap was cut 2026-05-01.)
 
 Section 5 — **Verification + observability** (~1 min). Show a Langfuse trace for one of the turns. Highlight the redacted body and the correlation id reaching the OpenEMR audit row.
 

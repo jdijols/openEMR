@@ -47,7 +47,7 @@ function inflightKey(sessionToken: string, patientUuid: string, encounterId: num
  * P3 guard: a brief that came back with zero blocks (transient LLM/provider
  * hiccup) or only refusal blocks (chart_read_failed, etc.) is NOT a usable
  * cached answer. Caching it pins the operator to a blank rail for the full
- * 30-minute TTL with no recovery path short of clicking Refresh — which is
+ * 2-hour TTL with no recovery path short of clicking refresh — which is
  * the exact P3 reproducer. Empty / refusal-only results are returned to the
  * caller (so they see what happened) but never persisted to the cache.
  */

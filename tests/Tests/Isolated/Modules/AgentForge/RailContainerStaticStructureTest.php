@@ -39,13 +39,16 @@ final class RailContainerStaticStructureTest extends TestCase
         self::assertStringContainsString('navigateChartSectionFromHint', $contents);
         self::assertStringContainsString('stats_full.php?active=all&category=allergy', $contents);
 
-        // Gate 3 G3-11 — auto case presentation: when a chart binds, ping CUI to render presentation.
-        self::assertStringContainsString('AGENTFORGE_PRESENT_PATIENT', $contents);
-        self::assertStringContainsString('schedulePresentPatientPing', $contents);
+        // Gate 3 G3-11 — auto case presentation: the CUI now self-triggers the
+        // brief on (handshake.status === 'ready' && patientUuid !== null), so
+        // the host no longer fires AGENTFORGE_PRESENT_PATIENT postMessages.
+        // See Documentation/AgentForge/process/journal/week-1/0501-T1500-brief-consistency-cache.md
+        // for the four bugs that the postMessage-based handshake produced.
+        self::assertStringNotContainsString('AGENTFORGE_PRESENT_PATIENT', $contents);
+        self::assertStringNotContainsString('schedulePresentPatientPing', $contents);
 
         // Embedded column: pid arrival ensures the panel iframe is loaded (replaces overlay openRail()).
         self::assertStringContainsString('ensurePanelLoaded', $contents);
-        self::assertStringContainsString("if (readPidProbe() !== '')", $contents);
 
         // Embedded column: rail lives as a sibling of #framesDisplay inside #mainFrames_div, not as fixed overlay.
         self::assertStringContainsString('mainFrames_div', $contents);

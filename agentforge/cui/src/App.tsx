@@ -1,13 +1,15 @@
 import type { FormEvent, ReactElement } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AgentForgeDeliveryError, getConversationRecap, postChat, postPresentPatient } from './api/client.js';
-import { markBriefFired, readBriefAlreadyFired } from './chat/brief_dedupe.js';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { AgentForgeDeliveryError, postChat, postPresentPatient } from './api/client.js';
+import { readCachedBrief, writeCachedBrief } from './chat/brief_cache.js';
+import { readCachedConversation, writeCachedConversation } from './chat/conversation_cache.js';
 import { MessageList, type ChatMessage, type ProposalApiEnv } from './chat/MessageList.js';
 import { findLatestOpenProposalId } from './chat/proposal_lookup.js';
 import { tryConfirmProposalFromDictation } from './chat/voice_confirm_proposal.js';
 import { useHandshake } from './chat/useHandshake.js';
 import MicControl from './recording/MicControl.js';
 import { readApiBase } from './config.js';
+import type { ProposalResolution } from './types/chat.js';
 
 function readDocumentHints(): { launchCode: string | null; patientUuid: string | null } {
   const root = document.documentElement;
@@ -26,9 +28,33 @@ function newConversationId(): string {
   return `cui-${Date.now().toString(16)}-${Math.random().toString(16).slice(2, 10)}`;
 }
 
-const BRIEF_ME_TRIGGER = /^(brief me|case presentation|present (?:the )?patient)\b/i;
-
-const RECAP_TRIGGER = /^(what did we capture|visit recap|capture summary)\b/i;
+/**
+ * Brief lifecycle state machine — replaces the prior pair of refs
+ * (`briefAutoFiredRef` + `pendingPresentRef`) plus the `presenting` boolean
+ * that together produced four post-deploy bugs:
+ *
+ *   1. The boolean marker in sessionStorage flipped to "fired" before the
+ *      network call resolved, so a transient failure pinned the rail blank
+ *      with no in-mount retry path.
+ *   2. The `AGENTFORGE_PRESENT_PATIENT` postMessage handler raced the
+ *      handshake (`pendingPresentRef` was a workaround that itself raced
+ *      with the iframe re-mount).
+ *   3. React StrictMode in dev double-fired the auto-trigger, briefly
+ *      double-prepending the brief.
+ *   4. The "Preparing case presentation…" hint flickered out of sync with
+ *      the actual fetch lifecycle.
+ *
+ * The machine collapses these into a single discriminated-union state.
+ * The `briefInFlightRef` is the synchronous companion that closes the
+ * StrictMode race: setState writes are async, so two effect runs in the
+ * same tick can both observe `idle` before either flips to `loading`.
+ */
+type BriefStatus =
+  | { kind: 'idle' }
+  | { kind: 'loading' }
+  | { kind: 'cached' }
+  | { kind: 'success' }
+  | { kind: 'failed'; error: AgentForgeDeliveryError };
 
 function toDeliveryFailure(err: unknown): AgentForgeDeliveryError {
   return err instanceof AgentForgeDeliveryError ? err : new AgentForgeDeliveryError('backend_error');
@@ -52,6 +78,31 @@ function describeSendFailure(err: AgentForgeDeliveryError): string {
   }
 }
 
+/**
+ * Circular arrows — visually aligned with OpenEMR tab chrome (`fa-sync` in
+ * `tabs_template.html.twig`); inlined because `panel.php` does not ship
+ * Font Awesome into the iframe.
+ */
+function IconPanelSync(): ReactElement {
+  return (
+    <svg
+      className="agentforge-cui__refresh-icon"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+    </svg>
+  );
+}
+
 export default function App(): ReactElement {
   const { launchCode, patientUuid } = useMemo(() => readDocumentHints(), []);
   const handshake = useHandshake(launchCode, patientUuid);
@@ -59,16 +110,38 @@ export default function App(): ReactElement {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationExternalId, setConversationExternalId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  const [presenting, setPresenting] = useState(false);
+  const [briefStatus, setBriefStatus] = useState<BriefStatus>({ kind: 'idle' });
   const [sendFailure, setSendFailure] = useState<AgentForgeDeliveryError | null>(null);
   const [micError, setMicError] = useState<string | null>(null);
   const [voiceCompletedProposalIds, setVoiceCompletedProposalIds] = useState(() => new Set<string>());
 
+  // Loading hint is a derivation of the state machine, not an independent
+  // boolean — the two used to drift apart on transient failures.
+  const presenting = briefStatus.kind === 'loading';
+
   const apiBase = useMemo(() => readApiBase(), []);
   const messagesRef = useRef<ChatMessage[]>([]);
+  const composeInputRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+
+  useLayoutEffect(() => {
+    if (handshake.status !== 'ready') {
+      return;
+    }
+    const el = composeInputRef.current;
+    if (el === null) return;
+    el.style.height = 'auto';
+    const maxRaw = typeof getComputedStyle !== 'undefined' ? getComputedStyle(el).maxHeight : '';
+    const maxPx = Number.parseFloat(maxRaw);
+    const natural = el.scrollHeight;
+    const next =
+      Number.isFinite(maxPx) && maxPx > 0 ?
+        Math.min(natural, maxPx)
+      : natural;
+    el.style.height = `${next}px`;
+  }, [handshake.status, input]);
 
   // Mint a conversation id as soon as the handshake is ready and a patient is bound.
   // The server upserts the row on first use (chat or WS auth), so the mic enables
@@ -99,25 +172,25 @@ export default function App(): ReactElement {
     };
   }, [apiBase, handshake, conversationExternalId, patientUuid]);
 
-  const pendingPresentRef = useRef(false);
-  // Two-layer dedupe for the auto-fire brief, because the rail container can
-  // schedule AGENTFORGE_PRESENT_PATIENT multiple times AND can re-mount this
-  // iframe (pid-probe interval, refresh-chart, re-handshake):
-  //   1. briefAutoFiredRef — in-memory; protects against multiple pings hitting
-  //      a single mount before the brief returns.
-  //   2. sessionStorage marker keyed by patient_uuid — survives iframe reloads
-  //      so a re-mounted App for the same patient does NOT auto-fire a second
-  //      brief. The user can still trigger fresh briefs explicitly via the
-  //      "brief me" / "case presentation" command.
-  const briefAutoFiredRef = useRef(false);
+  /**
+   * Synchronous in-flight guard. State updates from `setBriefStatus` are
+   * batched by React, so two effect runs in the same tick (notably
+   * StrictMode's intentional double-mount in dev) can both observe
+   * `kind === 'idle'` before either commits the `loading` transition.
+   * This ref flips synchronously and is the source of truth for "do not
+   * fire a second time within a single mount."
+   */
+  const briefInFlightRef = useRef(false);
 
-  const runPresent = useCallback(async () => {
+  const runPresent = useCallback(async (): Promise<void> => {
     if (handshake.status !== 'ready' || patientUuid === null || patientUuid === '') {
       return;
     }
-
-    setPresenting(true);
-    setSendFailure(null);
+    if (briefInFlightRef.current) {
+      return;
+    }
+    briefInFlightRef.current = true;
+    setBriefStatus({ kind: 'loading' });
     try {
       const out = await postPresentPatient(apiBase, handshake.sessionToken, patientUuid, false);
       const msg: ChatMessage = {
@@ -128,65 +201,134 @@ export default function App(): ReactElement {
       // Prepend so any messages typed/dictated during the brief aren't wiped.
       // The brief is still the first chronological turn of the conversation.
       setMessages((prev) => [msg, ...prev]);
+      // Persist the rendered payload (NOT correlationId — that's a per-call
+      // identifier and would cache-poison the next read with stale tracing
+      // metadata). A re-mounted App for the same patient replays it without
+      // a network round-trip.
+      writeCachedBrief(patientUuid, { blocks: out.blocks, citation_navigation: out.citation_navigation });
+      setBriefStatus({ kind: 'success' });
     } catch (err) {
-      setSendFailure(toDeliveryFailure(err));
+      setBriefStatus({ kind: 'failed', error: toDeliveryFailure(err) });
     } finally {
-      setPresenting(false);
+      briefInFlightRef.current = false;
     }
   }, [apiBase, handshake, patientUuid]);
 
-  useEffect(() => {
-    function onMessage(ev: MessageEvent): void {
-      if (ev.origin !== window.location.origin) {
-        return;
-      }
-      const d = ev.data;
-      if (!d || typeof d !== 'object' || (d as { type?: unknown }).type !== 'AGENTFORGE_PRESENT_PATIENT') {
-        return;
-      }
-
-      if (briefAutoFiredRef.current) {
-        return;
-      }
-
-      if (handshake.status !== 'ready' || patientUuid === null || patientUuid === '') {
-        pendingPresentRef.current = true;
-        return;
-      }
-
-      if (readBriefAlreadyFired(patientUuid)) {
-        briefAutoFiredRef.current = true;
-        return;
-      }
-
-      briefAutoFiredRef.current = true;
-      markBriefFired(patientUuid);
-      void runPresent();
-    }
-
-    window.addEventListener('message', onMessage);
-    return () => window.removeEventListener('message', onMessage);
-  }, [handshake.status, patientUuid, runPresent]);
-
+  /**
+   * The single brief auto-trigger. Runs once per (patient, mount) when the
+   * handshake reaches `ready`. The state-machine guard means it stays at
+   * its terminal state (`success` / `cached` / `failed`) until something
+   * resets it — so React StrictMode's intentional double-effect is a no-op
+   * after the first run, and a transient `failed` state is recovered via
+   * the explicit "Retry brief" button (which calls `runPresent` directly
+   * after flipping the state back to `idle`).
+   *
+   * Replay-source priority (most-specific first):
+   *   1. **conversation cache** — if the rail had any prior turns
+   *      (typed/dictated user messages, proposal cards, follow-up
+   *      assistant responses), seed the full message array verbatim.
+   *      Supersedes the brief cache because the brief itself is part of
+   *      that array and the conversation cache is the only source that
+   *      preserves a resolved proposal card's `resolved` field across
+   *      reload.
+   *   2. **brief cache** — if there was no prior conversation but a
+   *      previous mount had successfully fetched the brief, replay just
+   *      that one assistant message. This is the common path on a
+   *      second-tab open or a Refresh-chart reload immediately after the
+   *      auto-fire.
+   *   3. **runPresent** — first time this tab has seen this patient;
+   *      hit `/present-patient` and prepend the resulting brief.
+   */
   useEffect(() => {
     if (handshake.status !== 'ready' || patientUuid === null || patientUuid === '') {
       return;
     }
-
-    if (!pendingPresentRef.current || briefAutoFiredRef.current) {
+    if (briefStatus.kind !== 'idle') {
       return;
     }
 
-    pendingPresentRef.current = false;
-    briefAutoFiredRef.current = true;
-
-    if (readBriefAlreadyFired(patientUuid)) {
+    const cachedConversation = readCachedConversation(patientUuid);
+    if (cachedConversation !== null && cachedConversation.messages.length > 0) {
+      // Spread to a mutable copy — the cache returns a readonly array
+      // and `setMessages` is typed `ChatMessage[]`. The contents are
+      // already the rendered payload, so no transformation is needed.
+      setMessages([...cachedConversation.messages]);
+      setBriefStatus({ kind: 'cached' });
       return;
     }
 
-    markBriefFired(patientUuid);
+    // Cache replay path: the rail re-mounted the iframe (refresh-chart,
+    // panel reload, pid-poll re-entry) but the server-side cache for
+    // this (user_id, patient_uuid) almost certainly still has the brief.
+    // Replaying from the per-tab payload cache paints the rail
+    // immediately with no network round-trip and no flicker.
+    const cached = readCachedBrief(patientUuid);
+    if (cached !== null) {
+      const msg: ChatMessage = {
+        role: 'assistant',
+        blocks: cached.blocks,
+        citation_navigation: cached.citation_navigation,
+      };
+      setMessages((prev) => [msg, ...prev]);
+      setBriefStatus({ kind: 'cached' });
+      return;
+    }
+
     void runPresent();
-  }, [handshake.status, patientUuid, runPresent]);
+  }, [handshake.status, patientUuid, briefStatus.kind, runPresent]);
+
+  /**
+   * Persist the rail conversation on every change so a hard reload
+   * (Refresh chart, panel remount, pid-poll re-entry) replays the full
+   * dialog including resolved proposal cards. Mirrors the brief cache
+   * pattern: keyed on `patient_uuid`, 2-hour TTL, 8-patient LRU,
+   * fail-silent on quota / sessionStorage unavailability.
+   *
+   * Gate on `messages.length > 0` so the initial empty array on first
+   * paint doesn't clobber a still-valid cache before the read effect
+   * above has had a chance to seed it.
+   */
+  useEffect(() => {
+    if (patientUuid === null || patientUuid === '' || messages.length === 0) {
+      return;
+    }
+    writeCachedConversation(patientUuid, { messages });
+  }, [messages, patientUuid]);
+
+  /**
+   * Stamp the matching proposal block's `resolved` field when a card
+   * transitions to a terminal phase. The next run of the cache write
+   * effect picks this up and persists it, so a reload after Confirm /
+   * Decline replays the card already resolved (no re-active buttons,
+   * no misleading "Rejected by OpenEMR" toast on a duplicate click).
+   *
+   * If the proposal id isn't found (defensive — shouldn't happen) the
+   * update is a no-op rather than a throw.
+   */
+  const onProposalResolved = useCallback(
+    (proposalId: string, resolution: ProposalResolution): void => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.role !== 'assistant') {
+            return m;
+          }
+          let mutated = false;
+          const nextBlocks = m.blocks.map((b) => {
+            if (b.type === 'proposal' && b.proposal_id === proposalId) {
+              mutated = true;
+              return { ...b, resolved: resolution };
+            }
+            return b;
+          });
+          if (!mutated) {
+            return m;
+          }
+          return { ...m, blocks: nextBlocks };
+        }),
+      );
+    },
+    [],
+  );
 
   const onDictationFinal = useCallback(
     async (text: string): Promise<void> => {
@@ -209,12 +351,22 @@ export default function App(): ReactElement {
       // the card to accept right away (PRD §6.5.1 / Gate 5 G5-04) AND we still
       // want the agent to see the turn so a follow-up vitals/allergy line in
       // the same dictation isn't dropped on the floor.
+      //
+      // On voice-confirm success we *also* stamp the proposal block's
+      // `resolved` field so a hard reload after the dictation replays
+      // the card as already accepted. The "Accepted (voice)" surface
+      // pill is purely a per-mount affordance via
+      // `voiceCompletedProposalIds`; persisting through the resolved
+      // field gracefully degrades to a plain "Accepted." pill on
+      // remount, which is the correct truth (the server already wrote
+      // the row).
       const voicePromise =
         env !== undefined && proposalId !== null ?
           tryConfirmProposalFromDictation(t, proposalId, env)
             .then((ok) => {
               if (ok) {
                 setVoiceCompletedProposalIds((s) => new Set(s).add(proposalId));
+                onProposalResolved(proposalId, { phase: 'accepted' });
               }
             })
             .catch(() => {
@@ -253,63 +405,13 @@ export default function App(): ReactElement {
 
       await voicePromise;
     },
-    [apiBase, conversationExternalId, handshake, patientUuid, proposalEnv],
+    [apiBase, conversationExternalId, handshake, patientUuid, proposalEnv, onProposalResolved],
   );
 
   async function onSubmit(e: FormEvent): Promise<void> {
     e.preventDefault();
     const text = input.trim();
     if (text === '' || handshake.status !== 'ready') {
-      return;
-    }
-
-    const isBriefMe = BRIEF_ME_TRIGGER.test(text);
-    if (isBriefMe) {
-      setSending(true);
-      setSendFailure(null);
-      setInput('');
-      setMessages((prev) => [...prev, { role: 'user', blocks: [{ type: 'text', text }] }]);
-      try {
-        const out = await postPresentPatient(apiBase, handshake.sessionToken, patientUuid ?? '', false);
-        setMessages((prev) => [
-          ...prev,
-          { role: 'assistant', blocks: out.blocks, citation_navigation: out.citation_navigation },
-        ]);
-      } catch (err) {
-        setSendFailure(toDeliveryFailure(err));
-      } finally {
-        setSending(false);
-      }
-      return;
-    }
-
-    if (RECAP_TRIGGER.test(text)) {
-      setSending(true);
-      setSendFailure(null);
-      setInput('');
-      if (conversationExternalId === null || conversationExternalId.trim() === '') {
-        setMessages((prev) => [
-          ...prev,
-          { role: 'user', blocks: [{ type: 'text', text }] },
-          {
-            role: 'assistant',
-            blocks: [
-              { type: 'text', text: 'No visit thread yet — send a chart message first, then ask for a recap.' },
-            ],
-          },
-        ]);
-        setSending(false);
-        return;
-      }
-      setMessages((prev) => [...prev, { role: 'user', blocks: [{ type: 'text', text }] }]);
-      try {
-        const r = await getConversationRecap(apiBase, handshake.sessionToken, patientUuid ?? '', conversationExternalId);
-        setMessages((prev) => [...prev, { role: 'assistant', blocks: [{ type: 'recap', items: r.items }] }]);
-      } catch (err) {
-        setSendFailure(toDeliveryFailure(err));
-      } finally {
-        setSending(false);
-      }
       return;
     }
 
@@ -341,40 +443,9 @@ export default function App(): ReactElement {
     }
   }
 
-  if (handshake.status === 'error') {
-    return (
-      <main className="agentforge-cui">
-        <h1 className="agentforge-cui__title">Clinical Co-Pilot</h1>
-        {handshake.message === 'no_chart_bound' || handshake.message === 'no_patient_context' ? (
-          <>
-            <h2 className="agentforge-cui__subtitle">Open a patient chart to begin.</h2>
-            <p className="agentforge-cui__hint">
-              AgentForge needs an active chart to read or propose anything.
-            </p>
-          </>
-        ) : (
-          <p className="agentforge-cui__hint">
-            {handshake.message === 'missing_api_base'
-              ? 'Agent API URL is not configured (set AGENTFORGE_API_PUBLIC_URL for PHP).'
-              : 'Unable to start session. Refresh the chart page or contact an administrator.'}
-          </p>
-        )}
-      </main>
-    );
-  }
-
-  if (handshake.status === 'loading' || handshake.status === 'idle') {
-    return (
-      <main className="agentforge-cui">
-        <h1 className="agentforge-cui__title">Clinical Co-Pilot</h1>
-        <p className="agentforge-cui__hint">Connecting…</p>
-      </main>
-    );
-  }
-
   function refreshChartBinding(): void {
     // P3 fix: a plain `window.location.reload()` re-mounts the iframe but does
-    // NOT bust the agent-side 30-minute brief cache, so an operator who saw a
+    // NOT bust the agent-side 2-hour brief cache, so an operator who saw a
     // blank/stale brief and clicked Refresh would get the same blank brief
     // back. Fire a `force_refresh` present-patient first so the API drops the
     // cached entry for this (patient, encounter, sessionToken) tuple. This is
@@ -388,27 +459,135 @@ export default function App(): ReactElement {
     window.location.reload();
   }
 
-  return (
-    <main className="agentforge-cui">
-      <header className="agentforge-cui__header">
-        <h1 className="agentforge-cui__title">Clinical Co-Pilot</h1>
+  function reloadPanel(): void {
+    // Pre-handshake / error-state escape hatch. No cache-bust call — the
+    // session token isn't valid yet — just a page reload so the operator
+    // can recover from a stuck "Connecting…" or stale error message.
+    window.location.reload();
+  }
+
+  /**
+   * Header chrome bar — gray bar with title everywhere. Refresh is omitted
+   * only for the chart-required empty screen (no_chart / no patient
+   * context): there is nothing to refresh yet, and removing the secondary
+   * action keeps parity with PR5 chrome + white canvas framing.
+   *
+   * When the control is shown: handshake-ready uses cache-busting
+   * `refreshChartBinding`; loading / handshake error uses plain
+   * `reloadPanel`. `aria-label` is the sole visible affordance name
+   * (no `title` — matches OpenEMR tab chrome).
+   */
+  const headerIsReady = handshake.status === 'ready';
+  const renderPanelHeader = (showRefresh: boolean): ReactElement => (
+    <header className="agentforge-cui__header">
+      <h1 className="agentforge-cui__title">Clinical Co-Pilot</h1>
+      {showRefresh ? (
         <button
           type="button"
           className="agentforge-cui__refresh"
-          onClick={refreshChartBinding}
-          title="Re-handshake with the chart (use after saving a new encounter so the assistant sees it)"
-          aria-label="Refresh chart binding"
+          onClick={headerIsReady ? refreshChartBinding : reloadPanel}
+          aria-label={headerIsReady ? 'Refresh clinical co-pilot' : 'Reload clinical co-pilot panel'}
         >
-          Refresh chart
+          <IconPanelSync />
         </button>
-      </header>
+      ) : null}
+    </header>
+  );
+
+  if (handshake.status === 'error') {
+    const isNoChart =
+      handshake.message === 'no_chart_bound' || handshake.message === 'no_patient_context';
+    return (
+      <main className="agentforge-cui">
+        {renderPanelHeader(!isNoChart)}
+        <section className="agentforge-cui__empty" aria-labelledby="agentforge-cui-empty-title">
+          <span className="agentforge-cui__empty-glyph" aria-hidden="true">
+            {/* Stethoscope-ish glyph: chestpiece + tubing curve. Communicates
+                "clinical assistant waiting on a chart" without leaning on
+                a generic chat-bot bubble. */}
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="currentColor"
+                 strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M14 8v9a8 8 0 0 0 16 0V8" />
+              <path d="M22 25v6a8 8 0 0 0 16 0v-3" />
+              <circle cx="38" cy="22" r="3" />
+            </svg>
+          </span>
+          {isNoChart ? (
+            <>
+              <h2 id="agentforge-cui-empty-title" className="agentforge-cui__empty-title">
+                Open a patient chart to begin.
+              </h2>
+              <p className="agentforge-cui__empty-body">
+                AgentForge needs an active chart to read or propose anything.
+              </p>
+            </>
+          ) : (
+            <>
+              <h2 id="agentforge-cui-empty-title" className="agentforge-cui__empty-title">
+                Unable to start session.
+              </h2>
+              <p className="agentforge-cui__empty-body">
+                {handshake.message === 'missing_api_base'
+                  ? 'Agent API URL is not configured (set AGENTFORGE_API_PUBLIC_URL for PHP).'
+                  : 'Refresh the chart page or contact an administrator.'}
+              </p>
+            </>
+          )}
+        </section>
+      </main>
+    );
+  }
+
+  if (handshake.status === 'loading' || handshake.status === 'idle') {
+    return (
+      <main className="agentforge-cui">
+        {renderPanelHeader(true)}
+        <section className="agentforge-cui__empty" aria-labelledby="agentforge-cui-loading-title">
+          <span className="agentforge-cui__empty-spinner" aria-hidden="true" />
+          <h2 id="agentforge-cui-loading-title" className="agentforge-cui__empty-title">
+            Connecting…
+          </h2>
+          <p className="agentforge-cui__empty-body">
+            Loading your patient context.
+          </p>
+        </section>
+      </main>
+    );
+  }
+
+  return (
+    <main className="agentforge-cui">
+      {renderPanelHeader(true)}
       {presenting ? <p className="agentforge-cui__hint">Preparing case presentation…</p> : null}
       <MessageList
         messages={messages}
         boundPatientUuid={patientUuid}
         {...(proposalEnv !== undefined ? { proposalEnv } : {})}
         voiceCompletedProposalIds={voiceCompletedProposalIds}
+        onProposalResolved={onProposalResolved}
       />
+      {briefStatus.kind === 'failed' ? (
+        <div className="agentforge-cui__brief-failed" role="alert">
+          <p className="agentforge-cui__error">
+            Could not load the case presentation. {describeSendFailure(briefStatus.error)}
+          </p>
+          <button
+            type="button"
+            className="agentforge-cui__retry-brief"
+            onClick={() => {
+              // Flip back to idle; the auto-trigger effect re-fires on the
+              // next tick. Going through `idle` (rather than calling
+              // `runPresent` directly) preserves the cache-replay path —
+              // if a previous successful brief was written to
+              // sessionStorage in another mount, this will replay it
+              // instead of forcing a new LLM call.
+              setBriefStatus({ kind: 'idle' });
+            }}
+          >
+            Retry brief
+          </button>
+        </div>
+      ) : null}
       {sendFailure !== null ? (
         <p className="agentforge-cui__error" role="alert">
           {describeSendFailure(sendFailure)}
@@ -424,6 +603,7 @@ export default function App(): ReactElement {
           Message
         </label>
         <textarea
+          ref={composeInputRef}
           id="agentforge-message"
           className="agentforge-cui__input"
           rows={3}

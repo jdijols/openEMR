@@ -1,4 +1,4 @@
-import type { ChatBlock, ChatResponse, CitationNavigationHint, RecapListItem, RedeemResponse } from '../types/chat.js';
+import type { ChatBlock, ChatResponse, CitationNavigationHint, RedeemResponse } from '../types/chat.js';
 
 /** Thrown when /chat or /present-patient fails (transport, HTTP, or malformed JSON). Inspect `kind` + `correlationId` for UX. */
 export type AgentForgeDeliveryKind =
@@ -289,51 +289,6 @@ export async function postProposalReject(
   if (!json || typeof json !== 'object' || (json as { ok?: unknown }).ok !== true) {
     throw new AgentForgeDeliveryError('invalid_success_response', correlationId);
   }
-}
-
-export async function getConversationRecap(
-  apiBase: string,
-  sessionToken: string,
-  patientUuid: string,
-  conversationExternalId: string,
-): Promise<{ items: RecapListItem[]; counts: Record<string, number>; correlationId: string }> {
-  const base = stripBase(apiBase);
-  const correlationId = randomCorrelationId();
-  const cid = encodeURIComponent(conversationExternalId);
-  let res: Response;
-  try {
-    res = await fetch(`${base}/conversations/${cid}/recap`, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${sessionToken}`,
-        'X-Patient-Uuid': patientUuid,
-        'X-Correlation-Id': correlationId,
-      },
-    });
-  } catch {
-    throw new AgentForgeDeliveryError('network_unreachable');
-  }
-
-  const json: unknown = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw deliveryErrorFromAgentResponse(res.status, json);
-  }
-
-  if (
-    !json ||
-    typeof json !== 'object' ||
-    (json as { ok?: unknown }).ok !== true ||
-    !Array.isArray((json as { items?: unknown }).items)
-  ) {
-    throw new AgentForgeDeliveryError('invalid_success_response', correlationId);
-  }
-
-  const body = json as { items: RecapListItem[]; counts?: Record<string, number>; correlation_id?: string };
-  return {
-    items: body.items,
-    counts: body.counts ?? {},
-    correlationId: typeof body.correlation_id === 'string' ? body.correlation_id : correlationId,
-  };
 }
 
 export async function postPresentPatient(

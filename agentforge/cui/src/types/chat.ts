@@ -7,6 +7,21 @@ export type ClaimSegment =
   | { type: 'text'; text: string }
   | { type: 'cite'; text: string; citation_id: string };
 
+/**
+ * Terminal resolution state for a proposal card. Lifted out of the
+ * `ProposalBlock` component's local `useState` so it can ride along on
+ * the cached `ChatBlock` and survive a hard reload (Refresh chart, panel
+ * remount). Only terminal phases are persisted — `idle` and `submitting`
+ * are transient UI affordances that should reset to `idle` on remount
+ * (server-side idempotency in `confirmPendingProposal` handles a
+ * reload-then-reclick).
+ */
+export type ProposalResolution =
+  | { readonly phase: 'accepted' }
+  | { readonly phase: 'declined' }
+  | { readonly phase: 'openemr_denied'; readonly openemrReason?: string }
+  | { readonly phase: 'delivery_failed'; readonly deliveryMessage?: string };
+
 export type ChatBlock =
   | { type: 'text'; text: string }
   | {
@@ -24,19 +39,8 @@ export type ChatBlock =
       proposal_id: string;
       write_target: string;
       preview: string;
-    }
-  | {
-      type: 'recap';
-      items: readonly RecapListItem[];
+      resolved?: ProposalResolution;
     };
-
-export type RecapListItem = Readonly<{
-  id: string;
-  classification: 'confirmed' | 'rejected' | 'unresolved' | 'refusal';
-  summary: string;
-  write_target?: string;
-  proposal_id?: string;
-}>;
 
 export type RedeemResponse = {
   session_token: string;

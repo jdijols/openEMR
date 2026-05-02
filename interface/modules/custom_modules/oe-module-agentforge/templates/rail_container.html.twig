@@ -317,27 +317,19 @@
         var prevPid = readPidProbe();
         var prevEncounter = readEncounterProbe();
 
-        function postPresentPatientToFrame() {
-            if (!frame || !frame.contentWindow) {
-                return;
-            }
-            try {
-                frame.contentWindow.postMessage({ type: 'AGENTFORGE_PRESENT_PATIENT' }, window.location.origin);
-            } catch (ignored) {
-            }
-        }
-
-        function schedulePresentPatientPing() {
-            window.setTimeout(postPresentPatientToFrame, 200);
-        }
-
-        if (frame) {
-            frame.addEventListener('load', function () {
-                if (!rail.classList.contains('agentforge-rail--collapsed') && readPidProbe() !== '') {
-                    schedulePresentPatientPing();
-                }
-            });
-        }
+        // Brief auto-trigger lives inside the CUI now (App.tsx state machine).
+        // The host previously fired a present-patient postMessage on iframe
+        // load / pid-poll / setCollapsed (with a 200ms setTimeout race window)
+        // and the CUI listened for it. That handshake had four failure modes:
+        //   1. the message arrived before React mounted its listener,
+        //   2. the message arrived before the CUI handshake reached `ready`,
+        //   3. StrictMode double-fired the trigger,
+        //   4. the rail re-mount after a chart change blanked the CUI before
+        //      the message landed.
+        // The CUI now self-triggers on (handshake.status === 'ready'
+        // && patientUuid !== null) so the host only needs to manage the
+        // iframe lifecycle: blank on chart change, mount on un-collapse.
+        // See Documentation/AgentForge/process/journal/week-1/0501-T1500-brief-consistency-cache.md.
 
         function blankPanelIframe() {
             panelLoaded = false;
@@ -357,10 +349,7 @@
                 prevPid = cur;
                 prevEncounter = curEnc;
                 blankPanelIframe();
-                if (cur !== '' && !rail.classList.contains('agentforge-rail--collapsed')) {
-                    ensurePanelLoaded();
-                    schedulePresentPatientPing();
-                } else if (!rail.classList.contains('agentforge-rail--collapsed')) {
+                if (!rail.classList.contains('agentforge-rail--collapsed')) {
                     ensurePanelLoaded();
                 }
             }
@@ -438,9 +427,6 @@
             safeSessionSet(STORAGE_KEY_COLLAPSED, collapsed ? '1' : '0');
             if (!collapsed) {
                 ensurePanelLoaded();
-                if (readPidProbe() !== '') {
-                    schedulePresentPatientPing();
-                }
             }
         }
 
@@ -591,9 +577,6 @@
         setCollapsed(storedCollapsed);
         if (!storedCollapsed) {
             ensurePanelLoaded();
-            if (readPidProbe() !== '') {
-                schedulePresentPatientPing();
-            }
         }
     })();
 </script>

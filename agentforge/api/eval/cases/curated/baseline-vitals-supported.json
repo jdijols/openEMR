@@ -1,0 +1,11 @@
+{
+  "case_id": "supported-write-noop-pass-vitals",
+  "check": "unsupported_write_target_rejected",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-baseline-vitals",
+  "use_case": "S9 baseline — supported V1 target is a no-op for the unsupported-target check",
+  "context": {
+    "write_target": "vitals",
+    "rejected": false
+  }
+}

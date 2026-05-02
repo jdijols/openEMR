@@ -1,0 +1,14 @@
+{
+  "label": "synthea-007",
+  "uuid": "00000000-0000-0001-0001-000000000007",
+  "demographics": { "age_years": 38, "sex": "M" },
+  "problems": [],
+  "meds": [],
+  "allergies": [],
+  "last_vitals": { "bp_sys": 118, "bp_dia": 76, "hr": 70, "captured_on": "today" },
+  "labs": [
+    { "loinc": "718-7", "display": "Hemoglobin", "value_numeric": 14.2, "unit": "g/dL", "flag": "normal" },
+    { "loinc": "33914-3", "display": "eGFR", "value_numeric": 95, "unit": "mL/min/1.73m2", "flag": "normal" }
+  ],
+  "use_case_lane": "UC-A reads — labs / normal results"
+}

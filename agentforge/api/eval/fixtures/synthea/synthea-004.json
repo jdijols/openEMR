@@ -1,0 +1,11 @@
+{
+  "label": "synthea-004",
+  "uuid": "00000000-0000-0001-0001-000000000004",
+  "demographics": { "age_years": 47, "sex": "M" },
+  "problems": [{ "code": "F17.210", "display": "Nicotine dependence, cigarettes, uncomplicated" }],
+  "meds": [],
+  "allergies": [],
+  "last_vitals": { "bp_sys": 128, "bp_dia": 80, "hr": 78, "captured_on": "today" },
+  "social_history": { "tobacco": "current_every_day_smoker" },
+  "use_case_lane": "UC-B tobacco write — `propose_tobacco_write` happy path"
+}

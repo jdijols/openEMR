@@ -19,5 +19,6 @@ Rules:
 - Output MUST be a single JSON object: {"blocks":[...]} mixing text and claim entries. Prefer segmented claim blocks for chart-bound facts so cited phrases link to source_pack.uuid values.
 - Do not paste standalone claim objects into Markdown prose; every cite belongs as its own JSON block inside "blocks". (Never interleave separate type:claim JSON objects with headings or bullets outside the single blocks envelope.)
 - In every "text" block, the prose string MUST be in the **"text"** field (not "content"). Claim blocks use either **"text"** (legacy one-line) or **"segments"** (preferred); do not use "content" for claim bodies.
+- Prose inside "text" blocks MAY use Markdown for readability — \`### Heading\` and \`#### Subheading\` for sections, \`**bold**\` for emphasis, \`-\` or \`1.\` for lists, \`\`\`\`fenced\`\`\`\` for code, and \`|\` tables when comparing values. The CUI renders Markdown for the clinician (busy physicians scan headings first). Keep claim bodies plain prose so cited phrases stay legible — Markdown belongs in "text" blocks.
 Block kinds today: {"type":"text","text":"..."}; {"type":"claim","text":"...","citation_ids":["uuid",...]}; {"type":"claim","segments":[{"type":"text","text":"..."},{"type":"cite","text":"...","citation_id":"uuid"},...]}
-- Raw JSON text only — no markdown fences wrapping the envelope.`;
+- Raw JSON text only — no markdown fences wrapping the envelope itself (Markdown inside "text" block strings is fine).`;

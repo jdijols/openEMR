@@ -58,13 +58,30 @@ $apiPublicJson = \json_encode($apiPublicStr, \JSON_THROW_ON_ERROR);
 
 $globals = OEGlobalsBag::getInstance();
 $webroot = $globals->getWebRoot();
+
+/*
+ * Cache-bust the CUI bundle by content hash (G6-16). Without this, the
+ * browser caches `agentforge-cui.js` the first time it loads and never
+ * refetches across redeploys, so any client-side fix (e.g. the brief
+ * consistency PR1) silently fails to reach operators on already-warmed
+ * tabs. Hashing the file on every request is cheap (~64 KB read) and
+ * happens once per chart open. `md5_file()` returns false on a missing
+ * file — fall back to a constant marker so the iframe still loads (the
+ * resulting 404 will surface in the console with a recognisable URL).
+ */
+$bundleDir = __DIR__ . '/cui';
+$jsHash = @\md5_file($bundleDir . '/agentforge-cui.js');
+$cssHash = @\md5_file($bundleDir . '/agentforge-cui-index.css');
+$jsVersion = \is_string($jsHash) ? $jsHash : 'missing';
+$cssVersion = \is_string($cssHash) ? $cssHash : 'missing';
+
 $scriptSrc = \htmlspecialchars(
-    $webroot . '/interface/modules/custom_modules/oe-module-agentforge/public/cui/agentforge-cui.js',
+    $webroot . '/interface/modules/custom_modules/oe-module-agentforge/public/cui/agentforge-cui.js?v=' . $jsVersion,
     \ENT_QUOTES | \ENT_SUBSTITUTE,
     'UTF-8',
 );
 $styleHref = \htmlspecialchars(
-    $webroot . '/interface/modules/custom_modules/oe-module-agentforge/public/cui/agentforge-cui-index.css',
+    $webroot . '/interface/modules/custom_modules/oe-module-agentforge/public/cui/agentforge-cui-index.css?v=' . $cssVersion,
     \ENT_QUOTES | \ENT_SUBSTITUTE,
     'UTF-8',
 );

@@ -1,0 +1,9 @@
+{
+  "label": "synthea-001",
+  "uuid": "00000000-0000-0001-0001-000000000001",
+  "demographics": { "age_years": 54, "sex": "M" },
+  "problems": [{ "code": "I10", "display": "Essential hypertension" }],
+  "meds": [{ "rxnorm": "29046", "display": "Lisinopril 10 mg oral tablet" }],
+  "allergies": [],
+  "last_vitals": { "bp_sys": 132, "bp_dia": 84, "hr": 72, "captured_on": "today" }
+}

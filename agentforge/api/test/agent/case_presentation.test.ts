@@ -324,7 +324,7 @@ describe('runCasePresentation', () => {
    * P3 fix — when the model returns zero blocks, the verification step
    * synthesizes an `insufficient_evidence_after_verification` refusal. Pre-fix
    * that refusal landed in the cache, so a transient empty-brief hiccup
-   * pinned the operator to a blank rail for the full 30-min TTL. Post-fix the
+   * pinned the operator to a blank rail for the full 2-hour TTL. Post-fix the
    * second call fires a fresh LLM attempt and recovers.
    */
   it('does not cache an empty-brief result transformed to refusal by verification (P3)', async () => {

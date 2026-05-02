@@ -149,3 +149,16 @@ repos:
     language: system
     stages:
     - commit-msg
+
+  # Keeps the AgentForge CUI bundle (the JS/CSS the panel iframe actually
+  # loads) in lockstep with the React source. Without this, source edits
+  # compile + test cleanly while the bundled artifact stays stale and the
+  # iframe keeps loading the previous build. The hook auto-stages the
+  # rebuilt bundle so the commit succeeds first try. See
+  # `agentforge/cui/scripts/precommit-build.sh` for the exact contract.
+  - id: agentforge-cui-build
+    name: AgentForge CUI bundle freshness
+    entry: agentforge/cui/scripts/precommit-build.sh
+    language: system
+    files: ^agentforge/cui/(src/|index\.html$|package(-lock)?\.json$|tsconfig\.json$|vite\.config\.ts$)
+    pass_filenames: false

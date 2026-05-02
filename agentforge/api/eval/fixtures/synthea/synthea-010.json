@@ -1,0 +1,12 @@
+{
+  "label": "synthea-010",
+  "uuid": "00000000-0000-0001-0001-000000000010",
+  "demographics": { "age_years": 29, "sex": "M" },
+  "problems": [],
+  "meds": [],
+  "allergies": [],
+  "last_vitals": null,
+  "active_encounter_today": true,
+  "encounter_id_label": "today_saved",
+  "use_case_lane": "UC-B encounter binding — recent encounter exists; agent must use the bound encounter id (no get_encounters guess)"
+}

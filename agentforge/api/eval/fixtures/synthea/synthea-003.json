@@ -1,0 +1,10 @@
+{
+  "label": "synthea-003",
+  "uuid": "00000000-0000-0001-0001-000000000003",
+  "demographics": { "age_years": 33, "sex": "F" },
+  "problems": [],
+  "meds": [],
+  "allergies": [],
+  "last_vitals": null,
+  "notes": "Asymptomatic. Used to test §9.3 negative-statement guard ('no allergies on file' must follow an empty-but-success get_allergies call)."
+}

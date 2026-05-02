@@ -1,7 +1,117 @@
+/*
+ * AgentForge Clinical Co-Pilot — CUI panel styles
+ *
+ * The CUI lives inside a sandboxed iframe (panel.php → rail_container.html.twig)
+ * that does NOT load OpenEMR's Bootstrap. Rather than ship ~150 KB of theme CSS
+ * on every chart open, the panel echoes OpenEMR's Bootstrap 4.6 design language
+ * locally via the token layer below. Source palette + font stack are pulled
+ * from `interface/themes/default-variables.scss` so the iframe reads as a
+ * native part of the chart even though it stays visually independent.
+ *
+ * Aesthetic target: modern clinical product (Abridge / Suki / DAX) — generous
+ * whitespace, soft 8 px corners, OpenEMR-Bootstrap palette. The narrow rail
+ * (320–600 px) keeps the type scale tight; the spacing scale is the lever
+ * that actually carries the breathing room.
+ *
+ * PR1 scope (token swap, no DOM changes):
+ *   - Adopt CSS-variable tokens (`--af-*`) on `:root`.
+ *   - Re-skin every existing class to those tokens.
+ *   - Swap Send to OpenEMR primary blue and quiet the mic idle palette.
+ *   - Keep all class names, layout (flex/grid/sizing), and animations intact.
+ */
+
 :root {
-  font-family: system-ui, -apple-system, sans-serif;
-  line-height: 1.4;
-  color: #1a1a1a;
+  /* Type — Lato matches OpenEMR's `$font-family-sans-serif`. */
+  --af-font:
+    "Lato", "Helvetica Neue", Helvetica, Arial, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+  /* Brand — OpenEMR Bootstrap 4.6 ($blue / $green / $yellow / $red / $cyan).
+     `*-50` and `*-600` are tinted/shaded peers used for subtle backgrounds and
+     hover states; they're derived from the primary swatch, not Tailwind. */
+  --af-primary: #007bff;
+  --af-primary-600: #0069d9;
+  --af-primary-700: #0056b3;
+  --af-primary-50: #e7f1ff;
+
+  --af-success: #28a745;
+  --af-success-600: #218838;
+  --af-success-700: #1e7e34;
+  --af-success-50: #e6f4ea;
+
+  --af-warning: #ffc107;
+  --af-warning-700: #806100;
+  --af-warning-50: #fff8e1;
+
+  --af-danger: #dc3545;
+  --af-danger-600: #c82333;
+  --af-danger-700: #842029;
+  --af-danger-50: #fdecea;
+
+  --af-info: #17a2b8;
+  --af-info-700: #0c5460;
+  --af-info-50: #e3f4f7;
+
+  /* Grays — Bootstrap 4.6 gray scale. */
+  --af-gray-100: #f8f9fa;
+  --af-gray-200: #e9ecef;
+  --af-gray-300: #dee2e6;
+  --af-gray-400: #ced4da;
+  --af-gray-500: #adb5bd;
+  --af-gray-600: #6c757d;
+  --af-gray-700: #495057;
+  --af-gray-800: #343a40;
+  --af-gray-900: #212529;
+
+  /* Semantic surfaces. */
+  --af-surface: #ffffff;
+  --af-surface-alt: var(--af-gray-100);
+  --af-surface-sunk: var(--af-gray-200);
+  --af-border: var(--af-gray-300);
+  --af-border-strong: var(--af-gray-400);
+
+  /* Text. */
+  --af-text: var(--af-gray-900);
+  --af-text-muted: var(--af-gray-600);
+  --af-text-subtle: var(--af-gray-700);
+  --af-link: #0645ad;
+  --af-link-hover: #0b0080;
+
+  /* Radii — modern clinical product = soft. Cards 8 px, controls 6 px,
+     chips/buttons-inline 4 px, pills full. */
+  --af-radius: 8px;
+  --af-radius-control: 6px;
+  --af-radius-sm: 4px;
+  --af-radius-pill: 999px;
+
+  /* Spacing scale — 4 px base. Use these everywhere; no more ad-hoc rems. */
+  --af-s1: 4px;
+  --af-s2: 8px;
+  --af-s3: 12px;
+  --af-s4: 16px;
+  --af-s5: 20px;
+  --af-s6: 24px;
+
+  /* Type scale — tight because the rail is narrow (min 320 px). */
+  --af-text-body: 0.875rem;     /* 14 px */
+  --af-text-small: 0.8125rem;   /* 13 px */
+  --af-text-tiny: 0.75rem;      /* 12 px */
+  --af-text-micro: 0.6875rem;   /* 11 px */
+  --af-text-title: 1rem;        /* 16 px */
+  --af-text-section: 0.9375rem; /* 15 px */
+
+  /* Elevation — quiet, single layer. Cards stay flat; only the compose
+     footer earns a shadow. */
+  --af-shadow-footer: 0 -1px 4px rgba(0, 0, 0, 0.04);
+
+  /* Focus ring — OpenEMR uses Bootstrap's default outline; we mirror it. */
+  --af-focus-ring: 0 0 0 3px rgba(0, 123, 255, 0.25);
+
+  font-family: var(--af-font);
+  line-height: 1.45;
+  color: var(--af-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Iframe embed: give the body a definite height so the chat column can flex
@@ -11,6 +121,10 @@ body,
 #agentforge-panel-root {
   height: 100%;
   margin: 0;
+}
+
+body {
+  background: var(--af-surface);
 }
 
 #agentforge-panel-root {
@@ -30,124 +144,388 @@ body,
   border: 0;
 }
 
+/* ── Panel shell ──────────────────────────────────────────────────────
+ * PR5 inverts which surface is "chrome" vs "content":
+ *   - Header = edge-to-edge gray bar (chrome)
+ *   - Feed   = full-rail-width white canvas (content)
+ *   - Footer = edge-to-edge gray bar (chrome)
+ * The outer `.agentforge-cui` therefore drops its 16 px padding and its
+ * inter-section `gap` so the gray bars can run rail-edge to rail-edge;
+ * each section owns its own internal padding instead. The 1 px borders
+ * between bars and feed are the dividers (option A from the planning
+ * conversation).
+ */
+
 .agentforge-cui {
-  padding: 0.75rem;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
   height: 100%;
   min-height: 0;
   box-sizing: border-box;
-}
-
-.agentforge-cui__title {
-  font-size: 1rem;
-  margin: 0;
-  font-weight: 600;
+  background: var(--af-surface);
 }
 
 .agentforge-cui__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.25rem;
+  gap: var(--af-s2);
+  padding: var(--af-s3) var(--af-s4);
+  background: var(--af-surface-alt);
+  border-bottom: 1px solid var(--af-border);
+  flex: 0 0 auto;
 }
 
+.agentforge-cui__title {
+  font-size: var(--af-text-title);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--af-text);
+  margin: 0;
+}
+
+/* Icon-only refresh control (OpenEMR-tab-style circular arrows) — outline
+   chrome matches the gray header bar; square touch target ≥ 2.25 rem. */
 .agentforge-cui__refresh {
-  font-size: 0.75rem;
-  padding: 0.2rem 0.55rem;
-  border: 1px solid #c9c9d4;
-  background: #f5f5fa;
-  color: #1a1a1a;
-  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  padding: var(--af-s1);
+  line-height: 0;
+  border: 1px solid var(--af-border-strong);
+  background: var(--af-surface);
+  color: var(--af-text-subtle);
+  border-radius: var(--af-radius-control);
   cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.agentforge-cui__refresh-icon {
+  flex-shrink: 0;
+  display: block;
 }
 
 .agentforge-cui__refresh:hover {
-  background: #e8e8f0;
+  background: var(--af-gray-100);
+  border-color: var(--af-gray-500);
+}
+
+.agentforge-cui__refresh:focus-visible {
+  outline: none;
+  box-shadow: var(--af-focus-ring);
 }
 
 .agentforge-cui__subtitle {
-  font-size: 0.95rem;
-  margin: 0 0 0.35rem;
+  font-size: var(--af-text-section);
+  margin: 0 0 var(--af-s1);
   font-weight: 600;
+  color: var(--af-text);
 }
 
+/* Floating banners (presenting hint, send/mic error) live as flex children
+   of `.agentforge-cui` between the messages region and the form. They need
+   their own horizontal inset now that the outer container has none. */
 .agentforge-cui__hint,
 .agentforge-cui__error {
   margin: 0;
-  font-size: 0.875rem;
-  color: #444;
+  padding: var(--af-s2) var(--af-s4);
+  font-size: var(--af-text-body);
+  color: var(--af-text-muted);
 }
 
 .agentforge-cui__error {
-  color: #a30;
+  color: var(--af-danger-700);
 }
 
+/* ── Messages region ─────────────────────────────────────────────────
+ * Full-width white canvas. No border, no card background, no rounded
+ * frame — those all moved out in PR5 in favour of the chrome-bar
+ * pattern. The region's only chrome is its own internal padding (which
+ * sets the gutter that assistant prose and user bubbles sit inside)
+ * and the inter-message vertical gap.
+ *
+ * `gap: var(--af-s4)` (16 px) is generous on purpose — successive
+ * assistant turns have no card divider any more, so the spacing is
+ * the only separator between turns when no user bubble interleaves.
+ */
 .agentforge-messages {
   flex: 1 1 auto;
   overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--af-s4);
   min-height: 120px;
-  border: 1px solid #e2e2e2;
-  border-radius: 6px;
-  padding: 0.5rem;
-  background: #fafafa;
+  padding: var(--af-s4);
+  background: var(--af-surface);
 }
 
 .agentforge-msg {
   margin: 0;
-  padding: 0.35rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.875rem;
+  font-size: var(--af-text-body);
+  line-height: 1.5;
 }
 
-.agentforge-msg--user {
-  background: #e8f0fe;
-  align-self: flex-end;
-  max-width: 95%;
-}
-
+/* Assistant message — no card. Just a layout container that hosts the
+   blocks (text / claim / proposal / warning / refusal / tool / nav).
+   Bounded sub-blocks (proposal, alerts, tool) carry their own card
+   chrome; prose flows directly on the white canvas. This is the
+   Cursor / Claude / ChatGPT convention: the absence of a frame around
+   the assistant text *is* the authorship signal. */
 .agentforge-msg--assistant {
-  background: #fff;
-  border: 1px solid #e8e8e8;
+  background: transparent;
+  border: none;
+  padding: 0;
   align-self: stretch;
+}
+
+/* User message — bubble. Right-aligned so position carries authorship
+   on this side (mirroring the assistant's "no chrome" signal). The
+   85 % max-width keeps the bubble from filling the canvas; the
+   light-blue tint is the universal user-side color. */
+.agentforge-msg--user {
+  align-self: flex-end;
+  max-width: 85%;
+  padding: var(--af-s2) var(--af-s3);
+  border-radius: var(--af-radius);
+  border: 1px solid #c5d9f5;
+  background: var(--af-primary-50);
 }
 
 .agentforge-msg__text,
 .agentforge-msg__claim,
 .agentforge-msg__unknown {
-  margin: 0.15rem 0;
+  margin: var(--af-s2) 0;
 }
 
+.agentforge-msg__text:first-child,
+.agentforge-msg__claim:first-child,
+.agentforge-msg__unknown:first-child {
+  margin-top: 0;
+}
+
+.agentforge-msg__text:last-child,
+.agentforge-msg__claim:last-child,
+.agentforge-msg__unknown:last-child {
+  margin-bottom: 0;
+}
+
+/* ── Assistant Markdown prose ────────────────────────────────────────
+ * `.agentforge-msg__md` is the wrapper that <AssistantMarkdown> hangs
+ * around its rendered output. Block mode (`<div>`) lets headings, lists,
+ * and code blocks own real block-level chrome; inline mode (`<span>`)
+ * runs the rendered Markdown alongside surrounding text inside an
+ * existing `<p>` or `<button>` (claim segments, warning text).
+ *
+ * We intentionally keep the visual weight quiet — a busy clinician should
+ * scan section headings without the rail starting to read like a
+ * marketing landing page. h3/h4 are the only heading levels we render
+ * (h1/h2 from the model are demoted in the React component) and they're
+ * sized close to body text, just heavier and tighter.
+ */
+
+.agentforge-msg__md {
+  /* The wrapper itself doesn't add spacing — the existing
+     `.agentforge-msg__text` rule above owns the inter-block gap. */
+}
+
+.agentforge-msg__md > :first-child {
+  margin-top: 0;
+}
+
+.agentforge-msg__md > :last-child {
+  margin-bottom: 0;
+}
+
+.agentforge-msg__md p {
+  margin: var(--af-s2) 0;
+}
+
+.agentforge-msg__md h3 {
+  margin: var(--af-s3) 0 var(--af-s1);
+  font-size: var(--af-text-section);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--af-text);
+}
+
+.agentforge-msg__md h4 {
+  margin: var(--af-s3) 0 var(--af-s1);
+  font-size: var(--af-text-body);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--af-text);
+}
+
+.agentforge-msg__md ul,
+.agentforge-msg__md ol {
+  margin: var(--af-s2) 0;
+  padding-inline-start: 1.25rem;
+}
+
+.agentforge-msg__md li {
+  margin: var(--af-s1) 0;
+}
+
+.agentforge-msg__md li > p {
+  /* Tight-list paragraphs (GFM nests <p> inside <li>): keep them flush
+     so a 3-bullet list doesn't grow vertically by 60 px. */
+  margin: 0;
+}
+
+.agentforge-msg__md strong {
+  font-weight: 600;
+}
+
+.agentforge-msg__md em {
+  font-style: italic;
+}
+
+.agentforge-msg__md code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  padding: 0 4px;
+  background: var(--af-surface-alt);
+  border-radius: var(--af-radius-sm);
+  color: var(--af-text);
+}
+
+.agentforge-msg__md pre {
+  margin: var(--af-s2) 0;
+  padding: var(--af-s2) var(--af-s3);
+  background: var(--af-surface-alt);
+  border-radius: var(--af-radius-sm);
+  overflow-x: auto;
+  line-height: 1.45;
+}
+
+.agentforge-msg__md pre code {
+  padding: 0;
+  background: transparent;
+  font-size: var(--af-text-small);
+}
+
+.agentforge-msg__md blockquote {
+  margin: var(--af-s2) 0;
+  padding: var(--af-s1) var(--af-s3);
+  border-inline-start: 3px solid var(--af-border-strong);
+  color: var(--af-text-subtle);
+}
+
+.agentforge-msg__md hr {
+  margin: var(--af-s3) 0;
+  border: 0;
+  border-top: 1px solid var(--af-border);
+}
+
+.agentforge-msg__md a {
+  color: var(--af-link);
+  text-decoration: underline;
+}
+
+.agentforge-msg__md a:hover {
+  color: var(--af-link-hover);
+}
+
+/* GFM tables — narrow rail, so we keep borders minimal and let the table
+   scroll horizontally inside its parent if it overflows. */
+.agentforge-msg__md table {
+  margin: var(--af-s2) 0;
+  border-collapse: collapse;
+  font-size: var(--af-text-small);
+}
+
+.agentforge-msg__md th,
+.agentforge-msg__md td {
+  padding: var(--af-s1) var(--af-s2);
+  border: 1px solid var(--af-border);
+  text-align: start;
+}
+
+.agentforge-msg__md th {
+  background: var(--af-surface-alt);
+  font-weight: 600;
+}
+
+/* Inline mode: <span> wrapper, all block elements have already been
+   unwrapped by AssistantMarkdown so only phrasing tags survive. We make
+   sure the wrapper itself doesn't introduce a baseline shift by
+   inheriting font metrics from its parent. */
+.agentforge-msg__md--inline {
+  display: inline;
+}
+
+/* Dictation badge — small chip pinned to the top-left of the user bubble.
+   Below it, the prose blocks render in the bubble's normal flow. The
+   badge is genuinely useful info ("transcribed from voice — odd phrasing
+   is ASR error not a typo") so it survives the user-side label
+   removal. */
 .agentforge-msg__dictation-badge {
   display: inline-block;
-  margin: 0 0 0.2rem;
-  padding: 0.08rem 0.4rem;
-  font-size: 0.6875rem;
+  margin: 0 0 var(--af-s2);
+  padding: 2px var(--af-s2);
+  font-size: var(--af-text-micro);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #0b3d91;
-  background: #dbe7ff;
-  border: 1px solid #b8cdfa;
-  border-radius: 999px;
+  color: var(--af-primary-700);
+  background: var(--af-surface);
+  border: 1px solid #c5d9f5;
+  border-radius: var(--af-radius-pill);
+  line-height: 1.4;
+}
+
+/* Inline alerts — Bootstrap-alert pattern, now with leading SVG icons.
+   Icon + text are flex children so a wrapping warning string indents
+   correctly under the prose, not under the icon. */
+.agentforge-msg__warning,
+.agentforge-msg__refusal,
+.agentforge-msg__nav-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--af-s2);
+  margin: var(--af-s2) 0;
+  padding: var(--af-s2) var(--af-s3);
+  border-radius: var(--af-radius-sm);
+  border-inline-start: 3px solid;
+  font-size: var(--af-text-small);
+  line-height: 1.45;
 }
 
 .agentforge-msg__warning {
-  margin: 0.15rem 0;
-  color: #92400e;
+  border-inline-start-color: var(--af-warning);
+  background: var(--af-warning-50);
+  color: var(--af-warning-700);
 }
 
 .agentforge-msg__refusal {
-  margin: 0.15rem 0;
-  color: #991b1b;
+  border-inline-start-color: var(--af-danger);
+  background: var(--af-danger-50);
+  color: var(--af-danger-700);
 }
 
-/* Inline citation control — Wikipedia-style link (blue + underline), not a chrome button */
+.agentforge-msg__nav-notice {
+  margin: 0 0 var(--af-s2);
+  border-inline-start-color: var(--af-info);
+  background: var(--af-info-50);
+  color: var(--af-info-700);
+}
+
+/* Bump the alert icons up 1 px to sit on the cap-height line of the text. */
+.agentforge-msg__warning > .agentforge-msg__icon,
+.agentforge-msg__refusal > .agentforge-msg__icon,
+.agentforge-msg__nav-notice > .agentforge-msg__icon {
+  margin-top: 2px;
+  vertical-align: 0;
+  flex: 0 0 auto;
+}
+
+/* Inline citation control — Wikipedia-shaped link kept (right pattern for
+   inline reading); PR4 swaps solid → dotted underline so it reads as
+   "annotation" not "outbound link", and appends an arrow marker so the
+   clinician knows clicking will change the chart view. */
 .agentforge-msg__cite-link {
   font: inherit;
   font-size: inherit;
@@ -161,152 +539,383 @@ body,
   background: none;
   box-shadow: none;
   vertical-align: baseline;
-  color: #0645ad;
-  text-decoration: underline;
+  color: var(--af-link);
+  text-decoration: underline dotted;
+  text-decoration-thickness: 1px;
   text-decoration-skip-ink: auto;
-  text-underline-offset: 0.12em;
+  text-underline-offset: 0.18em;
   cursor: pointer;
   -webkit-appearance: none;
   appearance: none;
 }
 
 .agentforge-msg__cite-link:hover {
-  color: #0b0080;
+  color: var(--af-link-hover);
+  text-decoration-style: solid;
 }
 
 .agentforge-msg__cite-link:focus-visible {
-  outline: 2px solid #0645ad;
+  outline: 2px solid var(--af-link);
   outline-offset: 2px;
 }
 
-.agentforge-msg__cite-text {
-  color: #555;
+/* Tiny "↗" appended to navigable citations. The arrow is part of the
+   button so the focus ring covers it; no underline so it doesn't read
+   as a separate link. */
+.agentforge-msg__cite-marker {
+  display: inline-block;
+  margin-inline-start: 1px;
+  vertical-align: 1px;
+  text-decoration: none;
+  opacity: 0.7;
 }
 
-.agentforge-msg__nav-notice {
-  margin: 0 0 0.35rem;
-  padding: 0.35rem 0.45rem;
-  font-size: 0.8125rem;
-  background: #f3f4f6;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+.agentforge-msg__cite-link:hover .agentforge-msg__cite-marker {
+  opacity: 1;
 }
+
+.agentforge-msg__cite-text {
+  color: var(--af-text-subtle);
+}
+
+/* ── Proposal card (PR2 hero) ────────────────────────────────────────
+ * The proposal card is the journey's click-budget #4 (`journey.md`) —
+ * the moment the clinician decides whether the assistant's draft becomes
+ * a chart write. PR2 makes that moment visually unambiguous:
+ *
+ *   - Idle: amber wash + 3 px left accent. Bootstrap "needs decision"
+ *     language; reads as a proposal awaiting action without screaming.
+ *   - Accepted (button or voice): success-green wash, calm.
+ *   - Declined / OpenEMR denied / delivery failed: danger-red wash so
+ *     the operator sees at-a-glance which proposals failed to land.
+ *
+ * The state machine lives in MessageList.tsx (`ProposalSurfaceState`);
+ * CSS only switches on `data-state` so future states can be added on
+ * the JS side without a CSS round-trip.
+ *
+ * Action buttons are equal-width by `flex: 1 1 0`. This is a clinical-
+ * safety choice, not just a visual one: if Confirm and Reject have
+ * different visual weight the eye gets pulled toward Confirm and
+ * accidental confirmations rise. Equal weight keeps the decision
+ * neutral.
+ */
 
 .agentforge-msg__proposal-card {
-  margin: 0.35rem 0;
-  padding: 0.45rem 0.55rem;
-  border-radius: 6px;
-  border: 1px dashed #bdbdbd;
-  background: #f8fafc;
+  --af-prop-bg: var(--af-warning-50);
+  --af-prop-border: #f0d27a;
+  --af-prop-accent: var(--af-warning);
+
+  margin: var(--af-s2) 0;
+  padding: var(--af-s3) var(--af-s3) var(--af-s3) calc(var(--af-s3) + 1px);
+  border-radius: var(--af-radius);
+  border: 1px solid var(--af-prop-border);
+  border-inline-start: 3px solid var(--af-prop-accent);
+  background: var(--af-prop-bg);
+  color: var(--af-text);
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+/* State-driven washes. Keep idle/submitting amber; success/voice green;
+   any failure red. The `data-state` attribute is set by ProposalBlock. */
+.agentforge-msg__proposal-card[data-state="accepted"],
+.agentforge-msg__proposal-card[data-state="voice"] {
+  --af-prop-bg: var(--af-success-50);
+  --af-prop-border: #b6dfc1;
+  --af-prop-accent: var(--af-success);
+}
+
+.agentforge-msg__proposal-card[data-state="declined"],
+.agentforge-msg__proposal-card[data-state="denied"],
+.agentforge-msg__proposal-card[data-state="failed"] {
+  --af-prop-bg: var(--af-danger-50);
+  --af-prop-border: #f3b6bd;
+  --af-prop-accent: var(--af-danger);
+}
+
+.agentforge-msg__proposal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--af-s2);
+  margin-bottom: var(--af-s2);
 }
 
 .agentforge-msg__proposal-label {
-  margin: 0 0 0.2rem;
-  font-size: 0.6875rem;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--af-s1);
+  font-size: var(--af-text-micro);
+  font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--af-warning-700);
+}
+
+/* Label color tracks the surface state so the header reads the same wash. */
+.agentforge-msg__proposal-card[data-state="accepted"] .agentforge-msg__proposal-label,
+.agentforge-msg__proposal-card[data-state="voice"] .agentforge-msg__proposal-label {
+  color: var(--af-success-700);
+}
+
+.agentforge-msg__proposal-card[data-state="declined"] .agentforge-msg__proposal-label,
+.agentforge-msg__proposal-card[data-state="denied"] .agentforge-msg__proposal-label,
+.agentforge-msg__proposal-card[data-state="failed"] .agentforge-msg__proposal-label {
+  color: var(--af-danger-700);
+}
+
+.agentforge-msg__proposal-target {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--af-s2);
+  border-radius: var(--af-radius-pill);
+  border: 1px solid var(--af-border);
+  background: var(--af-surface);
+  color: var(--af-text-subtle);
+  font-size: var(--af-text-micro);
+  font-weight: 600;
   letter-spacing: 0.02em;
-  color: #555;
+  white-space: nowrap;
 }
 
 .agentforge-msg__proposal-preview {
   margin: 0;
   white-space: pre-wrap;
+  color: var(--af-text);
+  font-size: var(--af-text-body);
+  line-height: 1.5;
 }
 
+/* Status row — appears once the proposal resolves. Becomes a pill with
+   an icon and color matched to the surface state. */
 .agentforge-msg__proposal-status {
-  margin: 0.35rem 0 0;
-  font-size: 0.8125rem;
-  color: #1b4332;
+  margin: var(--af-s3) 0 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--af-s1);
+  padding: 2px var(--af-s2);
+  border-radius: var(--af-radius-pill);
+  font-size: var(--af-text-small);
+  font-weight: 500;
+  background: var(--af-surface);
+  border: 1px solid var(--af-border);
+  color: var(--af-text-subtle);
+}
+
+.agentforge-msg__proposal-card[data-state="accepted"] .agentforge-msg__proposal-status,
+.agentforge-msg__proposal-card[data-state="voice"] .agentforge-msg__proposal-status {
+  color: var(--af-success-700);
+  border-color: #b6dfc1;
+}
+
+.agentforge-msg__proposal-card[data-state="declined"] .agentforge-msg__proposal-status,
+.agentforge-msg__proposal-card[data-state="denied"] .agentforge-msg__proposal-status,
+.agentforge-msg__proposal-card[data-state="failed"] .agentforge-msg__proposal-status {
+  color: var(--af-danger-700);
+  border-color: #f3b6bd;
 }
 
 .agentforge-msg__proposal-hint {
-  margin: 0.35rem 0 0;
-  font-size: 0.75rem;
-  color: #6b7280;
+  margin: var(--af-s2) 0 0;
+  font-size: var(--af-text-tiny);
+  color: var(--af-text-muted);
 }
 
 .agentforge-msg__proposal-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin-top: 0.35rem;
+  gap: var(--af-s2);
+  margin-top: var(--af-s3);
 }
 
 .agentforge-msg__proposal-btn {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--af-s1);
   font: inherit;
-  font-size: 0.8125rem;
-  padding: 0.28rem 0.65rem;
-  border-radius: 4px;
+  font-size: var(--af-text-body);
+  font-weight: 600;
+  padding: var(--af-s2) var(--af-s3);
+  border-radius: var(--af-radius-control);
   border: 1px solid transparent;
   cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 
 .agentforge-msg__proposal-btn--primary {
-  border-color: #166534;
-  background: #22c55e;
-  color: #052e16;
+  border-color: var(--af-success-700);
+  background: var(--af-success);
+  color: #ffffff;
+}
+
+.agentforge-msg__proposal-btn--primary:hover:not(:disabled) {
+  background: var(--af-success-600);
+  border-color: var(--af-success-700);
 }
 
 .agentforge-msg__proposal-btn--secondary {
-  border-color: #9ca3af;
-  background: #fff;
-  color: #374151;
+  border-color: var(--af-border-strong);
+  background: var(--af-surface);
+  color: var(--af-text);
+}
+
+.agentforge-msg__proposal-btn--secondary:hover:not(:disabled) {
+  background: var(--af-gray-100);
+  border-color: var(--af-gray-500);
+  color: var(--af-text);
+}
+
+.agentforge-msg__proposal-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--af-focus-ring);
 }
 
 .agentforge-msg__proposal-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.55;
   cursor: not-allowed;
+}
+
+/* ── Inline icons ─────────────────────────────────────────────────────
+ * SVG sized inline (width/height attrs); this rule normalizes vertical
+ * alignment so the icon sits on the type baseline next to its label
+ * without wiggling between Confirm/Reject/status pill contexts. */
+.agentforge-msg__icon {
+  flex: 0 0 auto;
+  display: inline-block;
+  vertical-align: -2px;
+}
+
+/* ── Tool call / result blocks ───────────────────────────────────────── */
+
+/* Tool call/result band — quiet by design (these are dev-mode breadcrumbs,
+   not clinician-facing prose). Label = subtle uppercase tag, name = mono
+   so it's recognisable as a function identifier at a glance. */
+.agentforge-msg__tool {
+  margin: var(--af-s2) 0;
+  padding: var(--af-s2) var(--af-s3);
+  border-radius: var(--af-radius-sm);
+  background: var(--af-surface-alt);
+  border: 1px solid var(--af-border);
+  font-size: var(--af-text-tiny);
+  color: var(--af-text-muted);
 }
 
 .agentforge-msg__tool summary {
   cursor: pointer;
+  color: var(--af-text-subtle);
+  font-weight: 500;
+  list-style-position: outside;
+}
+
+.agentforge-msg__tool-label {
+  font-size: var(--af-text-micro);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--af-text-muted);
+}
+
+.agentforge-msg__tool-name {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
+  font-size: var(--af-text-tiny);
+  color: var(--af-text);
+  background: var(--af-surface);
+  padding: 1px var(--af-s1);
+  border-radius: var(--af-radius-sm);
+  border: 1px solid var(--af-border);
 }
 
 .agentforge-msg__tool pre {
-  font-size: 0.7rem;
+  margin: var(--af-s2) 0 0;
+  padding: var(--af-s2);
+  background: var(--af-surface);
+  border-radius: var(--af-radius-sm);
+  border: 1px solid var(--af-border);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
+  font-size: var(--af-text-micro);
+  color: var(--af-text-subtle);
   max-height: 8rem;
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
+/* ── Compose footer (chrome bar) ─────────────────────────────────────
+ * Edge-to-edge gray bar mirroring the header. The 1 px top border is
+ * the divider between the white feed and the gray chrome (option A
+ * from the planning conversation); the prior PR1 box-shadow is gone
+ * because the contrast + border carry it. */
 .agentforge-cui__form,
 .agentforge-cui__compose {
   display: flex;
   flex-direction: row;
   align-items: stretch;
-  gap: 0.5rem;
+  gap: var(--af-s2);
+  padding: var(--af-s3) var(--af-s4);
+  background: var(--af-surface-alt);
+  border-top: 1px solid var(--af-border);
+  flex: 0 0 auto;
 }
 
 .agentforge-cui__input {
   flex: 1 1 auto;
   min-width: 0;
   font: inherit;
-  resize: vertical;
-  padding: 0.4rem 0.5rem;
-  border-radius: 6px;
-  border: 1px solid #ccc;
+  font-size: var(--af-text-body);
+  resize: none;
+  overflow-y: auto;
+  max-height: 12rem;
+  padding: var(--af-s2) var(--af-s3);
+  border-radius: var(--af-radius-control);
+  border: 1px solid var(--af-border-strong);
+  background: var(--af-surface);
+  color: var(--af-text);
+  line-height: 1.45;
+}
+
+.agentforge-cui__input:focus {
+  outline: none;
+  border-color: var(--af-primary);
+  box-shadow: var(--af-focus-ring);
 }
 
 .agentforge-cui__compose-actions {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: var(--af-s2);
   flex: 0 0 auto;
   align-self: stretch;
   min-width: 9rem;
 }
 
+/* Send — OpenEMR primary blue, mirrors `btn-primary`. The `flex: 1 1 0` +
+ * column parent (`.agentforge-cui__compose-actions`) lets Send and Mic share
+ * the column height 50/50 so they grow vertically alongside the textarea
+ * (which itself auto-grows up to 12rem). */
 .agentforge-cui__send {
   font: inherit;
-  padding: 0.35rem 0.85rem;
-  border-radius: 6px;
-  border: 1px solid #1a5fb4;
-  background: #3584e4;
-  color: #fff;
+  font-weight: 500;
+  font-size: var(--af-text-body);
+  padding: var(--af-s2) var(--af-s4);
+  border-radius: var(--af-radius-control);
+  border: 1px solid var(--af-primary-700);
+  background: var(--af-primary);
+  color: #ffffff;
   cursor: pointer;
   width: 100%;
+  flex: 1 1 0;
+  min-height: 2.5rem;
+  transition: background-color 120ms ease;
+}
+
+.agentforge-cui__send:hover:not(:disabled) {
+  background: var(--af-primary-600);
+}
+
+.agentforge-cui__send:focus-visible {
+  outline: none;
+  box-shadow: var(--af-focus-ring);
 }
 
 .agentforge-cui__send:disabled {
@@ -314,41 +923,59 @@ body,
   cursor: not-allowed;
 }
 
-/* Gate 5 — PRD §6.4 mic. The mic button now lives in the compose-actions column
-   alongside Send (see DIVERGENCE-PRD-6.4 in MicControl.tsx for the dropped
-   disclaimer / mode-selector UI). */
+/* Mic — neutral outline at idle (was amber-on-cream, foreign to OpenEMR);
+   keeps the existing red language for the recording state because that
+   semantic ("recording = danger") reads correctly across the palette. */
 .agentforge-cui__mic-btn {
   font: inherit;
-  font-size: 0.85rem;
-  padding: 0.4rem 0.75rem;
-  border-radius: 6px;
-  border: 1px solid #b45309;
-  background: #fff7ed;
-  color: #7c2d12;
+  font-size: var(--af-text-body);
+  padding: var(--af-s2) var(--af-s3);
+  border-radius: var(--af-radius-control);
+  border: 1px solid var(--af-border-strong);
+  background: var(--af-surface);
+  color: var(--af-text-subtle);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.35rem;
+  gap: var(--af-s1);
   width: 100%;
+  flex: 1 1 0;
+  min-height: 2.5rem;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.agentforge-cui__mic-btn:hover:not(:disabled) {
+  background: var(--af-gray-100);
+  border-color: var(--af-gray-500);
+}
+
+.agentforge-cui__mic-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--af-focus-ring);
 }
 
 .agentforge-cui__mic-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
 .agentforge-cui__mic-btn--recording {
-  border-color: #b91c1c;
-  background: #fef2f2;
-  color: #991b1b;
+  border-color: var(--af-danger);
+  background: var(--af-danger-50);
+  color: var(--af-danger-700);
+}
+
+.agentforge-cui__mic-btn--recording:hover:not(:disabled) {
+  background: var(--af-danger-50);
+  border-color: var(--af-danger-600);
 }
 
 .agentforge-cui__mic-dot {
   width: 0.55rem;
   height: 0.55rem;
-  border-radius: 999px;
-  background: #ef4444;
+  border-radius: var(--af-radius-pill);
+  background: var(--af-danger);
   animation: agentforge-cui-mic-pulse 1s ease-in-out infinite;
 }
 
@@ -364,70 +991,114 @@ body,
   }
 }
 
-.agentforge-msg__recap {
-  margin: 0.35rem 0;
-  padding: 0.45rem 0.55rem;
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
-  background: #f9fafb;
-}
+/* ── Brief-failed banner ─────────────────────────────────────────────── */
 
-.agentforge-msg__recap-title {
-  margin: 0 0 0.35rem;
-  font-size: 0.8125rem;
-}
-
-.agentforge-msg__recap-list {
+.agentforge-cui__brief-failed {
   margin: 0;
-  padding-left: 1.1rem;
-  font-size: 0.8125rem;
-}
-
-.agentforge-msg__recap-item {
-  margin: 0.25rem 0;
+  padding: var(--af-s3);
+  border-radius: var(--af-radius);
+  border: 1px solid var(--af-danger);
+  background: var(--af-danger-50);
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
-  align-items: baseline;
+  gap: var(--af-s2);
+  align-items: center;
 }
 
-.agentforge-msg__recap-badge {
-  font-size: 0.65rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 0.1rem 0.35rem;
-  border-radius: 4px;
-  flex-shrink: 0;
+.agentforge-cui__brief-failed .agentforge-cui__error {
+  margin: 0;
+  flex: 1 1 auto;
+  font-size: var(--af-text-small);
+  color: var(--af-danger-700);
 }
 
-.agentforge-msg__recap-item--confirmed .agentforge-msg__recap-badge {
-  background: #dcfce7;
-  color: #166534;
+.agentforge-cui__retry-brief {
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: var(--af-text-small);
+  font-weight: 500;
+  padding: var(--af-s1) var(--af-s3);
+  border-radius: var(--af-radius-control);
+  border: 1px solid var(--af-danger);
+  background: var(--af-surface);
+  color: var(--af-danger-700);
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
 }
 
-.agentforge-msg__recap-item--rejected .agentforge-msg__recap-badge {
-  background: #fee2e2;
-  color: #991b1b;
+.agentforge-cui__retry-brief:hover {
+  background: var(--af-danger);
+  color: #ffffff;
 }
 
-.agentforge-msg__recap-item--unresolved .agentforge-msg__recap-badge {
-  background: #fef3c7;
-  color: #92400e;
+.agentforge-cui__retry-brief:focus-visible {
+  outline: none;
+  box-shadow: var(--af-focus-ring);
 }
 
-.agentforge-msg__recap-item--refusal .agentforge-msg__recap-badge {
-  background: #e0e7ff;
-  color: #3730a3;
+/* ── Empty / loading state ───────────────────────────────────────────
+ * Clinical glyph + headline + body centered in the rail on the same
+ * white canvas as the message feed (PR5 parity — no inset card chrome).
+ */
+.agentforge-cui__empty {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--af-s2);
+  padding: var(--af-s5) var(--af-s4);
+  text-align: center;
+  background: var(--af-surface);
+  border: none;
+  border-radius: 0;
+  color: var(--af-text);
 }
 
-.agentforge-msg__recap-target {
-  font-size: 0.7rem;
+.agentforge-cui__empty-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--af-radius-pill);
+  background: var(--af-primary-50);
+  color: var(--af-primary);
+  margin-bottom: var(--af-s2);
+}
+
+.agentforge-cui__empty-title {
+  margin: 0;
+  font-size: var(--af-text-section);
   font-weight: 600;
-  color: #4b5563;
+  color: var(--af-text);
+  line-height: 1.3;
 }
 
-.agentforge-msg__recap-summary {
-  flex: 1 1 100%;
-  color: #111827;
+.agentforge-cui__empty-body {
+  margin: 0;
+  max-width: 28ch;
+  font-size: var(--af-text-small);
+  color: var(--af-text-muted);
+  line-height: 1.5;
+}
+
+/* Connecting spinner — quiet rotating arc in primary blue. The empty
+   state above is reused for connecting; this swaps the stethoscope
+   glyph for spinner geometry without restructuring the markup. */
+.agentforge-cui__empty-spinner {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  margin-bottom: var(--af-s2);
+  border-radius: var(--af-radius-pill);
+  border: 3px solid var(--af-primary-50);
+  border-top-color: var(--af-primary);
+  animation: agentforge-cui-spin 700ms linear infinite;
+}
+
+@keyframes agentforge-cui-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

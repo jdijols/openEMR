@@ -9,13 +9,17 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && node -e \"const fs=require('fs');const p=require('path').resolve(__dirname,'../../interface/modules/custom_modules/oe-module-agentforge/public/cui/index.html');try{fs.unlinkSync(p)}catch(e){if(e&&e.code!=='ENOENT')throw e;}\"",
+    "build:watch": "vite build --watch",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --max-warnings 0",
     "test": "vitest run"
   },
   "dependencies": {
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
+    "rehype-sanitize": "^6.0.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

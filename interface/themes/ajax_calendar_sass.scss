@@ -5,6 +5,59 @@
 
 $side-calendar-date-padding: 0.3rem !default;
 
+/* ── Calendar top toolbar layout ─────────────────────────────────────
+ * Lifted OUT of the `@if $compact-theme == false { ... }` guard below
+ * so the layout is identical in both full and compact themes (both are
+ * served the same template markup, so both need the rules). Prior
+ * Bootstrap `.row` + `.col-md-*` percentages reserved fixed widths and
+ * pushed the Month button to a second line whenever the calendar iframe
+ * was narrowed (Clinical Co-Pilot rail). Per design feedback the date
+ * column should hug its content and the two button groups (#functions
+ * left, #viewPicker right) should each absorb half of the slack, so the
+ * right-hand button group always has far more room than its 5 buttons
+ * need and Month physically can't wrap. */
+#topToolbarRight {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  border-bottom: 1px solid $gray-300;
+  padding: 0.3125rem 0 0.1875rem;
+  z-index: 3;
+}
+
+#functions {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: $left;
+}
+
+#dateNAV {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  text-align: center;
+  padding: 0 1rem;
+  @include font-size("1.5rem");
+}
+
+#viewPicker {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: $right;
+  white-space: nowrap;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+
+  > a {
+    flex: 0 0 auto;
+
+    &:not(:last-child) {
+      margin-inline-end: 0.25rem;
+    }
+  }
+}
+
 @if $compact-theme == false {
   div.tiny {
     @include font-size("0.0625rem");
@@ -41,31 +94,9 @@ $side-calendar-date-padding: 0.3rem !default;
     margin-#{$left}: 8.75rem;
   }
 
-  #functions {
-    @extend .col-md-3;
-    text-align: $left;
-  }
-
-  #topToolbarRight {
-    @extend .row;
-    border-bottom: 1px solid $gray-300;
-    padding: 0.3125rem 0 0.1875rem;
-    z-index: 3;
-  }
-
-  #dateNAV {
-    @extend .col-md-6;
-    @include font-size("1.5rem");
-  }
-
   #dateDisplay {
     float: $left;
     padding-#{$left}: 0.625rem;
-  }
-
-  #viewPicker {
-    @extend .col-md-3;
-    text-align: $right;
   }
 
   #bigCalHeader {

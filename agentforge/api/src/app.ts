@@ -10,12 +10,6 @@ import { runCasePresentation } from './agent/case_presentation.js';
 import { runChatTurn } from './agent/orchestrator.js';
 import type { AgentForgeVariables } from './appTypes.js';
 import { confirmPendingProposal, rejectPendingProposal } from './conversations/apply_pending_write.js';
-import { buildRecapPayload } from './conversations/recap.js';
-import {
-  fetchConversationByExternalId,
-  listAssistantTurnBodies,
-  listPendingProposalsForConversation,
-} from './conversations/store.js';
 import { corsAllowlistMiddleware } from './cors.js';
 import type { Env } from './env.js';
 import { normalizeErrorHandler } from './errors/normalize.js';
@@ -40,6 +34,22 @@ async function probePostgres(pgPool: Pool): Promise<'ok' | 'degraded'> {
   } catch {
     return 'degraded';
   }
+}
+
+/**
+ * G6-15 / PRD §5.7.2 — typed misconfiguration thrown by `getChatModel`. Both
+ * `/present-patient` and `/chat` translate any of these into a `501
+ * misconfigured` so operators get a deterministic signal that the env is wrong
+ * (vs. a generic `500 internal_error`).
+ */
+const LLM_CONFIG_ERROR_NAMES = new Set([
+  'unsupported_llm_provider',
+  'openai_azure_missing_deployment_id',
+  'openai_azure_missing_endpoint',
+]);
+
+function isLlmConfigError(message: string): boolean {
+  return LLM_CONFIG_ERROR_NAMES.has(message);
 }
 
 /**
@@ -201,7 +211,7 @@ export function buildApp(
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'error';
-      if (msg === 'unsupported_llm_provider_gate2') {
+      if (isLlmConfigError(msg)) {
         return c.json({ error: 'misconfigured', correlation_id: correlationId }, 501);
       }
       return c.json({ error: 'internal_error', correlation_id: correlationId }, 500);
@@ -247,7 +257,7 @@ export function buildApp(
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'error';
-      if (msg === 'unsupported_llm_provider_gate2') {
+      if (isLlmConfigError(msg)) {
         return c.json({ error: 'misconfigured', correlation_id: correlationId }, 501);
       }
       return c.json({ error: 'internal_error', correlation_id: correlationId }, 500);
@@ -309,57 +319,6 @@ export function buildApp(
       ok: true,
       accepted: out.accepted,
       ...(out.reason !== undefined ? { reason: out.reason } : {}),
-      correlation_id: correlationId,
-    });
-  });
-
-  /**
-   * UC-C recap (PRD §5.9). Session in `Authorization: Bearer` + `X-Patient-Uuid` — never in query (S5).
-   */
-  app.get('/conversations/:conversationId/recap', async (c) => {
-    const correlationId = c.get('correlationId');
-    const pool = c.get('pgPool');
-    const envLocal = c.get('env');
-
-    const authHeader = (c.req.header('Authorization') ?? '').trim();
-    const bearer = /^Bearer\s+(.+)$/iu.exec(authHeader);
-    const token = bearer?.[1]?.trim();
-    const patientUuid = (c.req.header('X-Patient-Uuid') ?? '').trim();
-    const conversationExternalId = c.req.param('conversationId')?.trim() ?? '';
-
-    if (
-      token === undefined ||
-      token === '' ||
-      patientUuid === '' ||
-      conversationExternalId === ''
-    ) {
-      return c.json({ error: 'invalid_request', correlation_id: correlationId }, 400);
-    }
-
-    const sess = verifySessionToken(token, envLocal.SESSION_TOKEN_SECRET);
-    if (sess === null) {
-      return c.json({ error: 'unauthenticated', correlation_id: correlationId }, 401);
-    }
-    if (sess.patient_uuid?.toLowerCase() !== patientUuid.toLowerCase()) {
-      return c.json({ error: 'patient_mismatch', correlation_id: correlationId }, 403);
-    }
-
-    const conv = await fetchConversationByExternalId(pool, conversationExternalId);
-    if (conv === null) {
-      return c.json({ error: 'conversation_not_found', correlation_id: correlationId }, 404);
-    }
-    if (conv.patientUuid.toLowerCase() !== patientUuid.toLowerCase()) {
-      return c.json({ error: 'conversation_patient_mismatch', correlation_id: correlationId }, 403);
-    }
-
-    const proposals = await listPendingProposalsForConversation(pool, conv.internalId);
-    const assistantBodies = await listAssistantTurnBodies(pool, conv.internalId);
-    const { items, counts } = buildRecapPayload({ proposals, assistantBodies });
-
-    return c.json({
-      ok: true,
-      items,
-      counts,
       correlation_id: correlationId,
     });
   });

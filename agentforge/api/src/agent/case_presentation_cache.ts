@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto';
 import type { ChatBlock } from '../openemr/types.js';
 import type { CitationNavigationHint } from './toolEvidence.js';
 
-const TTL_MS = 30 * 60 * 1000;
+/** Case-presentation LRU entry lifetime — aligned with client `brief_cache` / `conversation_cache`. */
+const TTL_MS = 2 * 60 * 60 * 1000;
 
 type CachedPayload = {
   readonly blocks: ChatBlock[];
@@ -19,7 +20,7 @@ const store = new Map<string, CachedPayload>();
  * across two encounters when the rail re-mints the launch code mid-session
  * (P2 fix). Without it, the brief for encounter A is silently served for
  * encounter B and the operator has no escape hatch short of waiting out the
- * 30-minute TTL. `null` is its own bucket (no encounter saved yet).
+ * 2-hour TTL. `null` is its own bucket (no encounter saved yet).
  */
 function cacheKey(sessionToken: string, patientUuid: string, encounterId: number | null): string {
   const tok = createHash('sha256').update(sessionToken, 'utf8').digest('hex');

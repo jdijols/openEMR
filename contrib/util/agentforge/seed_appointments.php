@@ -30,6 +30,16 @@ require_once $fileRoot . '/interface/globals.php';
 
 final class AgentForgeAppointmentSeeder
 {
+    /**
+     * Fixed two-day demo window (Mon–Tue). Each patient is scheduled at most once across these days; dev/demo only.
+     *
+     * @var list<string>
+     */
+    private const DEMO_WEEKDAY_DATES = [
+        '2026-05-04',
+        '2026-05-05',
+    ];
+
     private const APPOINTMENT_MARKER = '[AgentForge Appointment Seed]';
     private const SCHEDULED_PATIENT_MARKER_NAME = 'AgentForge Scheduled Patient ID';
     private const SCHEDULED_PATIENT_PREFIX = 'AF-SCHEDULED-';
@@ -401,25 +411,50 @@ final class AgentForgeAppointmentSeeder
      */
     private function seedAppointments(array $establishedPatients, array $newPatients): array
     {
-        $weekdays = $this->nextWeekdays();
+        $weekdays = self::DEMO_WEEKDAY_DATES;
         $templates = $this->scheduleTemplates();
         $establishedIndex = 0;
         $newIndex = 0;
         $patientSchedule = [];
+        /** @var array<int, array<string, list<array{start:int, end:int}>>> */
+        $providerSchedule = [];
+        /** @var array<int, true> */
+        $usedPidsGlobal = [];
         $appointments = [];
+        $skippedSlots = 0;
 
         foreach ($weekdays as $dayIndex => $date) {
             $templateIndex = $dayIndex % count($templates);
             foreach ($this->providers as $providerKey => $provider) {
                 foreach ($templates[$templateIndex][$providerKey] as $slotIndex => $slot) {
+                    $startMinutes = $this->minutesSinceMidnight($slot['start']);
+                    $endMinutes = $startMinutes + (int)($slot['duration'] / 60);
+                    if ($this->calendarIntervalHasOverlap((int)$provider['id'], $date, $startMinutes, $endMinutes, $providerSchedule)) {
+                        $skippedSlots++;
+                        continue;
+                    }
+
                     $pool = $slot['source'] === 'new' ? $newPatients : $establishedPatients;
                     $poolIndex = $slot['source'] === 'new' ? $newIndex : $establishedIndex;
-                    $patient = $this->choosePatient($pool, $poolIndex, $date, $slot['start'], (int)$slot['duration'], $patientSchedule);
+                    $patient = $this->choosePatient(
+                        $pool,
+                        $poolIndex,
+                        $date,
+                        $slot['start'],
+                        (int)$slot['duration'],
+                        $patientSchedule,
+                        $usedPidsGlobal
+                    );
 
                     if ($slot['source'] === 'new') {
                         $newIndex = $poolIndex;
                     } else {
                         $establishedIndex = $poolIndex;
+                    }
+
+                    if ($patient === null) {
+                        $skippedSlots++;
+                        continue;
                     }
 
                     $title = $this->appointmentTitle((string)$slot['source'], (int)$slot['duration'], $dayIndex, $slotIndex);
@@ -452,35 +487,142 @@ final class AgentForgeAppointmentSeeder
                         'patient' => $patient['name'],
                         'title' => $title,
                     ];
+                    $providerSchedule[$provider['id']][$date][] = [
+                        'start' => $startMinutes,
+                        'end' => $endMinutes,
+                    ];
                 }
             }
+        }
+
+        $this->appendOverflowAppointmentsForUnusedPatients(
+            $appointments,
+            $establishedPatients,
+            $newPatients,
+            $usedPidsGlobal,
+            $providerSchedule,
+            $patientSchedule
+        );
+
+        if ($skippedSlots > 0) {
+            echo "Note: skipped {$skippedSlots} template slot(s) — no unused patient available in pool, provider already booked, or patient time collision.\n";
         }
 
         return $appointments;
     }
 
     /**
-     * @return list<string>
+     * Place any demo patient who did not receive a template slot into a short Tuesday overflow visit
+     * so the cohort is fully represented on the calendar.
+     *
+     * @param list<array<string, mixed>> $appointments
+     * @param list<array{pid:int, pubpid:string, name:string, source:string, primary_provider:string}> $establishedPatients
+     * @param list<array{pid:int, pubpid:string, name:string, source:string, primary_provider:string}> $newPatients
+     * @param array<int, true> $usedPidsGlobal
+     * @param array<int, array<string, list<array{start:int, end:int}>>> $providerSchedule
+     * @param array<int, array<string, list<array{start:int, end:int}>>> $patientSchedule
      */
-    private function nextWeekdays(): array
-    {
-        $today = new DateTimeImmutable('today');
-        $dates = [];
+    private function appendOverflowAppointmentsForUnusedPatients(
+        array &$appointments,
+        array $establishedPatients,
+        array $newPatients,
+        array &$usedPidsGlobal,
+        array &$providerSchedule,
+        array &$patientSchedule
+    ): void {
+        $byPid = [];
+        foreach (array_merge($establishedPatients, $newPatients) as $patient) {
+            $byPid[(int)$patient['pid']] = $patient;
+        }
 
-        for ($offset = 0; $offset < 7; $offset++) {
-            $date = $today->modify('+' . $offset . ' days');
-            $dayOfWeek = (int)$date->format('N');
-            if ($dayOfWeek >= 1 && $dayOfWeek <= 5) {
-                $dates[] = $date->format('Y-m-d');
+        $overflow = [];
+        foreach ($byPid as $pid => $patient) {
+            if (!isset($usedPidsGlobal[$pid])) {
+                $overflow[$pid] = $patient;
             }
         }
 
-        return $dates;
+        if ($overflow === []) {
+            return;
+        }
+
+        $lastDay = self::DEMO_WEEKDAY_DATES[array_key_last(self::DEMO_WEEKDAY_DATES)];
+        $times = [
+            '15:45', '16:00', '16:15', '16:30', '16:45', '17:00', '17:15', '17:30', '17:45',
+            '18:00', '18:15', '18:30',
+        ];
+        $dayIndex = count(self::DEMO_WEEKDAY_DATES) - 1;
+        $slotCounter = 0;
+
+        foreach ($overflow as $pid => $patient) {
+            $slotSource = $patient['source'] === 'new' ? 'new' : 'established';
+            $duration = 15 * 60;
+            $placed = false;
+
+            foreach ($times as $start) {
+                $startMinutes = $this->minutesSinceMidnight($start);
+                $endMinutes = $startMinutes + 15;
+                foreach ($this->providers as $providerKey => $provider) {
+                    if ($this->calendarIntervalHasOverlap((int)$provider['id'], $lastDay, $startMinutes, $endMinutes, $providerSchedule)) {
+                        continue;
+                    }
+
+                    if ($this->patientHasOverlap($pid, $lastDay, $startMinutes, $endMinutes, $patientSchedule)) {
+                        continue;
+                    }
+
+                    $title = $this->appointmentTitle($slotSource, $duration, $dayIndex, 900 + $slotCounter);
+                    $slotCounter++;
+                    $eid = $this->appointmentService->insert($pid, [
+                        'pc_catid' => $slotSource === 'new' ? $this->categoryIds['new_patient'] : $this->categoryIds['established_patient'],
+                        'pc_title' => $title,
+                        'pc_duration' => $duration,
+                        'pc_hometext' => self::APPOINTMENT_MARKER . ' ' . $title,
+                        'pc_apptstatus' => '-',
+                        'pc_eventDate' => $lastDay,
+                        'pc_startTime' => $start,
+                        'pc_facility' => $this->facility['id'],
+                        'pc_billing_location' => $this->facility['id'],
+                        'pc_aid' => $provider['id'],
+                        'pc_website' => null,
+                    ]);
+
+                    $usedPidsGlobal[$pid] = true;
+                    $providerSchedule[$provider['id']][$lastDay][] = [
+                        'start' => $startMinutes,
+                        'end' => $endMinutes,
+                    ];
+                    $patientSchedule[$pid][$lastDay][] = [
+                        'start' => $startMinutes,
+                        'end' => $endMinutes,
+                    ];
+
+                    $appointments[] = [
+                        'eid' => (int)$eid,
+                        'date' => $lastDay,
+                        'provider_key' => $providerKey,
+                        'provider' => $provider['display'],
+                        'start' => $start,
+                        'end' => $this->endTime($start, $duration),
+                        'duration_minutes' => 15,
+                        'category' => $slotSource === 'new' ? 'New Patient' : 'Established Patient',
+                        'patient_source' => $patient['source'],
+                        'pid' => $pid,
+                        'pubpid' => (string)$patient['pubpid'],
+                        'patient' => $patient['name'],
+                        'title' => $title,
+                    ];
+                    $placed = true;
+                    break 2;
+                }
+            }
+
+            if (!$placed) {
+                fwrite(STDERR, "AgentForge appointments: could not place overflow slot for pid {$pid} ({$patient['name']}).\n");
+            }
+        }
     }
 
-    /**
-     * @return list<array<string, list<array{start:string, duration:int, source:string}>>>
-     */
     private function scheduleTemplates(): array
     {
         return [
@@ -588,12 +730,20 @@ final class AgentForgeAppointmentSeeder
     /**
      * @param list<array{pid:int, pubpid:string, name:string, source:string, primary_provider:string}> $pool
      * @param array<int, array<string, list<array{start:int, end:int}>>> $patientSchedule
-     * @return array{pid:int, pubpid:string, name:string, source:string, primary_provider:string}
+     * @param array<int, true> $usedPidsGlobal
+     * @return array{pid:int, pubpid:string, name:string, source:string, primary_provider:string}|null
      */
-    private function choosePatient(array $pool, int &$poolIndex, string $date, string $startTime, int $duration, array &$patientSchedule): array
-    {
+    private function choosePatient(
+        array $pool,
+        int &$poolIndex,
+        string $date,
+        string $startTime,
+        int $duration,
+        array &$patientSchedule,
+        array &$usedPidsGlobal
+    ): ?array {
         if ($pool === []) {
-            throw new RuntimeException('No patients available for appointment assignment.');
+            return null;
         }
 
         $startMinutes = $this->minutesSinceMidnight($startTime);
@@ -603,17 +753,39 @@ final class AgentForgeAppointmentSeeder
         for ($attempt = 0; $attempt < $poolCount; $attempt++) {
             $candidateIndex = ($poolIndex + $attempt) % $poolCount;
             $patient = $pool[$candidateIndex];
-            if (!$this->patientHasOverlap((int)$patient['pid'], $date, $startMinutes, $endMinutes, $patientSchedule)) {
-                $poolIndex = ($candidateIndex + 1) % $poolCount;
-                $patientSchedule[$patient['pid']][$date][] = [
-                    'start' => $startMinutes,
-                    'end' => $endMinutes,
-                ];
-                return $patient;
+            if (isset($usedPidsGlobal[(int)$patient['pid']])) {
+                continue;
+            }
+
+            if ($this->patientHasOverlap((int)$patient['pid'], $date, $startMinutes, $endMinutes, $patientSchedule)) {
+                continue;
+            }
+
+            $poolIndex = ($candidateIndex + 1) % $poolCount;
+            $usedPidsGlobal[(int)$patient['pid']] = true;
+            $patientSchedule[$patient['pid']][$date][] = [
+                'start' => $startMinutes,
+                'end' => $endMinutes,
+            ];
+
+            return $patient;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<int, array<string, list<array{start:int, end:int}>>> $schedule keyed by provider id, then date
+     */
+    private function calendarIntervalHasOverlap(int $calendarId, string $date, int $startMinutes, int $endMinutes, array $schedule): bool
+    {
+        foreach ($schedule[$calendarId][$date] ?? [] as $block) {
+            if ($startMinutes < $block['end'] && $endMinutes > $block['start']) {
+                return true;
             }
         }
 
-        throw new RuntimeException('Unable to assign a patient without an overlapping appointment.');
+        return false;
     }
 
     /**
@@ -693,6 +865,9 @@ final class AgentForgeAppointmentSeeder
             'Generated by `contrib/util/agentforge/seed_appointments.php` on ' . date('Y-m-d H:i:s T') . '.',
             '',
             'All appointments and scheduled-patient records are fabricated synthetic data for demo and evaluation use only.',
+            '',
+            '**Demo window:** **Monday 2026-05-04 and Tuesday 2026-05-05** only. Each patient appears **at most once** across both days (remaining template slots are skipped).',
+            'Run `contrib/util/agentforge/seed_visit_intake.php` after this script to create same-day intake encounters.',
             '',
             '## Patient Sources',
             '',

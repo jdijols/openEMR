@@ -7,7 +7,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AgentForgeDeliveryError,
-  getConversationRecap,
   postChat,
   postPresentPatient,
   postProposalConfirm,
@@ -356,36 +355,3 @@ describe('postProposalReject (P1 hardening — typed error frames)', () => {
   });
 });
 
-describe('getConversationRecap (Gate 5 / UC-C)', () => {
-  it('GETs recap with Bearer session and X-Patient-Uuid', async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          ok: true,
-          items: [
-            { id: '1', classification: 'confirmed', summary: 'CC saved', write_target: 'chief_complaint' },
-          ],
-          counts: { confirmed: 1, rejected: 0, unresolved: 0, refusal: 0 },
-          correlation_id: 'r1',
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
-    );
-    globalThis.fetch = fetchMock as typeof fetch;
-
-    const out = await getConversationRecap(
-      'http://api.local/',
-      'sess.tok',
-      'patient-uu',
-      '00000000-0000-4000-8000-00000000c0de',
-    );
-
-    expect(out.items[0]?.classification).toBe('confirmed');
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toContain('/conversations/');
-    expect(url).toContain('recap');
-    const headers = new Headers(init.headers as Record<string, string>);
-    expect(headers.get('Authorization')).toBe('Bearer sess.tok');
-    expect(headers.get('X-Patient-Uuid')).toBe('patient-uu');
-  });
-});

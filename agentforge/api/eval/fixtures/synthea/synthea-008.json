@@ -1,0 +1,17 @@
+{
+  "label": "synthea-008",
+  "uuid": "00000000-0000-0001-0001-000000000008",
+  "demographics": { "age_years": 62, "sex": "M" },
+  "problems": [
+    { "code": "N18.3", "display": "Chronic kidney disease, stage 3 (moderate)" },
+    { "code": "I10", "display": "Essential hypertension" }
+  ],
+  "meds": [{ "rxnorm": "29046", "display": "Lisinopril 10 mg oral tablet" }],
+  "allergies": [],
+  "last_vitals": { "bp_sys": 148, "bp_dia": 88, "hr": 76, "captured_on": "today" },
+  "labs": [
+    { "loinc": "33914-3", "display": "eGFR", "value_numeric": 42, "unit": "mL/min/1.73m2", "flag": "low" },
+    { "loinc": "2160-0", "display": "Creatinine", "value_numeric": 1.7, "unit": "mg/dL", "flag": "high" }
+  ],
+  "use_case_lane": "UC-A reads — labs / abnormal results, citation discipline"
+}

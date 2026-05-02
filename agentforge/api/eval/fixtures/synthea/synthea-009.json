@@ -1,0 +1,15 @@
+{
+  "label": "synthea-009",
+  "uuid": "00000000-0000-0001-0001-000000000009",
+  "demographics": { "age_years": 51, "sex": "F" },
+  "problems": [{ "code": "F41.1", "display": "Generalized anxiety disorder" }],
+  "meds": [{ "rxnorm": "1115008", "display": "Sertraline 50 mg oral tablet" }],
+  "allergies": [],
+  "last_vitals": { "bp_sys": 122, "bp_dia": 80, "hr": 68, "captured_on": "today" },
+  "social_history": {
+    "tobacco": "former_smoker_quit_5_years_ago",
+    "alcohol": "drinks_socially",
+    "housing_stability": "stable"
+  },
+  "use_case_lane": "UC-A reads — social history / SDoH"
+}

@@ -25,9 +25,23 @@ This folder holds **course and process documentation** for the Clinical Co-Pilot
 | 12  | [process/12-gate1-gate2-complete.md](process/12-gate1-gate2-complete.md)       | Gate 1 security primitives + Gate 2 UC-A read spine closed; journal evidence; handoff to Gate 3 |
 | 13  | [process/13-gate3-complete.md](process/13-gate3-complete.md)                 | Gate 3 UC-A read completeness closed; case presentation + verification; handoff to Gate 4 |
 | 14  | [process/14-gate4-complete.md](process/14-gate4-complete.md)                 | Gate 4 UC-B confirmed writes closed; G4-10 chief-complaint E2E + `log_from='agent'` audit; handoff to Gate 5 |
+| 15  | [process/15-gate6-complete.md](process/15-gate6-complete.md)                 | Gate 6 eval + observability + deploy closed (G6-01..G6-18 + G6-20); LLM provider swap + eval-runner refactor + Context HTTP-matrix backfill; handoff to Gate 7 |
 
 Dated entries under `process/journal/week-N/` are session journals between milestones; they are not listed in the table.
 
+
+## Demo data seeding (local Docker)
+
+Synthetic primary-care **demo calendar** for AgentForge uses **2026-05-04 (Monday) and 2026-05-05 (Tuesday)** only. Each **patient appears at most once** across those two days; extra template slots are skipped so the schedule stays realistic. After a DB reset / demo install, run the seeders **in order** (from `docker/development-easy/`):
+
+```bash
+docker compose exec openemr php /var/www/localhost/htdocs/openemr/contrib/util/agentforge/seed_cohort.php
+docker compose exec openemr php /var/www/localhost/htdocs/openemr/contrib/util/agentforge/seed_appointments.php
+docker compose exec openemr php /var/www/localhost/htdocs/openemr/contrib/util/agentforge/seed_visit_intake.php
+```
+
+- [`seed_appointments.php`](../../contrib/util/agentforge/seed_appointments.php) writes [`cohort/appointments.md`](cohort/appointments.md).
+- [`seed_visit_intake.php`](../../contrib/util/agentforge/seed_visit_intake.php) creates a same-day **intake encounter** per seeded appointment (reason prefixed `[AgentForge Intake]`, MA vitals, nursing note, social-history touch-up). It also **deletes** any prior `[AgentForge Intake]` encounters (idempotent) and removes encounters dated **2026-04-29–2026-05-01** for demo patients (stock, cohort, scheduled) to clear the old rolling-window artifacts.
 
 ## References
 
