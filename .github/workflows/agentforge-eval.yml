@@ -1,0 +1,78 @@
+name: AgentForge Eval Suite
+
+# Deterministic regression gate for the Clinical Co-Pilot's stop-the-line invariants.
+# Runs `npm run eval` from agentforge/api. Pure CPU + filesystem — no network, no LLM,
+# no DB. Architecture: agentforge/api/eval/README.md and EVALUATION.md at repo root.
+
+on:
+  push:
+    branches:
+    - master
+    - rel-*
+    paths:
+    - agentforge/api/eval/**
+    - agentforge/api/package.json
+    - agentforge/api/package-lock.json
+    - .github/workflows/agentforge-eval.yml
+  pull_request:
+    branches:
+    - master
+    - rel-*
+    paths:
+    - agentforge/api/eval/**
+    - agentforge/api/package.json
+    - agentforge/api/package-lock.json
+    - .github/workflows/agentforge-eval.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'pull_request' && github.event.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+
+  agentforge_eval:
+    runs-on: ubuntu-24.04
+    name: AgentForge Eval Suite
+    strategy:
+      matrix:
+        node-version: ['24']
+    defaults:
+      run:
+        working-directory: agentforge/api
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+    - name: Set up Node
+      uses: actions/setup-node@v6
+      with:
+        node-version: ${{ matrix.node-version }}
+    - name: Get NPM Cache Directory
+      id: npm-cache-dir
+      run: |
+        {
+          printf 'dir='
+          npm config get cache
+        } >> "$GITHUB_OUTPUT"
+    - name: Cache node modules
+      uses: actions/cache@v5
+      with:
+        path: ${{ steps.npm-cache-dir.outputs.dir }}
+        key: ${{ runner.os }}-agentforge-api-node-${{ matrix.node-version }}-${{ hashFiles('agentforge/api/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-agentforge-api-node-${{ matrix.node-version }}-
+          ${{ runner.os }}-agentforge-api-node-
+    - name: NPM CI
+      run: npm ci
+    - name: Run eval suite
+      run: npm run eval
+    - name: Upload eval report on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: agentforge-eval-report
+        path: agentforge/api/eval/reports/
+        retention-days: 14
+        if-no-files-found: warn

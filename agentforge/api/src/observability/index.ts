@@ -1,3 +1,38 @@
+/**
+ * Observability — Langfuse-backed trace surface for the Clinical Co-Pilot.
+ *
+ * One chat turn = one Langfuse trace, keyed by the request's `correlation_id`.
+ * Inside that trace are three step types, each surfaced through a separate
+ * method on the `Observability` interface:
+ *
+ *   - **Spans** (`recordToolCall`)   — tool executions with start + end times
+ *                                      and input / output payloads. The caller
+ *                                      MUST `await span.end(...)` so latency
+ *                                      captures even on failure.
+ *   - **Events** (`recordEvent`)     — instantaneous markers: verification
+ *                                      gates, security guards, cache hits.
+ *                                      No duration, no end call.
+ *   - **Generations** (`recordLlmCall`) — LLM calls with model name, token
+ *                                      usage, and dollar cost (pulled from
+ *                                      Langfuse's model-price database when
+ *                                      a canonical model name is passed).
+ *
+ * Every meta payload runs through the PHI redactor in `redact.ts` before it
+ * leaves this process — see OBSERVABILITY.md §"PHI redactor" for the
+ * deny-list policy and the deliberate over-redaction trade-off.
+ *
+ * Failure isolation: every Langfuse SDK call is wrapped in try/catch with a
+ * warn-level log fallback. Observability never crashes a chat turn. When the
+ * env keys are placeholder values (`replace-me`) or `NODE_ENV=test`, the
+ * client is never instantiated and the methods short-circuit to no-ops.
+ *
+ * Graceful shutdown: `shutdown()` flushes the Langfuse batch queue. Wired into
+ * SIGTERM / SIGINT handlers in `index.ts` so traces aren't lost on deploy.
+ *
+ * Architectural narrative, the four "brief questions" answered, and known
+ * limitations live in OBSERVABILITY.md at repo root.
+ */
+
 import { Langfuse } from 'langfuse';
 import type { Env } from '../env.js';
 import { redactPhi } from './redact.js';

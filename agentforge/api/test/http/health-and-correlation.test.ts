@@ -46,8 +46,71 @@ describe('correlation + health', () => {
     expect(body.deps).toEqual({
       openemr_module: 'ok',
       postgres: 'reachable',
-      langfuse: 'unknown',
+      langfuse: 'ok',
     });
+  });
+});
+
+describe('GET /health — Langfuse reachability probe', () => {
+  const env = testEnv();
+
+  it('reports langfuse: "ok" when the public health endpoint returns 200', async () => {
+    stubProbeFetch((url) => {
+      if (url.includes('/api/public/health')) {
+        return new Response(JSON.stringify({ status: 'OK' }), { status: 200 });
+      }
+      // OpenEMR module probe path — return 200 so it doesn't dominate the assertion.
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    });
+    const app = buildApp(env, createObservability(env), createStubPgPool());
+
+    const body = (await (await app.request('/health')).json()) as { ok: boolean; deps: Record<string, string> };
+    expect(body.deps.langfuse).toBe('ok');
+    expect(body.ok).toBe(true);
+  });
+
+  it('reports langfuse: "unreachable" on non-200 response without flipping overall ok', async () => {
+    stubProbeFetch((url) => {
+      if (url.includes('/api/public/health')) {
+        return new Response('boom', { status: 503 });
+      }
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    });
+    const app = buildApp(env, createObservability(env), createStubPgPool());
+
+    const body = (await (await app.request('/health')).json()) as { ok: boolean; deps: Record<string, string> };
+    expect(body.deps.langfuse).toBe('unreachable');
+    // Losing observability does not break the chat surface — overall ok stays true.
+    expect(body.ok).toBe(true);
+  });
+
+  it('reports langfuse: "unreachable" when the probe fetch rejects', async () => {
+    stubProbeFetch((url) => {
+      if (url.includes('/api/public/health')) {
+        return Promise.reject(new TypeError('Failed to fetch'));
+      }
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    });
+    const app = buildApp(env, createObservability(env), createStubPgPool());
+
+    const body = (await (await app.request('/health')).json()) as { ok: boolean; deps: Record<string, string> };
+    expect(body.deps.langfuse).toBe('unreachable');
+    expect(body.ok).toBe(true);
+  });
+
+  it('reports langfuse: "not_configured" when keys are placeholder values', async () => {
+    stubProbeFetch(() => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const placeholderEnv = {
+      ...env,
+      LANGFUSE_PUBLIC_KEY: 'replace-me',
+      LANGFUSE_SECRET_KEY: 'replace-me',
+    };
+    const app = buildApp(placeholderEnv, createObservability(placeholderEnv), createStubPgPool());
+
+    const body = (await (await app.request('/health')).json()) as { ok: boolean; deps: Record<string, string> };
+    expect(body.deps.langfuse).toBe('not_configured');
+    // Placeholder Langfuse keys are a deploy-time concern, not a runtime failure.
+    expect(body.ok).toBe(true);
   });
 });
 

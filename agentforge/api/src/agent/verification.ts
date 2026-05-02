@@ -1,3 +1,25 @@
+/**
+ * Clinical verification layer — runs after the LLM produces its draft response
+ * and after every tool call has returned. Strips uncited claims, blocks unbacked
+ * negative statements, flags impossible vitals, and warns on medication-status
+ * conflicts. If every block in a turn is stripped, returns a single refusal.
+ *
+ * Four layers, each anchored to a PRD section:
+ *   1. Citation enforcement (§9.1) — every claim cites a tool-result UUID.
+ *   2. Negative-claim backing (§9.3) — "no allergies on file" requires an
+ *      empty-query observation; otherwise the claim is stripped.
+ *   3. BP range guard (§9.2.3) — defense-in-depth numeric parser; flags
+ *      systolic outside [40,300] or diastolic outside [20,200].
+ *   4. Medication-inactive warning — claims of chronic-use language that cite
+ *      a row marked inactive/discontinued surface as a warning, not a strip.
+ *
+ * Cross-patient leak short-circuits before any block is examined and returns
+ * `blocked_cross_patient_tool_args`.
+ *
+ * Architectural story, known limitations, and interview-defense framing live
+ * in VERIFICATION.md at repo root.
+ */
+
 import type { Observability } from '../observability/index.js';
 import type { ChatBlock } from '../openemr/types.js';
 import type { ClinicalToolEvidence } from './toolEvidence.js';
@@ -69,6 +91,13 @@ function backingForNegativeLabs(ev: ClinicalToolEvidence): boolean {
 
 /**
  * Gates 3–6 — deterministic verification pipeline (§9.1 §9.2 §9.3 slices).
+ *
+ * LIMITATION (fidelity drift): citation enforcement guarantees every claim has
+ * a matching tool-result UUID, but does not check that the claim's prose
+ * accurately represents the cited row's values. A model that quotes a wrong
+ * dose for a correctly-cited medication will pass verification. Defense
+ * against this requires a structured-extraction pass and is deferred to V2.
+ * See VERIFICATION.md §"What verification does NOT catch" §1.
  */
 export async function verifyClinicalBlocks(
   obs: Observability,

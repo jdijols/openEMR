@@ -190,18 +190,28 @@ Verification trusts the tool-evidence aggregate. If a tool returns malicious or 
 
 Verification operates on the final assembled response. We do not stream tokens to the client; the full response is built, verified, and returned in one shot. This is a UX cost (the user waits for the whole turn) chosen as a verification cost (we never have to retract a token we already sent). For a real-time clinical use case at higher volumes a streaming version would need a token-level commit-or-rollback design, which is significant additional engineering.
 
+### 7. External evidence grounding
+
+Verification checks claims against the patient's chart. It does not check claims against the medical literature. If a clinician asks *"what's the recommended A1c target for a 68-year-old with type 2 diabetes and hypertension?"*, the question is not about this patient's data — it's about general medical knowledge. There is no chart record to verify against, and the existing four layers do not fire.
+
+V1's posture on these questions is **deferral**: the system prompt instructs the model to redirect general medical knowledge questions to clinician judgment rather than answer them with a recommendation. That keeps the verification layer's chart-only scope honest — the agent does not ship "subjective AI recommendations" dressed as evidence-backed answers — but it does mean the agent can't help with the kind of treatment-threshold questions a more capable co-pilot would ideally answer.
+
+The natural V2 extension is *evidence-based citation*: a separate safety layer that grounds general medical knowledge in peer-reviewed sources via a `lookup_clinical_evidence` tool over PubMed, NEJM, OpenEvidence, or similar. The existing citation-enforcement architecture already does the right thing on UUIDs from any tool, including external ones — adding the new tool wouldn't require redesigning the verification layer, only registering a new source pack and extending citation rendering to handle external URLs alongside in-chart navigation. See [Documentation/AgentForge/implementation/v2-roadmap.md](Documentation/AgentForge/implementation/v2-roadmap.md) for the design sketch.
+
+The boundary matters for interview defense: V1 verification is about *chart fidelity*, not *clinical correctness writ large*. Conflating the two would make the four-layer story look thinner than it is — and would obscure the deferral posture that is itself a deliberate safety choice.
+
 ---
 
 ## Open gaps for follow-up code work
 
-Items the audit surfaced that the next chat will fix:
+The four initial gaps from the audit pass that produced this document are now closed:
 
-- **Inline doc anchor for verification flow position** — add a comment at [agentforge/api/src/agent/orchestrator.ts:660](agentforge/api/src/agent/orchestrator.ts:660) explicitly stating *"this is the verification gate; runs post-LLM, post-tool, pre-return; see VERIFICATION.md for the four layers."* Right now the position is inferable from code order but not signposted.
-- **Module-level docblock in `verification.ts`** — the current file has function-level comments but no top-of-file docblock that names the four layers and their PRD section anchors. A future maintainer reading the file cold sees the regex constants first; they should see the architecture statement first.
-- **Fidelity-drift TODO marker** — the limitation in §1 above (citation valid, content drifts from source) is real and unmarked in the code. A `// LIMITATION:` comment on `verifyClinicalBlocks` linking to this doc gives future contributors the context to consider before extending the layer.
-- **Negative-claim coverage matrix** — the regex set is narrow on purpose, but there is no test fixture enumerating which paraphrases the layer does and does not catch. A small `verification-negative-coverage.test.ts` would convert the limitation in §2 above from "documented" to "regression-tested."
+- **Inline signpost at the verification call site** — added at [agentforge/api/src/agent/orchestrator.ts:660](agentforge/api/src/agent/orchestrator.ts:660). The comment block names the gate, its position in the flow, and points back to this doc.
+- **Module-level docblock naming the four layers** — added at the top of [agentforge/api/src/agent/verification.ts](agentforge/api/src/agent/verification.ts). A future maintainer opening the file cold now sees the architecture statement before the regex constants.
+- **Fidelity-drift LIMITATION marker** — added as a LIMITATION block on the `verifyClinicalBlocks` JSDoc in the same file. Documents the citation-valid-but-content-drifts gap from §"What verification does NOT catch" §1 in the code itself, with a forward pointer to V2.
+- **Negative-claim paraphrase coverage matrix** — added at [agentforge/api/test/agent/verification-negative-coverage.test.ts](agentforge/api/test/agent/verification-negative-coverage.test.ts). 24 cases: paraphrases the regex catches (must stay caught), paraphrases the regex misses by design (must stay missed without a doc update), and clinical surfaces V1 doesn't cover at all. Converts the §"What verification does NOT catch" §2 limitation from "documented" to "regression-tested."
 
-These are all follow-ups, not blockers. The verification system as it stands satisfies the brief's two requirements (source attribution + domain constraint enforcement) and openly documents what it doesn't.
+The verification system satisfies the brief's two requirements (source attribution + domain constraint enforcement) and openly documents what it doesn't. New gaps will be appended here as they surface.
 
 ---
 

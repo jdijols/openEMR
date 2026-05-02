@@ -1,0 +1,5 @@
+# Per-run JSON reports written by `npm run eval`. Build artifacts keyed by
+# run_id; grow unboundedly and are not meant to be committed. The CI
+# workflow uploads them as artifacts on failure (see .github/workflows/
+# agentforge-eval.yml) — that is the canonical archive surface.
+reports/

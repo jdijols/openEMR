@@ -1,9 +1,24 @@
 /**
  * Gate 3 (G3-13) — tiny in-repo heuristic rates (USD). Not invoicing-grade; PHI-free.
+ *
+ * These rates are keyed by provider, NOT by canonical model name, so they are a
+ * coarse approximation. The Langfuse-side cost (computed against Langfuse's
+ * model-price database keyed on the model name we pass via `getProviderModelId`)
+ * is the authoritative number — see OBSERVABILITY.md §Q4 for that path.
+ *
+ * The values below are the V1 default-deployment rates:
+ *   - `anthropic`     → claude-haiku-4-5 ($1 / $5 per Mtok input / output)
+ *   - `openai_azure`  → operator-supplied deployment id, no canonical model;
+ *                       leave at a conservative GPT-4-class default until a
+ *                       per-deployment table is added
+ *   - `openai`        → same conservative default as openai_azure
+ *
+ * If the operator changes Anthropic's default model to a non-Haiku model
+ * (Sonnet, Opus), update this table or move to a per-model lookup.
  */
 
 const RATES_USD_PER_MTOK: Partial<Record<string, { input: number; output: number }>> = {
-  anthropic: { input: 3.0, output: 15.0 },
+  anthropic: { input: 1.0, output: 5.0 },
   openai_azure: { input: 5.0, output: 15.0 },
   openai: { input: 5.0, output: 15.0 },
 };

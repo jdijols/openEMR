@@ -30,6 +30,15 @@ const V1_WRITE_TARGETS = new Set<string>([
   'allergy_update',
 ]);
 
+/**
+ * Performance budget for a full eval run. The runner is purely deterministic —
+ * no network calls, no LLM, no DB. Typical wall-clock is under one second.
+ * Exceeding this threshold is a strong signal someone has accidentally added
+ * an external call or heavy I/O; the warning surfaces in the run summary
+ * without failing the run.
+ */
+const PERF_BUDGET_MS = 5000;
+
 type StepKind = 'proposal' | 'confirm' | 'openemr_write';
 
 type Step = Readonly<{ kind: StepKind; proposal_id: string }>;
@@ -69,6 +78,96 @@ type CheckResult = Readonly<{
   detail?: string;
 }>;
 
+/**
+ * Per-check field-level validation. Runs after the basic case-level shape check
+ * in `loadCuratedCases` and asserts that each case's `context` (or `steps[]`,
+ * for legacy `no_write_without_confirm` cases) carries the fields the rule
+ * needs to evaluate. The goal is to fail loudly at load time on a malformed
+ * fixture — not at evaluation time with a confusing rule error.
+ *
+ * Inline `typeof` checks (rather than Zod) keep the runner's "no runtime
+ * dependency on the rest of the API" property. Schema is small enough that
+ * the verbosity is worth the simplicity.
+ */
+function validateCaseShape(filename: string, c: CuratedCase): void {
+  const check: CheckName = c.check ?? 'no_write_without_confirm';
+  switch (check) {
+    case 'no_write_without_confirm': {
+      const steps = c.steps;
+      if (!Array.isArray(steps)) {
+        throw new Error(`invalid_case_structure:${filename} — 'steps' must be an array`);
+      }
+      for (const [i, s] of steps.entries()) {
+        if (typeof s !== 'object' || s === null) {
+          throw new Error(`invalid_case_structure:${filename} — steps[${i}] must be an object`);
+        }
+        const kind = (s as Step).kind;
+        if (kind !== 'proposal' && kind !== 'confirm' && kind !== 'openemr_write') {
+          throw new Error(
+            `invalid_case_structure:${filename} — steps[${i}].kind must be 'proposal' | 'confirm' | 'openemr_write', got ${String(kind)}`,
+          );
+        }
+        if (typeof (s as Step).proposal_id !== 'string') {
+          throw new Error(
+            `invalid_case_structure:${filename} — steps[${i}].proposal_id must be a string`,
+          );
+        }
+      }
+      return;
+    }
+    case 'unsupported_write_target_rejected': {
+      const ctx = c.context ?? {};
+      if (typeof ctx['write_target'] !== 'string') {
+        throw new Error(
+          `invalid_case_structure:${filename} — '${check}' requires context.write_target: string`,
+        );
+      }
+      // `rejected` / `rejection_reason` may be absent for V1 supported targets;
+      // the rule itself short-circuits to a no-op in that branch.
+      return;
+    }
+    case 'cross_patient_blocked': {
+      const ctx = c.context ?? {};
+      if (
+        typeof ctx['bound_patient_uuid'] !== 'string' ||
+        typeof ctx['request_patient_uuid'] !== 'string'
+      ) {
+        throw new Error(
+          `invalid_case_structure:${filename} — '${check}' requires context.bound_patient_uuid and context.request_patient_uuid (both strings)`,
+        );
+      }
+      return;
+    }
+    case 'internal_disclosure_blocked': {
+      const ctx = c.context ?? {};
+      if (!Array.isArray(ctx['blocks'])) {
+        throw new Error(
+          `invalid_case_structure:${filename} — '${check}' requires context.blocks: array`,
+        );
+      }
+      return;
+    }
+    case 'vitals_parser_uncertain_not_guess': {
+      const ctx = c.context ?? {};
+      if (typeof ctx['parser_output'] !== 'string') {
+        throw new Error(
+          `invalid_case_structure:${filename} — '${check}' requires context.parser_output: string`,
+        );
+      }
+      return;
+    }
+    case 'negative_claim_requires_empty_query': {
+      const ctx = c.context ?? {};
+      if (typeof ctx['negative_claim'] !== 'boolean') {
+        throw new Error(
+          `invalid_case_structure:${filename} — '${check}' requires context.negative_claim: boolean`,
+        );
+      }
+      return;
+    }
+  }
+}
+
 function loadCuratedCases(dir: string): CuratedCase[] {
   try {
     return readdirSync(dir)
@@ -93,6 +192,7 @@ function loadCuratedCases(dir: string): CuratedCase[] {
             `invalid_case_structure:${name} — '${json.check}' requires a 'context' object`,
           );
         }
+        validateCaseShape(name, json);
         return json;
       });
   } catch (e: unknown) {
@@ -265,6 +365,7 @@ function evaluateCase(c: CuratedCase): RuleResult {
 }
 
 export async function main(): Promise<number> {
+  const startedAtMs = Date.now();
   const dir = join(here, 'cases', 'curated');
   const cases = loadCuratedCases(dir);
 
@@ -313,11 +414,17 @@ export async function main(): Promise<number> {
     return acc;
   }, {});
 
+  const durationMs = Date.now() - startedAtMs;
+  const overBudget = durationMs > PERF_BUDGET_MS;
+
   writeFileSync(
     outPath,
     JSON.stringify(
       {
         run_id: runId,
+        duration_ms: durationMs,
+        perf_budget_ms: PERF_BUDGET_MS,
+        perf_over_budget: overBudget,
         correlation_ids: [
           ...new Set(checks.map((c) => c.correlation_id).filter((x): x is string => x !== null)),
         ],
@@ -332,8 +439,26 @@ export async function main(): Promise<number> {
 
   const failures = checks.filter((c) => !c.evaluation_passes).length;
 
+  if (overBudget) {
+    // Warning to stderr — does not fail the run, but signals that the harness
+    // may have grown an external call or heavy I/O. The runner is meant to be
+    // deterministic and sub-second.
+    console.warn(
+      `eval_perf_warning: run took ${durationMs}ms, exceeding the ${PERF_BUDGET_MS}ms budget. ` +
+        `If a tool call, network call, or filesystem walk has been added, the runner has lost its purity.`,
+    );
+  }
+
   console.info(
-    JSON.stringify({ run_id: runId, cases: checks.length, failures, report: outPath, aggregate }),
+    JSON.stringify({
+      run_id: runId,
+      cases: checks.length,
+      failures,
+      duration_ms: durationMs,
+      perf_over_budget: overBudget,
+      report: outPath,
+      aggregate,
+    }),
   );
   return failures > 0 ? 1 : 0;
 }

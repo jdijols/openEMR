@@ -657,6 +657,9 @@ export async function runChatTurn(
 
   const evidence = buildClinicalToolEvidence(input.patientUuid, mergedToolResults);
 
+  // Verification gate — runs post-LLM, post-tool, pre-return. The four layers
+  // (citation enforcement, negative-claim backing, BP range guard, med-inactive
+  // warning) and their known limitations live in VERIFICATION.md at repo root.
   blocks = await verifyClinicalBlocks(observability, correlationId, blocks, evidence);
 
   const usage = result.totalUsage;

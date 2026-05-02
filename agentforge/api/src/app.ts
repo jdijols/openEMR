@@ -90,6 +90,43 @@ async function probeOpenEmrModule(env: Env): Promise<'ok' | 'secret_mismatch' | 
   return 'unreachable';
 }
 
+/**
+ * Active Langfuse reachability probe. Does NOT validate credentials — just
+ * confirms the API container can reach the configured Langfuse host. Returns
+ * `not_configured` when keys are still placeholder values (the observability
+ * layer short-circuits to no-ops in that case anyway). A non-`ok` result
+ * never gates overall `/health.ok` because losing observability does not
+ * break the chat surface — see OBSERVABILITY.md §"Failure isolation".
+ */
+const LANGFUSE_HEALTH_PROBE_TIMEOUT_MS = 1500;
+
+async function probeLangfuse(env: Env): Promise<'ok' | 'unreachable' | 'not_configured'> {
+  if (env.LANGFUSE_PUBLIC_KEY === 'replace-me' || env.LANGFUSE_SECRET_KEY === 'replace-me') {
+    return 'not_configured';
+  }
+
+  const base = env.LANGFUSE_BASE_URL.replace(/\/$/, '');
+  const url = `${base}/api/public/health`;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), LANGFUSE_HEALTH_PROBE_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(url, { method: 'GET', signal: controller.signal });
+  } catch {
+    return 'unreachable';
+  } finally {
+    clearTimeout(timer);
+  }
+
+  // Langfuse Cloud's `/api/public/health` returns 200 with `{"status":"OK"}`
+  // when the ingest API is healthy. Self-hosted Langfuse v2 exposes the same
+  // path. Anything else means the host responded but the API surface is
+  // degraded — treat as `unreachable` from the operator's perspective.
+  return res.status === 200 ? 'ok' : 'unreachable';
+}
+
 const chatRequestSchema = z.object({
   session_token: z.string().min(1),
   patient_uuid: z.string().min(1),
@@ -131,9 +168,10 @@ export function buildApp(
   app.use('*', corsAllowlistMiddleware(env));
 
   app.get('/health', async (c) => {
-    const [postgres_probe, openemr_module_probe] = await Promise.all([
+    const [postgres_probe, openemr_module_probe, langfuse_probe] = await Promise.all([
       probePostgres(pgPool),
       probeOpenEmrModule(env),
+      probeLangfuse(env),
     ]);
 
     return c.json({
@@ -143,7 +181,7 @@ export function buildApp(
       deps: {
         openemr_module: openemr_module_probe,
         postgres: postgres_probe === 'ok' ? 'reachable' : 'degraded_chat_requires_migrations_or_url',
-        langfuse: 'unknown',
+        langfuse: langfuse_probe,
       },
     });
   });
