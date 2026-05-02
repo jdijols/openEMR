@@ -9,8 +9,12 @@ function noopObs(): Observability {
     async traceTurn(input) {
       return { id: 't', correlationId: input.correlationId };
     },
-    async recordToolCall() {},
+    async recordToolCall() {
+      return { end: async () => {} };
+    },
+    async recordEvent() {},
     async recordLlmCall() {},
+    async shutdown() {},
   };
 }
 

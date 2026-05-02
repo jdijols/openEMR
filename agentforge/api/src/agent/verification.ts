@@ -6,7 +6,7 @@ const NEGATIVE_ALLERGY_PATTERN = /\b(no|without|denies)\b.+allerg/i;
 const NEGATIVE_LABS_PATTERN = /\bno\s+(recent\s+)?labs?\b|\b(without\s+).*\blabs?\b/i;
 
 async function emitCategory(obs: Observability, correlationId: string, category: string): Promise<void> {
-  await obs.recordToolCall({ correlationId, toolName: 'verification', meta: { category } });
+  await obs.recordEvent({ correlationId, name: `verification.${category}`, meta: { category } });
 }
 
 /**

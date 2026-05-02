@@ -69,6 +69,14 @@ function recordingObs(): {
             ? { name: `tool:${toolName}`, correlationId }
             : { name: `tool:${toolName}`, correlationId, meta },
         );
+        return { end: async () => {} };
+      },
+      async recordEvent({ correlationId, name, meta }) {
+        events.push(
+          meta === undefined
+            ? { name: `event:${name}`, correlationId }
+            : { name: `event:${name}`, correlationId, meta },
+        );
       },
       async recordLlmCall({ correlationId, providerModel, meta }) {
         events.push(
@@ -77,6 +85,7 @@ function recordingObs(): {
             : { name: `llm:${providerModel}`, correlationId, meta },
         );
       },
+      async shutdown() {},
     },
   };
 }
@@ -447,7 +456,7 @@ describe('runChatTurn (PRD §5.7 wiring)', () => {
     expect(events).toEqual([
       { name: 'traceTurn', correlationId: 'corr-sec' },
       {
-        name: 'tool:security_guard',
+        name: 'event:security_guard.internal_disclosure_block',
         correlationId: 'corr-sec',
         meta: { category: 'internal_disclosure_block' },
       },
@@ -556,8 +565,8 @@ describe('runChatTurn (PRD §5.7 wiring)', () => {
 
     expect(events.map((e) => e.name)).toEqual([
       'traceTurn',
-      `llm:${env.LLM_PROVIDER}`,
-      `llm:${env.LLM_PROVIDER}`,
+      'llm:claude-haiku-4-5',
+      'llm:claude-haiku-4-5',
     ]);
     expect(events.every((e) => e.correlationId === 'corr-xyz')).toBe(true);
   });

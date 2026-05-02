@@ -14,7 +14,7 @@ import { createProposeWriteTools } from '../tools/propose_writes.js';
 import { estimateUsdForProviderTokens } from './cost_estimate.js';
 import { todayInFacilityTz } from './local_date.js';
 import { CLINICAL_SYSTEM_PROMPT } from './system_prompt.js';
-import { getChatModel } from './model.js';
+import { getChatModel, getProviderModelId } from './model.js';
 import { buildCitationNavigationIndex, buildClinicalToolEvidence, type CitationNavigationHint } from './toolEvidence.js';
 import { verifyClinicalBlocks } from './verification.js';
 import { type AiToolResultLike, isToolResultLike } from './tool_results.js';
@@ -570,9 +570,9 @@ export async function runChatTurn(
     : randomUUID();
 
   if (isInternalDisclosureRequest(input.userMessage)) {
-    await observability.recordToolCall({
+    await observability.recordEvent({
       correlationId,
-      toolName: 'security_guard',
+      name: 'security_guard.internal_disclosure_block',
       meta: { category: 'internal_disclosure_block' },
     });
 
@@ -619,9 +619,10 @@ export async function runChatTurn(
   };
 
   const model = getChatModel(env);
+  const providerModelId = getProviderModelId(env);
   await observability.recordLlmCall({
     correlationId,
-    providerModel: env.LLM_PROVIDER,
+    providerModel: providerModelId,
     meta: { phase: 'request' },
   });
 
@@ -640,6 +641,7 @@ export async function runChatTurn(
       `patient_uuid for this turn: ${input.patientUuid}\nactive_encounter_id for this turn: ${boundEncounterId}\nserver_today: ${today}\n\nUser: ${input.userMessage}`
     : `patient_uuid for this turn: ${input.patientUuid}\nactive_encounter_id for this turn: <none — the rail was launched without a bound encounter; either an encounter has not been saved yet, or this rail iframe is stale and needs to be reopened after the physician saved the encounter form>\nserver_today: ${today}\n\nUser: ${input.userMessage}`;
 
+  const llmStartedAtMs = Date.now();
   const result = await generateText({
     model,
     system: CLINICAL_SYSTEM_PROMPT,
@@ -662,12 +664,18 @@ export async function runChatTurn(
     estimateUsdForProviderTokens(env.LLM_PROVIDER, usage?.inputTokens, usage?.outputTokens) ?? null;
   const costMeta =
     usage === undefined
-      ? { phase: 'response_completed', traceId: trace.id, cost_usd: null as number | null }
+      ? {
+          phase: 'response_completed',
+          traceId: trace.id,
+          start_time_ms: llmStartedAtMs,
+          cost_usd: null as number | null,
+        }
       : {
           phase: 'response_completed',
           traceId: trace.id,
           correlation_id: correlationId,
           provider: env.LLM_PROVIDER,
+          start_time_ms: llmStartedAtMs,
           input_tokens: usage.inputTokens ?? null,
           output_tokens: usage.outputTokens ?? null,
           cost_usd: costUsd ?? null,
@@ -677,7 +685,7 @@ export async function runChatTurn(
 
   await observability.recordLlmCall({
     correlationId,
-    providerModel: env.LLM_PROVIDER,
+    providerModel: providerModelId,
     meta: costMeta as Record<string, unknown>,
   });
 

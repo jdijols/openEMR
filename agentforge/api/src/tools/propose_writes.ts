@@ -102,30 +102,39 @@ export function createProposeWriteTools(
           return { ok: false as const, error: bound.error };
         }
 
-        await obs.recordToolCall({ correlationId, toolName: 'propose_chief_complaint_write', meta: {} });
-
-        const proposalId = randomUUID();
-
-        await insertPendingProposal(pool, {
-          proposalId,
-          conversationInternalId: ctx.conversationInternalId,
-          patientUuid: input.patient_uuid.toLowerCase(),
-          encounterId: input.encounter_id,
-          writeTarget: 'chief_complaint',
-          payload: { reason: input.reason.trim() },
+        const span = await obs.recordToolCall({
+          correlationId,
+          toolName: 'propose_chief_complaint_write',
+          meta: {},
         });
+        try {
+          const proposalId = randomUUID();
 
-        const preview = `Chief complaint (encounter #${input.encounter_id}) → ${input.reason.trim().slice(0, 280)}`;
+          await insertPendingProposal(pool, {
+            proposalId,
+            conversationInternalId: ctx.conversationInternalId,
+            patientUuid: input.patient_uuid.toLowerCase(),
+            encounterId: input.encounter_id,
+            writeTarget: 'chief_complaint',
+            payload: { reason: input.reason.trim() },
+          });
 
-        return {
-          ok: true as const,
-          proposal_id: proposalId,
-          write_target: 'chief_complaint',
-          preview,
-          patient_uuid: input.patient_uuid.toLowerCase(),
-          encounter_id: input.encounter_id,
-          payload: { reason: input.reason.trim() },
-        };
+          const preview = `Chief complaint (encounter #${input.encounter_id}) → ${input.reason.trim().slice(0, 280)}`;
+
+          await span.end({ meta: { proposal_id: proposalId, write_target: 'chief_complaint' } });
+          return {
+            ok: true as const,
+            proposal_id: proposalId,
+            write_target: 'chief_complaint',
+            preview,
+            patient_uuid: input.patient_uuid.toLowerCase(),
+            encounter_id: input.encounter_id,
+            payload: { reason: input.reason.trim() },
+          };
+        } catch (e) {
+          await span.end({ error: e });
+          throw e;
+        }
       },
     }),
 
@@ -138,30 +147,45 @@ export function createProposeWriteTools(
           return { ok: false as const, error: bound.error };
         }
 
-        await obs.recordToolCall({ correlationId, toolName: 'propose_vitals_write', meta: {} });
-
-        const proposalId = randomUUID();
-
-        await insertPendingProposal(pool, {
-          proposalId,
-          conversationInternalId: ctx.conversationInternalId,
-          patientUuid: input.patient_uuid.toLowerCase(),
-          encounterId: input.encounter_id,
-          writeTarget: 'vitals',
-          payload: { ...input.vitals },
+        const span = await obs.recordToolCall({
+          correlationId,
+          toolName: 'propose_vitals_write',
+          meta: {},
         });
+        try {
+          const proposalId = randomUUID();
 
-        const preview = `Vitals (encounter #${input.encounter_id}) — ${Object.keys(input.vitals).join(', ')}`;
+          await insertPendingProposal(pool, {
+            proposalId,
+            conversationInternalId: ctx.conversationInternalId,
+            patientUuid: input.patient_uuid.toLowerCase(),
+            encounterId: input.encounter_id,
+            writeTarget: 'vitals',
+            payload: { ...input.vitals },
+          });
 
-        return {
-          ok: true as const,
-          proposal_id: proposalId,
-          write_target: 'vitals',
-          preview,
-          patient_uuid: input.patient_uuid.toLowerCase(),
-          encounter_id: input.encounter_id,
-          payload: { ...input.vitals },
-        };
+          const preview = `Vitals (encounter #${input.encounter_id}) — ${Object.keys(input.vitals).join(', ')}`;
+
+          await span.end({
+            meta: {
+              proposal_id: proposalId,
+              write_target: 'vitals',
+              vital_keys: Object.keys(input.vitals),
+            },
+          });
+          return {
+            ok: true as const,
+            proposal_id: proposalId,
+            write_target: 'vitals',
+            preview,
+            patient_uuid: input.patient_uuid.toLowerCase(),
+            encounter_id: input.encounter_id,
+            payload: { ...input.vitals },
+          };
+        } catch (e) {
+          await span.end({ error: e });
+          throw e;
+        }
       },
     }),
 
@@ -174,27 +198,36 @@ export function createProposeWriteTools(
           return { ok: false as const, error: bound.error };
         }
 
-        await obs.recordToolCall({ correlationId, toolName: 'propose_tobacco_write', meta: {} });
-
-        const proposalId = randomUUID();
-
-        await insertPendingProposal(pool, {
-          proposalId,
-          conversationInternalId: ctx.conversationInternalId,
-          patientUuid: input.patient_uuid.toLowerCase(),
-          encounterId: null,
-          writeTarget: 'tobacco',
-          payload: { status: input.status },
+        const span = await obs.recordToolCall({
+          correlationId,
+          toolName: 'propose_tobacco_write',
+          meta: {},
         });
+        try {
+          const proposalId = randomUUID();
 
-        return {
-          ok: true as const,
-          proposal_id: proposalId,
-          write_target: 'tobacco',
-          preview: `Tobacco → ${input.status}`,
-          patient_uuid: input.patient_uuid.toLowerCase(),
-          payload: { status: input.status },
-        };
+          await insertPendingProposal(pool, {
+            proposalId,
+            conversationInternalId: ctx.conversationInternalId,
+            patientUuid: input.patient_uuid.toLowerCase(),
+            encounterId: null,
+            writeTarget: 'tobacco',
+            payload: { status: input.status },
+          });
+
+          await span.end({ meta: { proposal_id: proposalId, write_target: 'tobacco' } });
+          return {
+            ok: true as const,
+            proposal_id: proposalId,
+            write_target: 'tobacco',
+            preview: `Tobacco → ${input.status}`,
+            patient_uuid: input.patient_uuid.toLowerCase(),
+            payload: { status: input.status },
+          };
+        } catch (e) {
+          await span.end({ error: e });
+          throw e;
+        }
       },
     }),
 
@@ -207,44 +240,55 @@ export function createProposeWriteTools(
           return { ok: false as const, error: bound.error };
         }
 
-        await obs.recordToolCall({ correlationId, toolName: 'propose_allergy_write', meta: {} });
-
-        const proposalId = randomUUID();
-
-        const allergyPayload: Record<string, unknown> = { action: input.action };
-        if (input.substance !== undefined) {
-          allergyPayload['substance'] = input.substance;
-        }
-
-        if (input.allergy_uuid !== undefined) {
-          allergyPayload['allergy_uuid'] = input.allergy_uuid.toLowerCase();
-        }
-
-        if (input.reaction !== undefined) {
-          allergyPayload['reaction'] = input.reaction;
-        }
-
-        if (input.severity !== undefined) {
-          allergyPayload['severity'] = input.severity;
-        }
-
-        await insertPendingProposal(pool, {
-          proposalId,
-          conversationInternalId: ctx.conversationInternalId,
-          patientUuid: input.patient_uuid.toLowerCase(),
-          encounterId: null,
-          writeTarget: 'allergy',
-          payload: allergyPayload,
+        const span = await obs.recordToolCall({
+          correlationId,
+          toolName: 'propose_allergy_write',
+          meta: {},
         });
+        try {
+          const proposalId = randomUUID();
 
-        return {
-          ok: true as const,
-          proposal_id: proposalId,
-          write_target: 'allergy',
-          preview: `${input.action}`,
-          patient_uuid: input.patient_uuid.toLowerCase(),
-          payload: allergyPayload,
-        };
+          const allergyPayload: Record<string, unknown> = { action: input.action };
+          if (input.substance !== undefined) {
+            allergyPayload['substance'] = input.substance;
+          }
+
+          if (input.allergy_uuid !== undefined) {
+            allergyPayload['allergy_uuid'] = input.allergy_uuid.toLowerCase();
+          }
+
+          if (input.reaction !== undefined) {
+            allergyPayload['reaction'] = input.reaction;
+          }
+
+          if (input.severity !== undefined) {
+            allergyPayload['severity'] = input.severity;
+          }
+
+          await insertPendingProposal(pool, {
+            proposalId,
+            conversationInternalId: ctx.conversationInternalId,
+            patientUuid: input.patient_uuid.toLowerCase(),
+            encounterId: null,
+            writeTarget: 'allergy',
+            payload: allergyPayload,
+          });
+
+          await span.end({
+            meta: { proposal_id: proposalId, write_target: 'allergy', action: input.action },
+          });
+          return {
+            ok: true as const,
+            proposal_id: proposalId,
+            write_target: 'allergy',
+            preview: `${input.action}`,
+            patient_uuid: input.patient_uuid.toLowerCase(),
+            payload: allergyPayload,
+          };
+        } catch (e) {
+          await span.end({ error: e });
+          throw e;
+        }
       },
     }),
   };

@@ -18,6 +18,25 @@ import type { Env } from '../env.js';
 
 export const ANTHROPIC_DEFAULT_MODEL_ID = 'claude-haiku-4-5';
 
+/**
+ * Canonical model identifier for a given provider env. Returned as a string
+ * Langfuse's model-price database can match against (Anthropic publishes
+ * `claude-haiku-4-5`; Azure OpenAI uses the deployment id as the model name).
+ *
+ * Falls back to the provider name if a per-provider id is somehow missing
+ * — never throws, since this is called on the observability path.
+ */
+export function getProviderModelId(env: Env): string {
+  switch (env.LLM_PROVIDER) {
+    case 'anthropic':
+      return ANTHROPIC_DEFAULT_MODEL_ID;
+    case 'openai_azure':
+      return env.OPENAI_AZURE_DEPLOYMENT_ID ?? 'openai_azure';
+    default:
+      return env.LLM_PROVIDER;
+  }
+}
+
 export class UnsupportedLlmProviderError extends Error {
   constructor(public readonly provider: string) {
     super('unsupported_llm_provider');

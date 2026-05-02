@@ -22,3 +22,14 @@ const server = serve({ fetch: app.fetch, port }, () => {
   console.info(`agentforge-api listening on ${port}`);
 });
 injectWebSocket(server);
+
+const shutdown = async (signal: string): Promise<void> => {
+  console.info('agentforge_api_shutdown_begin', { signal });
+  try {
+    await observability.shutdown();
+  } finally {
+    server.close(() => process.exit(0));
+  }
+};
+process.on('SIGTERM', () => void shutdown('SIGTERM'));
+process.on('SIGINT', () => void shutdown('SIGINT'));

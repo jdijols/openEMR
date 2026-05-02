@@ -21,11 +21,16 @@ export function createGetIdentityTool(
         return { ok: false as const, error: bound.error };
       }
 
-      await obs.recordToolCall({ correlationId, toolName: 'get_identity', meta: {} });
+      const span = await obs.recordToolCall({
+        correlationId,
+        toolName: 'get_identity',
+        meta: {},
+      });
 
       try {
         const ctx = { sessionToken, correlationId };
         const row = await getIdentity(env, ctx, patient_uuid);
+        await span.end({ meta: { row_count: 1 } });
         return {
           ok: true as const,
           data: row,
@@ -33,8 +38,10 @@ export function createGetIdentityTool(
         };
       } catch (e) {
         if (e instanceof OpenEmrCallError) {
+          await span.end({ meta: { outcome: 'openemr_error' } });
           return { ok: false as const, error: 'openemr_error' as const };
         }
+        await span.end({ error: e });
         throw e;
       }
     },
