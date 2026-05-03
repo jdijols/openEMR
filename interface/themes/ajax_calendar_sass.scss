@@ -11,18 +11,17 @@ $side-calendar-date-padding: 0.3rem !default;
  * served the same template markup, so both need the rules).
  *
  * Distribution rules:
- *   - #dateNAV    hugs its content (the long date string + chevrons).
- *   - #viewPicker hugs its content too (5 buttons incl. Print/Refresh/
- *                 Day/Week/Month). It does not grow into wasted space and
- *                 — critically — does not shrink. This is the lever that
- *                 keeps Month off a second line whenever the Clinical
- *                 Copilot rail narrows the calendar iframe: the previous
- *                 `flex: 1 1 0` made viewPicker share shrink with #functions
- *                 even though viewPicker needs roughly twice the room, so
- *                 viewPicker hit content limit first and Month wrapped.
- *   - #functions  absorbs ALL the slack (grow + shrink). It only contains
- *                 a few icon buttons, so it can take any extra width when
- *                 wide and tolerate shrinking when narrow. */
+ *   - #functions and #viewPicker share IDENTICAL flex values so they
+ *     each absorb half of the slack. That visually centres #dateNAV
+ *     between them instead of pinning it to one side.
+ *   - #dateNAV hugs its content (the long date string + chevrons).
+ *   - `min-width: max-content` on both side groups is the lever that
+ *     keeps Month off a second line: it pins each group's lower bound
+ *     at its own intrinsic width so #viewPicker (5 buttons, ~290 px)
+ *     can never shrink below what fits Month inline. In wide layouts
+ *     both groups grow past max-content and stay equal; in narrow
+ *     layouts each pegs at its own content width and #functions
+ *     (smaller) gives back room first — but neither wraps. */
 #topToolbarRight {
   display: flex;
   flex-wrap: nowrap;
@@ -34,7 +33,7 @@ $side-calendar-date-padding: 0.3rem !default;
 
 #functions {
   flex: 1 1 0;
-  min-width: 0;
+  min-width: max-content;
   text-align: $left;
 }
 
@@ -47,7 +46,8 @@ $side-calendar-date-padding: 0.3rem !default;
 }
 
 #viewPicker {
-  flex: 0 0 auto;
+  flex: 1 1 0;
+  min-width: max-content;
   text-align: $right;
   white-space: nowrap;
   display: flex;

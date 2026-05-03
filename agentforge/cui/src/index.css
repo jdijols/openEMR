@@ -251,15 +251,18 @@ body {
   box-shadow: var(--af-focus-ring);
 }
 
-/* Right column: two icon buttons (visit-history + refresh). Gap matches
-   `.agentforge-cui__title-group` AND the header's own left/right padding
-   (`var(--af-s4)`) so every horizontal gap in the header strip — edge↔
-   name, name↔Today, clock↔refresh, refresh↔edge — reads as one
-   consistent rhythm. */
+/* Right column: two icon buttons (visit-history + refresh). Gap is
+   intentionally tighter than `.agentforge-cui__title-group` because at
+   the rail's minimum width the title-group fills the row and `Today`
+   sits flush against the icon group — at that point a 16 px right-pair
+   gap looks visibly larger than the natural Today↔clock proximity. The
+   tighter 8 px keeps all three buttons reading as one consistent
+   rhythm at min width without disturbing the left-column 16 px gap
+   the user already approved. */
 .agentforge-cui__header-actions {
   display: flex;
   align-items: center;
-  gap: var(--af-s4);
+  gap: var(--af-s2);
   flex-shrink: 0;
 }
 
