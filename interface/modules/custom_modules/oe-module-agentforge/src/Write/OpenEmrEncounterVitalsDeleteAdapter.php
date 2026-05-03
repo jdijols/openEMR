@@ -62,12 +62,16 @@ final class OpenEmrEncounterVitalsDeleteAdapter implements EncounterVitalsDelete
         }
 
         try {
+            // OpenEMR canonical soft-delete on the forms table is `deleted = 1`
+            // (the table has no `activity` column — that lives on the form-specific
+            // `form_vitals` table only). Core OpenEMR queries filter
+            // `WHERE deleted = 0` consistently (see library/forms.inc.php).
             QueryUtils::sqlStatementThrowException(
-                "UPDATE forms SET activity = 0 WHERE form_id = ? AND formdir = 'vitals' AND pid = ? AND encounter = ? LIMIT 1",
+                "UPDATE forms SET deleted = 1 WHERE form_id = ? AND formdir = 'vitals' AND pid = ? AND encounter = ? LIMIT 1",
                 [$formVitalsId, $pid, $encounterNumericId],
             );
             // The JOIN above already verified the encounter binding; the form_vitals
-            // row is keyed by (id, pid) — no `eid` column exists on this table.
+            // row is keyed by (id, pid) — there is no `eid` column on this table.
             QueryUtils::sqlStatementThrowException(
                 "UPDATE form_vitals SET activity = 0 WHERE id = ? AND pid = ? LIMIT 1",
                 [$formVitalsId, $pid],
