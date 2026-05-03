@@ -794,6 +794,17 @@ body {
   border-color: var(--af-success-700);
 }
 
+.agentforge-msg__proposal-btn--danger {
+  border-color: var(--af-danger-700);
+  background: var(--af-danger);
+  color: #ffffff;
+}
+
+.agentforge-msg__proposal-btn--danger:hover:not(:disabled) {
+  background: var(--af-danger-600);
+  border-color: var(--af-danger-700);
+}
+
 .agentforge-msg__proposal-btn--secondary {
   border-color: var(--af-border-strong);
   background: var(--af-surface);

@@ -15,7 +15,7 @@ import AssistantMarkdown from './AssistantMarkdown.js';
  * `duplicate_proposal`, `unauthenticated`, `missing_encounter_id`) are
  * self-diagnosing without a server log dive.
  */
-function formatDeliveryFailure(verb: 'Confirm' | 'Decline', err: unknown): string {
+function formatDeliveryFailure(verb: 'Confirm' | 'Decline' | 'Delete' | 'Cancel', err: unknown): string {
   if (err instanceof AgentForgeDeliveryError) {
     const code = err.serverError ?? err.kind;
     const corr =
@@ -297,6 +297,29 @@ function IconMicCheck(): ReactElement {
   );
 }
 
+function IconTrash(): ReactElement {
+  return (
+    <svg
+      className="agentforge-msg__icon"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M3 6h18" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M19 6 17.6 19.1A2 2 0 0 1 15.6 21H8.4a2 2 0 0 1-2-1.9L5 6" />
+      <path d="M10 11v6M14 11v6" />
+    </svg>
+  );
+}
+
 function IconBan(): ReactElement {
   return (
     <svg
@@ -416,6 +439,10 @@ function ProposalBlock(
   const showDecisionButtons =
     !voiceDone && (ui.phase === 'idle' || ui.phase === 'submitting');
   const surfaceState = surfaceStateFor(ui, voiceDone);
+  // Delete-type proposals get a destructive button pair (Delete/Cancel, red primary, trash
+  // icon) instead of the default Confirm/Reject. Detected by `_delete` suffix so future
+  // delete targets (e.g. medication_delete) pick this up automatically.
+  const isDelete = props.block.write_target.endsWith('_delete');
 
   function statusText(): string {
     if (voiceDone) {
@@ -474,7 +501,7 @@ function ProposalBlock(
         setUiAndPersist({ phase: 'openemr_denied', openemrReason: outcome.reason });
       }
     } catch (e) {
-      setUiAndPersist({ phase: 'delivery_failed', deliveryMessage: formatDeliveryFailure('Confirm', e) });
+      setUiAndPersist({ phase: 'delivery_failed', deliveryMessage: formatDeliveryFailure(isDelete ? 'Delete' : 'Confirm', e) });
     }
   }
 
@@ -488,7 +515,7 @@ function ProposalBlock(
       await postProposalReject(env.apiBase, env.sessionToken, env.patientUuid, env.conversationId, proposalId);
       setUiAndPersist({ phase: 'declined' });
     } catch (e) {
-      setUiAndPersist({ phase: 'delivery_failed', deliveryMessage: formatDeliveryFailure('Decline', e) });
+      setUiAndPersist({ phase: 'delivery_failed', deliveryMessage: formatDeliveryFailure(isDelete ? 'Cancel' : 'Decline', e) });
     }
   }
 
@@ -522,12 +549,16 @@ function ProposalBlock(
         <div className="agentforge-msg__proposal-actions">
           <button
             type="button"
-            className="agentforge-msg__proposal-btn agentforge-msg__proposal-btn--primary"
+            className={
+              isDelete ?
+                'agentforge-msg__proposal-btn agentforge-msg__proposal-btn--danger'
+              : 'agentforge-msg__proposal-btn agentforge-msg__proposal-btn--primary'
+            }
             onClick={() => void onConfirm()}
             disabled={!canInteract}
           >
-            <IconCheck />
-            <span>Confirm</span>
+            {isDelete ? <IconTrash /> : <IconCheck />}
+            <span>{isDelete ? 'Delete' : 'Confirm'}</span>
           </button>
           <button
             type="button"
@@ -536,7 +567,7 @@ function ProposalBlock(
             disabled={!canInteract}
           >
             <IconX />
-            <span>Reject</span>
+            <span>{isDelete ? 'Cancel' : 'Reject'}</span>
           </button>
         </div>
       : null}
