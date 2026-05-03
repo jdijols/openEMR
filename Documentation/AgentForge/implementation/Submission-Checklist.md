@@ -43,6 +43,83 @@ Interview, where the rationale may need to be defended.
 
 ---
 
+## Feedback response (cohort instructor reviews)
+
+Two prior submissions received written instructor feedback. Each actionable
+point is mapped here to the deliverable it touches and given an explicit
+status so nothing slips through. Praise items are kept verbatim for AI
+Interview context but require no action.
+
+### Submission 2 — Early Submission (Thursday)
+
+> **Strengths called out (verbatim):** "13 LLM-callable tools with real
+> dynamic selection via the Vercel AI SDK, a citation-attribution verifier
+> with fail-closed behavior, Langfuse-backed token/cost/latency tracing on a
+> self-hosted VPS, and a live app with a confirmed end-to-end briefing
+> workflow. The audit and architecture documents are excellent: specific
+> OpenEMR file-level findings with code citations, direct cross-references
+> between audit constraints and architecture decisions, and a well-reasoned
+> integration path."
+>
+> **Main gap (verbatim):** "Three use cases in USERS.md is too thin a
+> foundation for this stage, and 13 eval cases needs to grow significantly.
+> These two gaps close together — every new use case you add should cascade
+> into at least one new tool path and three new eval fixtures."
+
+**Action items (instructor priority order):**
+
+| #    | Feedback point                                                                                                                                                | Maps to                                                                                                                              | Status                                                                                                                                                                                  |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F2-1 | Put the **live URL in the README** — first thing any reviewer checks                                                                                          | Deliverable 1 (Repository) → root [`README.md`](../../../README.md) "AgentForge Clinical Copilot" section                            | ⏳ **open** — README update is already on the deliverable-1 to-do list; ship it first this morning                                                                                       |
+| F2-2 | **Expand to 7+ use cases.** Suggested: abnormal lab follow-up, medication reconciliation, pre-procedure anticoagulation check                                 | Deliverable 3 ([`USERS.md`](../../../USERS.md)) — currently 3 use cases (UC-A / UC-B / UC-C); each new use case cascades to ≥1 new tool path + ≥3 new eval fixtures | ⚠️ **at-risk** — full +4 expansion is unrealistic by 12:00 CT today. **Triage decision needed before recording demo** — see triage note below                                            |
+| F2-3 | Add **failure-mode eval cases:** all-domains-unavailable, provider timeout, conflicting medication records, constraint-boundary (describes a med change vs. recommends it) | Deliverable 6 (Eval Dataset) — current suite covers happy path + S1 cross-patient binding; missing systemic-failure + constraint-boundary | ⏳ **open** — these are self-contained eval fixtures (no new use-case prerequisite); achievable in remaining time independent of F2-2 outcome                                            |
+
+**Triage note (F2-2 — use-case expansion under deadline pressure).** Adding
+4 net-new use cases by 12:00 CT today is not realistic without cutting other
+Gate 7 work. Realistic options, in priority order:
+
+- **(a) Add 1 new use case + 3 eval fixtures + document the other two as
+  V2 backlog.** *Abnormal lab follow-up* has the lowest tool-cascade cost
+  because it reuses the existing labs Context endpoint. Medication
+  reconciliation and pre-procedure anticoagulation get a one-paragraph
+  entry each in [`USERS.md`](../../../USERS.md) §7 ("V1 does not include")
+  with a "deferred to V2 — rationale" note. **Recommended.**
+- **(b) Hold at 3 use cases**, document the gap explicitly in
+  [`USERS.md`](../../../USERS.md) and acknowledge it in the demo video as a
+  known V1 boundary. Lowest risk to schedule, highest risk to grading.
+- **(c) Cut other Gate 7 polish** (social post draft, Loom polish, README
+  formatting) to free time for 2+ new use cases. Not recommended — the
+  remaining Gate 7 work is more visible to graders than borderline-quality
+  use cases would be.
+
+Pick before recording the demo so the video script aligns with what's
+actually shipping.
+
+### Submission 1 — MVP (Tuesday)
+
+> **Verdict (verbatim):** MVP **passed**. Strengths: scope narrowing,
+> "thinking through this like an actual product, not just an AI demo," user
+> definition + workflow mapping (before/during/after visit), tied directly
+> into architectural decisions. "Choices around keeping OpenEMR as the
+> source of truth, handling permissions in PHP, and enforcing confirmation
+> on writes show strong awareness of real constraints."
+>
+> **Critique at the time (verbatim):** "You didn't show proof of the system
+> actually running — no deployed app, no walkthrough of OpenEMR, and no
+> audit surfaced. For early submission, you need a live deployed
+> environment, a full audit with key findings, and a working agent loop
+> even if narrow."
+
+**Status of MVP critique points:**
+
+- [x] **Live deployed environment** — VPS at `https://108-61-145-220.nip.io` (closed Gate 6, 2026-05-01)
+- [x] **Full audit with key findings** — [`AUDIT.md`](../../../AUDIT.md) at repo root, all five lanes covered (Security / Performance / Architecture / Data Quality / Compliance)
+- [x] **Working agent loop** — UC-A auto brief + UC-B propose-confirm-write + UC-C recap, end-to-end on the live VPS, confirmed via 2026-05-01 re-smoke
+
+No outstanding MVP-critique work; all three gaps closed by Gate 5 / Gate 6.
+
+---
+
 ## Submission deliverables
 
 Order matches the PDF Submission Requirements table.
@@ -59,13 +136,14 @@ pointer to [`Documentation/AgentForge/README.md`](../README.md), but **does not
 yet include the deployed link or an explicit AgentForge setup section**.
 
 **To-do:**
-- [ ] Confirm the GitLab repo is **publicly viewable** (or graders have access) and `master` is current with the deployed build
-- [ ] Add a top-level "AgentForge Clinical Copilot" section to [`README.md`](../../../README.md) with:
-  - [ ] **Deployed link** (live URL — currently `https://108-61-145-220.nip.io`)
-  - [ ] **Setup guide** link or short block — point at [`docker/development-easy/`](../../../docker/development-easy/) plus [`process/04-stage1-local-dev-runbook.md`](../process/04-stage1-local-dev-runbook.md) and [`process/09-vps-live-deployment.md`](../process/09-vps-live-deployment.md)
-  - [ ] **Architecture overview** link to [`ARCHITECTURE.md`](../../../ARCHITECTURE.md)
-  - [ ] Pointers to [`AUDIT.md`](../../../AUDIT.md), [`USERS.md`](../../../USERS.md), [`PRD.md`](../../../PRD.md), [`JOURNEY.md`](../../../JOURNEY.md)
-- [ ] Verify `Assisted-by: Claude Code` trailers exist where AI helped (per [`CLAUDE.md`](../../../CLAUDE.md) AI Assistance Trailer policy)
+- [x] GitLab repo at `https://labs.gauntletai.com/jasondijols/openemr.git` is **publicly viewable** — confirmed by user 2026-05-03.
+- [~] `master` is current with the deployed build — local `master` in sync with `gitlab/master`; user confirmed essentially up-to-date. Five working-tree files (Submission-Checklist.md, v2-roadmap.md, README.md, VERIFICATION.md, agentforge/api/src/agent/system_prompt.ts) will land in a staging commit + push **before** final submission.
+- [x] **README.md has a top-level Clinical Copilot section** — README was wholesale rewritten as a Clinical Copilot landing page (commit `a0d505905`); supersedes the original "add section" plan.
+  - [x] **Deployed link** — README line 6 + line 100, prominently placed under the title
+  - [x] **Setup guide** — README lines 101–102 link [`docker/development-easy/`](../../../docker/development-easy/), [`process/04-stage1-local-dev-runbook.md`](../process/04-stage1-local-dev-runbook.md), and [`process/09-vps-live-deployment.md`](../process/09-vps-live-deployment.md)
+  - [x] **Architecture overview** — README line 94 + Documentation table line 114 link [`ARCHITECTURE.md`](../../../ARCHITECTURE.md)
+  - [x] **Pointers to AUDIT / USERS / PRD / JOURNEY** — Documentation table at README lines 113–121 lists all four plus VERIFICATION, EVALUATION, OBSERVABILITY, and TASKS
+- [~] **(USER)** `Assisted-by: Claude Code` trailers — 23 commits already carry the trailer; the recent run (last ~10 commits) is clean. One older commit lacks it: `4a928113d UI updates, agent hardening, Gate 6 complete`. Decide whether to leave that as-is or note in submission that AI assistance applied across the build.
 
 ### 2. Audit Document — `./AUDIT.md`
 
