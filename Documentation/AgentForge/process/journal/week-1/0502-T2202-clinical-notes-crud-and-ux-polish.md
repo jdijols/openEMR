@@ -142,3 +142,25 @@ Sunday noon CT deadline ~22 hours out at session start. Gate 6 already closed. E
 6. **Demo-data hygiene is a recurring task, not a one-time cleanup.** Internal markers (`[AgentForge Intake]`, `(demo seed)`) leak into clinician-visible surfaces; needs a periodic grep/sweep before any demo.
 7. **Author attribution carries clinical signal.** Two notes both authored by `physician` made it impossible to tell intake (front-desk/MA) from progress (physician) at a glance. Distinct usernames per role is a small change with disproportionate readability gain.
 8. **WS state staleness across API restarts is a known transient.** Symptom: `Dictation failed (not_recording)`. Cause: client iframe holds a reference to a WebSocket whose server-side bag was wiped by a `tsx watch` reload. Fix: refresh the rail. Worth a runbook entry if it recurs in prod.
+
+## Outcomes
+
+- AgentForge has full clinical-note CRUD: read, append-write, by-uuid update, by-uuid soft-delete. The chief_complaint write path no longer captures physician dictation by default — that legacy bug is fixed.
+- The encounter view (`form_encounter.reason`, vitals, Clinical Notes Form) auto-refreshes after every confirmed write — operators no longer click the encounter Refresh tab to see what they just confirmed.
+- Demo data no longer leaks internal markers into clinician-visible UI: encounter reasons read clean, MA intake notes show natural prose authored by `clinician` (not `physician`), and vitals render in clinician-friendly units (`Temp 97.8°F`, `Wt 220 lb`, `Ht 5'10"`) instead of raw DECIMAL trailing zeros.
+- Commit `df39efdf0` shipped the change; this journal lives at the canonical CT-timestamped path under `process/journal/week-1/`.
+
+## Next steps
+
+- [ ] Add a runbook entry for the "WebSocket staleness across API restarts" transient (lesson #8): symptom, diagnosis, fix. Suggested file: `Documentation/AgentForge/runbooks/dictation-not-recording.md`.
+- [ ] Decide whether `propose_clinical_note_edit` `action: 'update'` should grow a third sub-action for granular line edits (replace-substring within description) or whether the current full-description-replacement model is sufficient. Defer until a real demo case forces it.
+- [ ] Add a follow-up sweep to grep for any remaining demo-only text in clinician-visible surfaces (`grep -rn 'AgentForge\|demo seed\|Intake]'` across `interface/`, `agentforge/api/src/`, `agentforge/cui/src/`).
+- [ ] Decide whether the per-vital formatters in `case_presentation_format.ts` should also apply when the agent calls `get_vitals` directly (currently formatting only happens in the case-brief assembler; agent tool-call view sees raw decimals).
+- [ ] Confirm push timing for `gitlab` remote (Gauntlet grading remote): branch is now 3 commits ahead.
+
+## Links
+
+- Commit: `df39efdf0` — `feat(agentforge): clinical notes CRUD + dictation routing rewrite + encounter auto-refresh + UX polish`
+- Related prior journal: [0502-T1822-submission-docs-punch-list.md](0502-T1822-submission-docs-punch-list.md) (the parallel work on submission docs that ran alongside the early part of this session)
+- Related prior journal: [0502-T0051-encounter-scope-binding-brief.md](0502-T0051-encounter-scope-binding-brief.md) (earlier encounter-binding work that the dictation routing rules build on)
+- Module README: [oe-module-agentforge/README.md](../../../../interface/modules/custom_modules/oe-module-agentforge/README.md)
