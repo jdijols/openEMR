@@ -13,7 +13,7 @@ This is a **planning artifact**, not a binding plan. Each candidate has a fit no
 
 ## Anchoring assumptions
 
-- V1 has shipped per [submission-checklist.md](submission-checklist.md).
+- V1 has shipped per [Submission-Checklist.md](Submission-Checklist.md).
 - The four V1 verification layers stay in place; V2 extends them, doesn't replace them.
 - The active-chart binding model from PRD §8.1 is preserved; cross-patient leakage remains a stop-the-line invariant.
 - The propose → confirm → write contract is preserved for every write target, including any V2 additions.
@@ -129,4 +129,4 @@ Pick one workstream, write a real PRD with stop-the-line invariants and eval cas
 - [USERS.md §7.1](../../../USERS.md) — V1 "does not include" list, source for Theme 2 candidates.
 - [ARCHITECTURE.md](../../../ARCHITECTURE.md) — V1 architecture reference, including Compliance-2 and Cost-snapshot anchors used here.
 - [clinical-copilot-task-list.md](clinical-copilot-task-list.md) — V1 task list shape; V2 PRDs should follow the same gate structure.
-- [submission-checklist.md](submission-checklist.md) — V1 ship gate.
+- [Submission-Checklist.md](Submission-Checklist.md) — V1 ship gate.

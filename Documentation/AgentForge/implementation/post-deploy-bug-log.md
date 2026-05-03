@@ -2,9 +2,10 @@
 title: AgentForge — Post-deploy bug log (prod VPS)
 source: Manual smoke after 0501-T0014 deploy of `d2b8f3621` (Gates 3–5 + STT)
 created: 2026-05-01
-status: fixes-shipped 2026-05-01 — awaiting prod re-smoke
+status: fixes-shipped 2026-05-01 + redeployed to prod 2026-05-02 (commit `fb9613edb`) — full P1/P2/P3 re-smoke deferred to morning
 related_journal: ../process/journal/week-1/0501-T0014-prod-deploy-gates3-5-vps.md
 closure_journal: ../process/journal/week-1/0501-T1430-post-deploy-bugs-p1-p3-closed.md
+followup_deploy_journal: ../process/journal/week-1/0502-T0208-langfuse-observability-prod-deploy.md
 ---
 
 # Post-deploy bug log — prod VPS (`108-61-145-220.nip.io`)
@@ -17,12 +18,12 @@ The user explicitly deferred fixes to the next session — this file is the **pi
 
 ## Triage summary
 
-| #   | Bug                                                                | Severity | Likely surface                                | Blocks       | Status (2026-05-01)                                  |
-| --- | ------------------------------------------------------------------ | -------- | --------------------------------------------- | ------------ | ---------------------------------------------------- |
-| P1  | Confirmed write returns denied/failed                              | Critical | Write executor / OpenEMR S2S / pending ledger | Gate 4 demo  | **fix shipped** — `70af8e309`, awaiting prod re-smoke |
-| P2  | Dictation often replies "no recent encounter for active patient"   | High     | Encounter binding / handshake context / cache | Gate 5 demo  | **fix shipped** — `20dd57f32`, awaiting prod re-smoke |
-| P3  | Auto brief intermittently blank; "Refresh chart" doesn't recover   | High     | Case-presentation fetch / cache / streaming   | Gate 3 demo  | **fix shipped** — `a0cb1662f`, awaiting prod re-smoke |
-| M1  | Meta — overall agent hardening pass needed before video capture    | High     | Cross-cutting (orchestrator, retries, logging)| G7 demo cut  | partial — observability spine `20c716935`; rest in G6-19 |
+| #   | Bug                                                                | Severity | Likely surface                                | Blocks       | Status (2026-05-02)                                                                    |
+| --- | ------------------------------------------------------------------ | -------- | --------------------------------------------- | ------------ | -------------------------------------------------------------------------------------- |
+| P1  | Confirmed write returns denied/failed                              | Critical | Write executor / OpenEMR S2S / pending ledger | Gate 4 demo  | **fix shipped + redeployed** (`70af8e309` + tonight's `fb9613edb`); full E2E re-smoke deferred to morning |
+| P2  | Dictation often replies "no recent encounter for active patient"   | High     | Encounter binding / handshake context / cache | Gate 5 demo  | **fix shipped + redeployed** (`20dd57f32` + tonight's `fb9613edb`); full E2E re-smoke deferred to morning |
+| P3  | Auto brief intermittently blank; "Refresh chart" doesn't recover   | High     | Case-presentation fetch / cache / streaming   | Gate 3 demo  | **fix shipped + redeployed** (`a0cb1662f` + tonight's `fb9613edb`); browser smoke 2026-05-02 confirms auto-brief renders against cloned MariaDB on prod |
+| M1  | Meta — overall agent hardening pass needed before video capture    | High     | Cross-cutting (orchestrator, retries, logging)| G7 demo cut  | substantially closed — observability spine `20c716935` + tonight's Langfuse wiring (`ca2006f74`) gives turn-level traces, tool spans, model+tokens+cost on prod |
 
 ---
 

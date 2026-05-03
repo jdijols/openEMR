@@ -94,7 +94,7 @@ The submission package now has all six instructor-facing docs at repo root (AUDI
 
 - [ ] Push to `gitlab` (Gauntlet remote) and possibly `origin` per user's call.
 - [ ] Optional: mirror `.github/workflows/agentforge-eval.yml` to `.gitlab-ci.yml` if Gauntlet enforcement matters before submission.
-- [ ] Continue submission preparation per [submission-checklist.md](../../implementation/Submission-Checklist.md) — Loom, social post, `submission.md` URL bundle.
+- [ ] Continue submission preparation per [Submission-Checklist.md](../../implementation/Submission-Checklist.md) — Loom, social post, `submission.md` URL bundle.
 - [ ] Run the `update-submission-files` skill once against a real code change (e.g., the parallel clinical-note write work) to verify the auto-apply flow in practice.
 
 ## Links
@@ -102,4 +102,4 @@ The submission package now has all six instructor-facing docs at repo root (AUDI
 - Commit `2b99defb7` — VERIFICATION + EVALUATION + OBSERVABILITY docs at repo root + update-submission-files skill.
 - Commit `885e15e28` — 15-item punch list closure: schema validation, perf budget, eval README, CI workflow, redactor coverage matrix, Langfuse `/health` probe, observability runbook, V2 roadmap.
 - Related milestones: [process/15-gate6-complete.md](../../15-gate6-complete.md) (Gate 6 close — eval + observability infrastructure), [process/18-langfuse-observability-cost-analysis.md](../../18-langfuse-observability-cost-analysis.md) (Langfuse-live in prod).
-- Submission-side: [submission-checklist.md](../../implementation/Submission-Checklist.md), [v2-roadmap.md](../../implementation/v2-roadmap.md).
+- Submission-side: [Submission-Checklist.md](../../implementation/Submission-Checklist.md), [v2-roadmap.md](../../implementation/v2-roadmap.md).

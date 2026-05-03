@@ -36,6 +36,7 @@ This folder holds **course and process documentation** for the Clinical Co-Pilot
 | 15  | [process/15-gate6-complete.md](process/15-gate6-complete.md)                 | Gate 6 eval + observability + deploy closed (G6-01..G6-18 + G6-20); LLM provider swap + eval-runner refactor + Context HTTP-matrix backfill; handoff to Gate 7 |
 | 16  | [process/16-clinical-copilot-acl-role-gate.md](process/16-clinical-copilot-acl-role-gate.md) | **Access control:** who may use Clinical Co-Pilot (`agentforge/use`, `propose_write`) vs excluded preset roles; GACL layering; examiner links |
 | 17  | [process/17-encounter-scoped-chart-bind-and-brief.md](process/17-encounter-scoped-chart-bind-and-brief.md) | **Open encounter scope:** appointment click context → session + AgentForge binder; brief vitals + Context `encounter_id` (not calendar “today”) |
+| 18  | [process/18-langfuse-observability-cost-analysis.md](process/18-langfuse-observability-cost-analysis.md) | **Observability live + AI cost appendix:** real Langfuse client (cloud) replacing the G6-07 stub — tool spans, LLM generations with model + tokens + cost, PHI-redacted; G7-07 [`ai-cost-analysis.md`](implementation/ai-cost-analysis.md) shipped; deployed to prod |
 
 Dated entries under `process/journal/week-N/` are session journals between milestones; they are not listed in the table.
 

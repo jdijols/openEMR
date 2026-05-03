@@ -16,7 +16,7 @@ This document records gaps, inconsistencies, and risks identified by auditing th
 | # | Issue | Severity | Blocks |
 |---|-------|----------|--------|
 | 1 | AI Cost Analysis missing entirely from task list | Critical | Final submission |
-| 2 | Loom/demo video length conflict: task list says ≤12 min, PDF says 3–5 min | Critical | Final submission |
+| 2 | ~~Loom/demo video length conflict: task list says ≤12 min, PDF says 3–5 min~~ **RESOLVED 2026-05-02:** ~5 min target, ≤7 min cap; updated across task list G7-01, PRD §13.2, and submission checklist | Critical | ~~Final submission~~ closed |
 | 3 | Gate 1 + Gate 2 targeting the same calendar day is not credible | High | Thu early submission |
 | 4 | No Postgres client or migration framework setup task exists | High | Gate 4 |
 | 5 | Vercel AI SDK + Hono streaming integration complexity not called out | High | Gate 2 smoke test |
@@ -44,7 +44,7 @@ This document records gaps, inconsistencies, and risks identified by auditing th
 
 ---
 
-## Issue 2 — Demo Video Length Conflict
+## Issue 2 — Demo Video Length Conflict — **RESOLVED 2026-05-02**
 
 **Task list (G7-01):** `≤12 minutes`, citing PRD §13.2.
 
@@ -52,9 +52,10 @@ This document records gaps, inconsistencies, and risks identified by auditing th
 
 **The conflict:** The PRD is your internal document. The PDF is the Gauntlet grader's authoritative requirement. A 12-minute video submitted against a 3–5 minute expectation is at direct risk of grader penalization. The PRD's §13.2 is wrong relative to the source requirement.
 
-**Resolution needed:**
-- Decide which is authoritative and update G7-01 accordingly.
-- If targeting 3–5 minutes, the Loom script in §13.2 needs significant compression — UC-A, UC-B full loop, UC-C, and a refusal/safety demo cannot all be shown thoroughly in 5 minutes. The script must prioritize ruthlessly.
+**Resolution (2026-05-02):**
+- **Target ~5 min, ≤7 min cap.** Cohort guidance allows mild leniency past the 3–5 min PDF wording, but the prior 8–12 min budget is gone.
+- **Updates landed:** task list `G7-01` row, PRD §0.3 checklist (line 35), PRD §13.2.1 script outline header + per-section timings, PRD §13.2.2 "Done means" length line, and the new [`Submission-Checklist.md`](./Submission-Checklist.md).
+- **Script compression to do at record time:** the original §13.2.1 outline lists 6 sections × longer budgets; the per-section minute estimates have been compressed but the script *content* may need additional trimming (fewer dictation examples, optional rejection path) to actually fit ~5 min.
 
 ---
 
@@ -187,7 +188,7 @@ Mark items below as resolved when a decision is made and the task list is update
 | # | Resolved | Resolution summary |
 |---|----------|--------------------|
 | 1 | [ ] | |
-| 2 | [ ] | |
+| 2 | [x] | 2026-05-02 — Demo video target ~5 min, ≤7 min cap; G7-01, PRD §13.2, and `Submission-Checklist.md` all updated. |
 | 3 | [ ] | |
 | 4 | [ ] | |
 | 5 | [ ] | |

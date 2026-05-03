@@ -32,7 +32,7 @@ The Gauntlet AgentForge submission requires four artifacts. The PRD's "done" def
 
 - [ ] **Repo deliverables in this fork:** [`AUDIT.md`](AUDIT.md), [`USERS.md`](USERS.md), [`ARCHITECTURE.md`](ARCHITECTURE.md), this [`PRD.md`](PRD.md), and the implementation code under `interface/modules/custom_modules/oe-module-agentforge/`, `agentforge/api/`, `agentforge/cui/`, and `docker/agentforge/`.
 - [ ] **Live URL** — public HTTPS endpoint served by Caddy on a Linux VPS (default: Vultr per [`process/09-vps-live-deployment.md`](Documentation/AgentForge/process/09-vps-live-deployment.md)). OpenEMR shell + co-pilot reachable to graders.
-- [ ] **Loom** — 8-12 minute walkthrough hitting architecture decisions, UC-A, UC-B (with at least one confirmed write demonstrated end-to-end), and UC-C.
+- [ ] **Loom** — **~5 min walkthrough (≤7 min cap)** per Gauntlet PDF Submission Requirements row 5 ("Demo Video (3–5 min)"); hitting architecture decisions, UC-A, UC-B (with at least one confirmed write demonstrated end-to-end), and UC-C.
 - [ ] **Social post** — X or LinkedIn thread per the case study, tagging `@GauntletAI`.
 
 ### 0.4 Owners
@@ -1987,24 +1987,26 @@ At least 3, ideally 5, of the live OpenEMR cohort patients are pre-selected as t
 
 ### 13.2 Loom
 
-#### 13.2.1 Script outline (target 8-12 minutes)
+#### 13.2.1 Script outline (target ~5 min, ≤7 min cap)
 
-Section 1 — **Architecture** (~2 min). Walk the [`ARCHITECTURE.md`](ARCHITECTURE.md) system diagram. Call out: VPS + Compose, PHP module + Node API split, BAA egress, self-hosted Langfuse.
+> **2026-05-02:** Compressed from the original 8–12 min budget to match Gauntlet PDF Submission Requirements row 5 ("Demo Video (3–5 min)"). At record time, expect to **trim script content further** — fewer dictation examples in §3, fold §4 audit walk-through into §3 if needed, drop §5 or §6 if running long.
 
-Section 2 — **UC-A pre-room briefing** (~2 min). Open the briefing patient. The rail auto-opens and the brief auto-fires once. Show source-cited claims, the "what changed" item, and click a citation to navigate. Mention the cache: closing the chart and re-opening replays the cached brief — no second LLM call.
+Section 1 — **Architecture** (~45 s). Walk the [`ARCHITECTURE.md`](ARCHITECTURE.md) system diagram. Call out: VPS + Compose, PHP module + Node API split, BAA egress, self-hosted Langfuse.
 
-Section 3 — **UC-B in-room writes** (~3-4 min). Open the vitals patient. Start transcript (tap mode). Dictate a chief complaint, vitals (incl. pain/H/W), tobacco status, and an allergy add. Confirm each. Show one rejection path (decline a proposal) and one OpenEMR-rejected path if available. Show the audit row in MariaDB or in OpenEMR's log surface.
+Section 2 — **UC-A pre-room briefing** (~1 min). Open the briefing patient. The rail auto-opens and the brief auto-fires once. Show source-cited claims, the "what changed" item, and click a citation to navigate. Mention the cache: closing the chart and re-opening replays the cached brief — no second LLM call.
 
-Section 4 — **UC-B post-room confirm trail** (~1-2 min). End transcript. Walk through the confirmed proposals + audit rows in MariaDB to demonstrate that every write traces back to an explicit physician confirm. (UC-C "what did we capture" recap was cut 2026-05-01.)
+Section 3 — **UC-B in-room writes** (~2 min). Open the vitals patient. Start transcript (tap mode). Dictate a chief complaint and one vital (or allergy add) — confirm. Show **one** rejection path (decline a proposal). Show the audit row in MariaDB or in OpenEMR's log surface. (Original full coverage of vitals/H/W/tobacco/allergy + OpenEMR-rejected path moves to optional B-roll.)
 
-Section 5 — **Verification + observability** (~1 min). Show a Langfuse trace for one of the turns. Highlight the redacted body and the correlation id reaching the OpenEMR audit row.
+Section 4 — **UC-B post-room confirm trail** (~30 s). End transcript. One-line walk through the confirmed proposals + audit rows in MariaDB to demonstrate that every write traces back to an explicit physician confirm. (UC-C "what did we capture" recap was cut 2026-05-01.)
 
-Section 6 — **Refusal / safety** (~1 min). Demonstrate the prompt-injection refusal and the allergy-delete refusal (both from §12.3).
+Section 5 — **Verification + observability** (~30 s). Show a Langfuse trace for one of the turns. Highlight the redacted body and the correlation id reaching the OpenEMR audit row.
+
+Section 6 — **Refusal / safety** (~30 s). Demonstrate one refusal — prompt-injection or allergy-delete (both from §12.3); pick whichever lands cleanest.
 
 #### 13.2.2 Done means
 
 - [ ] Loom recorded, edited (cuts only — no narration overlay needed beyond live voice).
-- [ ] Length ≤ 12 minutes.
+- [ ] Length **~5 min target, ≤7 min cap** (per Gauntlet PDF Submission Requirements row 5: "Demo Video (3–5 min)"; cohort-confirmed mild leniency).
 - [ ] Loom URL recorded in the submission bundle.
 
 ### 13.3 Social post
