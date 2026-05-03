@@ -7,7 +7,7 @@
 ## Preconditions (handshake)
 
 - Stack: `docker compose -f docker/development-easy/docker-compose.yml -f docker/agentforge/docker-compose.override.yml up -d`; AgentForge API `npm run dev` (host) with Postgres reachable on `/health`.
-- OpenEMR: chart open, **encounter created and saved** so `$_SESSION['encounter']` binds; **Refresh chart** in co-pilot rail before dictation.
+- OpenEMR: chart open, **encounter created and saved** so `$_SESSION['encounter']` binds; **Refresh chart** in copilot rail before dictation.
 
 ## Successful run (evidence from DB snapshots)
 
@@ -44,5 +44,5 @@
 
 ## Handoff
 
-- **Gate 4** marked closed in [`implementation/clinical-copilot-task-list.md`](../../../implementation/clinical-copilot-task-list.md); milestone [`../../14-gate4-complete.md`](../../14-gate4-complete.md).
+- **Gate 4** marked closed in [`TASKS.md`](../../../../../TASKS.md); milestone [`../../14-gate4-complete.md`](../../14-gate4-complete.md).
 - **Next chat:** Gate 5 — STT + UC-C per task list § Gate 5.

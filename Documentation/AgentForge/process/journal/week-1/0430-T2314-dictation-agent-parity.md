@@ -80,7 +80,7 @@ Gate 4 (UC-B) + Gate 5 (STT) engineering closed earlier today. Manual smoke expo
 
 ## Next steps
 
-- [ ] **G5-08 live smoke on VPS:** redo the checklist in [`0430-T2145-gate5-stt-uc-c-manual-smoke.md`](./0430-T2145-gate5-stt-uc-c-manual-smoke.md) with the new build. Expected: dictated "BP 125 over 60" produces the vitals proposal card; dictated "yes, confirm" accepts it; recap lists it confirmed. Mark `[x]` G5-08 in [`clinical-copilot-task-list.md`](../../../implementation/clinical-copilot-task-list.md) when green.
+- [ ] **G5-08 live smoke on VPS:** redo the checklist in [`0430-T2145-gate5-stt-uc-c-manual-smoke.md`](./0430-T2145-gate5-stt-uc-c-manual-smoke.md) with the new build. Expected: dictated "BP 125 over 60" produces the vitals proposal card; dictated "yes, confirm" accepts it; recap lists it confirmed. Mark `[x]` G5-08 in [`TASKS.md`](../../../../../TASKS.md) when green.
 - [ ] **Pre-existing typecheck debt** in `agentforge/cui/src/api/client.ts` (lost `ChatBlock` / `ChatResponse` imports) — fold into the next CUI touch.
 - [ ] **Optional cleanup:** drop `BRIEF_ME_TRIGGER` from `onSubmit` in `App.tsx` since the brief auto-fires on chart open (user's observation this session).
 
@@ -89,4 +89,4 @@ Gate 4 (UC-B) + Gate 5 (STT) engineering closed earlier today. Manual smoke expo
 - Previous journal: [`0430-T2256-mic-enabled-on-load-and-assemblyai-stt.md`](./0430-T2256-mic-enabled-on-load-and-assemblyai-stt.md) — flagged this exact follow-up.
 - Gate 5 manual checklist: [`0430-T2145-gate5-stt-uc-c-manual-smoke.md`](./0430-T2145-gate5-stt-uc-c-manual-smoke.md).
 - Gate 4 milestone: [`process/14-gate4-complete.md`](../../14-gate4-complete.md).
-- Task list: [`clinical-copilot-task-list.md`](../../../implementation/clinical-copilot-task-list.md) (G5-08 row).
+- Task list: [`TASKS.md`](../../../../../TASKS.md) (G5-08 row).

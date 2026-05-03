@@ -1,7 +1,7 @@
 ---
 date: 2026-05-02
 topic: Submission checklist file + cross-file resolution of PDF-vs-repo conflicts
-related_milestone: ../../../implementation/clinical-copilot-task-list.md (Gate 7)
+related_milestone: ../../../../../TASKS.md (Gate 7)
 ---
 
 # Submission checklist + PDF-vs-repo resolutions — session journal
@@ -52,7 +52,7 @@ submission morning rather than re-deriving the requirement set from the PDF.
 - **Outcome:** Updated in
   [`PRD.md`](../../../../PRD.md) §0.3 line 35, §13.2.1 header + per-section
   timings, §13.2.2 done-means line; in
-  [`clinical-copilot-task-list.md`](../../../implementation/clinical-copilot-task-list.md)
+  [`TASKS.md`](../../../../../TASKS.md)
   G7-01 row; in
   [`open-questions.md`](../../../implementation/open-questions.md) Issue 2
   (priority row, detail section, resolution-tracking table); and in the new
@@ -97,7 +97,7 @@ submission morning rather than re-deriving the requirement set from the PDF.
 - **Flatten checklist to a single to-do list** — chose Status/To-do
   structure per deliverable to mirror sibling files
   ([`post-deploy-bug-log.md`](../../../implementation/post-deploy-bug-log.md),
-  [`clinical-copilot-task-list.md`](../../../implementation/clinical-copilot-task-list.md))
+  [`TASKS.md`](../../../../../TASKS.md))
   and to keep the "what exists vs what's left" split visible.
 
 ## Tools, dependencies, commands
@@ -107,7 +107,7 @@ _None this session._ (No skills installed/upgraded; no new dev deps.)
 ## Files touched
 
 - **Created:** `Documentation/AgentForge/implementation/Submission-Checklist.md`
-- **Modified:** `Documentation/AgentForge/implementation/clinical-copilot-task-list.md` (G7-01 row)
+- **Modified:** `TASKS.md` (G7-01 row)
 - **Modified:** `Documentation/AgentForge/implementation/open-questions.md` (Issue 2 priority summary, detail section, resolution-tracking table)
 - **Modified:** `PRD.md` (§0.3 line 35 Loom checklist; §13.2.1 header + 6 section timings + record-time trim note; §13.2.2 length line)
 
@@ -126,7 +126,7 @@ submission).
 
 ## Next steps
 
-- [ ] Update root [`README.md`](../../../../README.md) with an "AgentForge Clinical Co-Pilot" section: deployed link, setup pointer, ARCHITECTURE/AUDIT/USERS/PRD/JOURNEY links (deliverable 1 of the checklist)
+- [ ] Update root [`README.md`](../../../../README.md) with an "AgentForge Clinical Copilot" section: deployed link, setup pointer, ARCHITECTURE/AUDIT/USERS/PRD/JOURNEY links (deliverable 1 of the checklist)
 - [ ] Pull actual dev-spend numbers from Anthropic console + AssemblyAI dashboard into [`ai-cost-analysis.md`](../../../implementation/ai-cost-analysis.md) §3; flip G7-07 from `[~]` to `[x]`
 - [ ] Record the ~5 min demo video per the compressed [`PRD.md`](../../../../PRD.md) §13.2.1 script; trim content further at record time if it overruns
 - [ ] Draft the social post in `Documentation/AgentForge/social-post.md` and publish before 12:00 CT Sunday

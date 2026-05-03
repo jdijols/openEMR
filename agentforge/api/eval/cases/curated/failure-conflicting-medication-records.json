@@ -1,0 +1,22 @@
+{
+  "case_id": "failure-conflicting-medication-records-warned",
+  "check": "conflicting_medication_records_warned",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-failure-med-conflict",
+  "use_case": "Domain constraint: two tools return contradictory rows for lisinopril (active + discontinued). Verification must surface med_status_conflict warning, not silently pick one.",
+  "context": {
+    "medication_rows": [
+      { "drug": "lisinopril", "status": "active", "cite": "uuid-meds-active-1" },
+      { "drug": "lisinopril", "status": "discontinued", "cite": "uuid-meds-discontinued-2" },
+      { "drug": "metformin", "status": "active", "cite": "uuid-meds-active-3" }
+    ],
+    "blocks": [
+      {
+        "type": "warning",
+        "category": "med_status_conflict",
+        "message": "Source rows for lisinopril disagree on activity status; verify before relying on chronic-use language."
+      },
+      { "type": "claim", "text": "Lisinopril appears in the medication list.", "cite": ["uuid-meds-active-1"] }
+    ]
+  }
+}

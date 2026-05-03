@@ -19,7 +19,7 @@ Cluster 1.5 locked the v1 persona as adult PCP / family medicine, non-emergent v
 ### Decision: Treat OpenEMR session context as security context, not convenience state
 
 - **Prompt:** "How normal UI auth works... How session/site/patient context is established."
-- **Recommendation:** Record the browser UI path as `interface/globals.php` + `library/auth.inc.php` + session/global context. Site id, user auth state, `pid`, and `encounter` are all established through the existing OpenEMR runtime, and an embedded co-pilot must not bypass that context.
+- **Recommendation:** Record the browser UI path as `interface/globals.php` + `library/auth.inc.php` + session/global context. Site id, user auth state, `pid`, and `encounter` are all established through the existing OpenEMR runtime, and an embedded copilot must not bypass that context.
 - **Outcome:** [`AUDIT.md` §Security-1](../../../../AUDIT.md#security-1-browser-ui-authentication-and-chart-context-are-sessionglobal-driven) landed; presearch §3 and §12 now state that v1 chart reads must preserve the user's OpenEMR site/session/patient context.
 
 ### Decision: Separate OAuth scopes from clinical role policy

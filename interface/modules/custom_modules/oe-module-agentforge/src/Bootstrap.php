@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Header icon + right-rail shim for the Clinical Co-Pilot (PRD §4.1, §4.2 — Gate 2).
+ * Header icon + right-rail shim for the Clinical Copilot (PRD §4.1, §4.2 — Gate 2).
  *
  * @package   OpenEMR
  * @link      https://www.open-emr.org
@@ -23,7 +23,10 @@ use Twig\Environment;
 
 final class Bootstrap
 {
-    private const RAIL_WIDTH_PX = 420;
+    // Initial inline width used before the rail-container script reads
+    // sessionStorage. Matches the JS MAX_WIDTH so a fresh-session render
+    // doesn't briefly flash the narrower default before snapping to max.
+    private const RAIL_WIDTH_PX = 600;
 
     public function __construct(
         private readonly EventDispatcherInterface $eventDispatcher

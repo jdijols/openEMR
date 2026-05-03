@@ -1,7 +1,7 @@
 # Stage 15 — Gate 6 complete (engineering)
 
 **Purpose:** Record closure of **Gate 6 — Eval + Observability + Deploy**
-from [`implementation/clinical-copilot-task-list.md`](../implementation/clinical-copilot-task-list.md):
+from [`TASKS.md`](../../../TASKS.md):
 two-vhost Caddyfile, preflight credential gate, PHI redactor (S7),
 LLM provider swap (Anthropic + Azure OpenAI), Synthea fixtures + 13
 curated/adversarial cases, §8 security baseline script, demo storyboard,
@@ -92,7 +92,7 @@ Final regression sweep:
 ## Next
 
 **Gate 7** — Submission Bundle. See
-[`clinical-copilot-task-list.md` § Gate 7](../implementation/clinical-copilot-task-list.md#gate-7--submission-bundle):
+[`TASKS.md` § Gate 7](../../../TASKS.md#gate-7--submission-bundle):
 Loom recording (UC-A + UC-B propose→confirm→write + UC-C + refusal),
 social post, `submission.md` URL bundle, final §13.4 checklist,
 `ai-cost-analysis.md` cost appendix (G7-07), and the 11:45 cellular

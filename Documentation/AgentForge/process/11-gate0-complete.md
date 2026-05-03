@@ -1,6 +1,6 @@
 # Stage 11 — Gate 0 complete
 
-**Purpose:** Record closure of **Gate 0 — Scaffold + Contract Spine** from [`implementation/clinical-copilot-task-list.md`](../implementation/clinical-copilot-task-list.md): repo layout per PRD §3.2, `agentforge/api` + `cui`, `oe-module-agentforge` module skeleton, `docker/agentforge` compose extension, contract drift tests (Vitest + PHPUnit), Langfuse env + observability interface, `.gitignore` / `secrets.env.example`.
+**Purpose:** Record closure of **Gate 0 — Scaffold + Contract Spine** from [`TASKS.md`](../../../TASKS.md): repo layout per PRD §3.2, `agentforge/api` + `cui`, `oe-module-agentforge` module skeleton, `docker/agentforge` compose extension, contract drift tests (Vitest + PHPUnit), Langfuse env + observability interface, `.gitignore` / `secrets.env.example`.
 
 ## Verification
 
@@ -13,4 +13,4 @@ Engineer re-ran installs and tests on host (PHP 8.5 + Composer + Redis extension
 
 ## Next
 
-**Gate 1** — [`clinical-copilot-task-list.md` § Gate 1](../implementation/clinical-copilot-task-list.md#gate-1--security-primitives-first) (security primitives, stop-the-line S1/S4/S5/S6/S10 module-side).
+**Gate 1** — [`TASKS.md` § Gate 1](../../../TASKS.md#gate-1--security-primitives-first) (security primitives, stop-the-line S1/S4/S5/S6/S10 module-side).

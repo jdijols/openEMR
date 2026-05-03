@@ -8,11 +8,11 @@ related_milestone: process/11-gate0-complete.md
 
 ## Goal
 
-Implement and fully close Gate 1 for the AgentForge Clinical Co-Pilot: security primitives first, stop-the-line S1/S4/S5/S6/S10 coverage, docs aligned with PRD/task list/architecture, and local smoke evidence before moving to Gate 2.
+Implement and fully close Gate 1 for the AgentForge Clinical Copilot: security primitives first, stop-the-line S1/S4/S5/S6/S10 coverage, docs aligned with PRD/task list/architecture, and local smoke evidence before moving to Gate 2.
 
 ## Context
 
-Gate 0 was already closed. The Gate 1 task list initially conflicted with `ARCHITECTURE.md` on whether `admin/super` users should be blocked; the user clarified that architecture was authoritative and that the co-pilot should mirror OpenEMR permissions rather than create a second privilege plane.
+Gate 0 was already closed. The Gate 1 task list initially conflicted with `ARCHITECTURE.md` on whether `admin/super` users should be blocked; the user clarified that architecture was authoritative and that the copilot should mirror OpenEMR permissions rather than create a second privilege plane.
 
 ## Key decisions
 
@@ -20,12 +20,12 @@ Gate 0 was already closed. The Gate 1 task list initially conflicted with `ARCHI
 
 - **Prompt:** "ARCHITECTURE.md is actually correct. I believe they should be allowed. An admin/superuser should be allowed to do everything a physician can do."
 - **Recommendation:** Remove the special admin/super launch block and rely on OpenEMR session/GACL, active-chart binding, token hygiene, explicit confirmed writes, and V1 write-target limits.
-- **Outcome:** Gate 1 policy, code, tests, and docs now define S4 as "no co-pilot privilege bypass," not "no admin launch." See `Documentation/AgentForge/implementation/clinical-copilot-task-list.md` and `interface/modules/custom_modules/oe-module-agentforge/README.md`.
+- **Outcome:** Gate 1 policy, code, tests, and docs now define S4 as "no copilot privilege bypass," not "no admin launch." See `TASKS.md` and `interface/modules/custom_modules/oe-module-agentforge/README.md`.
 
-### Decision: use existing chart-read ACL for co-pilot access
+### Decision: use existing chart-read ACL for copilot access
 
 - **Prompt:** "Anyone who has access to certain data (read or write) would have the same access through the copilot."
-- **Recommendation:** Treat co-pilot launch/read access as downstream of OpenEMR's existing chart authorization, while keeping optional module-owned ACOs for future admin/write-proposal controls.
+- **Recommendation:** Treat copilot launch/read access as downstream of OpenEMR's existing chart authorization, while keeping optional module-owned ACOs for future admin/write-proposal controls.
 - **Outcome:** `AclMap` uses existing `patients/demo` for rail/read launch. The module does not create a parallel `agentforge/read_chart` gate.
 
 ### Decision: configure shared secrets through one gitignored env file
@@ -91,7 +91,7 @@ Gate 0 was already closed. The Gate 1 task list initially conflicted with `ARCHI
 - **Created:** `tests/Tests/Isolated/Modules/AgentForge/NoParallelPrivilegePlaneTest.php`
 - **Created:** `tests/Tests/Isolated/Modules/AgentForge/SessionTokenInteropTest.php`
 - **Created:** `tests/Tests/Isolated/Modules/AgentForge/SessionTokenIssuerFixture.php`
-- **Modified:** `Documentation/AgentForge/implementation/clinical-copilot-task-list.md`
+- **Modified:** `TASKS.md`
 - **Modified:** `PRD.md`
 - **Modified:** `agentforge/api/src/app.ts`
 - **Modified:** `docker/agentforge/README.md`
@@ -117,5 +117,5 @@ Gate 1 is closed in the implementation task list. Automated tests and local smok
 ## Links
 
 - Gate 1 smoke evidence: [0429-T2151-gate1-security-smoke.md](0429-T2151-gate1-security-smoke.md)
-- Task list: [clinical-copilot-task-list.md](../../../implementation/clinical-copilot-task-list.md)
+- Task list: [TASKS.md](../../../../../TASKS.md)
 - Numbered milestone context: [process/11-gate0-complete.md](../../11-gate0-complete.md)

@@ -51,7 +51,7 @@ _None this session — execution followed PRD/task list._
 
 ## Files touched
 
-- **Modified (this wrap-up):** `Documentation/AgentForge/implementation/clinical-copilot-task-list.md`, `Documentation/AgentForge/README.md`, `Documentation/AgentForge/process/10-prd.md`, `Documentation/AgentForge/process/02-tooling-and-skills.md`, `Documentation/AgentForge/process/11-gate0-complete.md` (created), this journal (created).
+- **Modified (this wrap-up):** `TASKS.md`, `Documentation/AgentForge/README.md`, `Documentation/AgentForge/process/10-prd.md`, `Documentation/AgentForge/process/02-tooling-and-skills.md`, `Documentation/AgentForge/process/11-gate0-complete.md` (created), this journal (created).
 - **Engineer commit (already on GitLab):** scaffold trees per Gate 0 — `agentforge/`, `docker/agentforge/`, `interface/modules/custom_modules/oe-module-agentforge/`, `tests/Tests/Isolated/Modules/AgentForge/`, `.gitignore`, docs/PRD/task-list material as committed by user.
 
 ## Outcomes
@@ -60,7 +60,7 @@ Gate 0 exit criteria are green on the engineer’s machine; implementation is on
 
 ## Next steps
 
-- [ ] Begin **Gate 1** — security primitives ([`clinical-copilot-task-list.md`](../../implementation/clinical-copilot-task-list.md#gate-1--security-primitives-first)) in a new session.
+- [ ] Begin **Gate 1** — security primitives ([`TASKS.md`](../../implementation/TASKS.md#gate-1--security-primitives-first)) in a new session.
 - [ ] (Optional) Patch root `composer.json` `phpunit-isolated` to invoke `./vendor/bin/phpunit`.
 
 ## Links

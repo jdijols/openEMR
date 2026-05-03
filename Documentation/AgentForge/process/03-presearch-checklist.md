@@ -13,7 +13,7 @@ Complete this before writing code. Save your AI conversation as a reference docu
 _**Persona target locked** by the Cluster 1.5 spike (2026-04-28). The persona shape below holds; **the bundled OpenEMR demo dataset does not support it as shipped** — see [→ AUDIT.md §DataQuality-1](../../../AUDIT.md#dataquality-1-persona-viability--adult-pcp-returning-patient-demo-coverage). Cluster 4 resolved the augmentation direction as **hybrid Synthea + hand-curated eval fixtures**; data augmentation remains a hard prerequisite before verification/eval implementation and Cluster 6 demo work. Persona shape itself was not the problem; the substrate was._
 
 * Which domain: healthcare, insurance, finance, legal, or custom?
-  * **Healthcare** — clinical co-pilot embedded in this OpenEMR fork.
+  * **Healthcare** — clinical copilot embedded in this OpenEMR fork.
 
 * What specific use cases will you support?
   * **v1 persona: adult primary care physician (family medicine).** Chosen because the case study scenario explicitly describes ambulatory rooming flow ("between patient rooms"), returning patients ("what changed since the last visit"), and rich existing records ("dense EHR notes... lab results... medication lists"). Pediatric and ED variants reserved for later iterations.
@@ -146,7 +146,7 @@ _Cluster 3 filled the security/compliance baseline and Cluster 4 filled the veri
 
 * External API dependencies?
   * **Preferred boundary:** OpenEMR REST/FHIR APIs where they cover the needed chart slice. FHIR is attractive for standardized resources and patient-binding semantics; standard REST is useful for existing OpenEMR-specific resources but mixes `puuid` and numeric `pid` routes.
-  * **In-repo demo boundary:** a custom module can call internal services or narrow read-only module routes, but should keep the data access layer shaped like an API consumer so later extraction remains plausible. See [→ AUDIT.md §Architecture-3](../../../AUDIT.md#architecture-3-restfhir-apis-provide-the-cleanest-read-boundary-but-identifier-and-resource-coverage-are-uneven-across-standard-and-fhir-routes) and [§Architecture-4](../../../AUDIT.md#architecture-4-custom-modules-plus-event-hooks-are-the-most-plausible-in-repo-integration-path-for-a-v1-embedded-read-only-co-pilot).
+  * **In-repo demo boundary:** a custom module can call internal services or narrow read-only module routes, but should keep the data access layer shaped like an API consumer so later extraction remains plausible. See [→ AUDIT.md §Architecture-3](../../../AUDIT.md#architecture-3-restfhir-apis-provide-the-cleanest-read-boundary-but-identifier-and-resource-coverage-are-uneven-across-standard-and-fhir-routes) and [§Architecture-4](../../../AUDIT.md#architecture-4-custom-modules-plus-event-hooks-are-the-most-plausible-in-repo-integration-path-for-a-v1-embedded-read-only-copilot).
 
 * Mock vs real data for development?
   * **Real OpenEMR chart reads are required for integration testing**, but the bundled demo data is insufficient for persona/eval work as-is (see `DataQuality-1`). Cluster 4 decision: use a **hybrid** approach — import a small synthetic Synthea cohort for longitudinal chart substrate, then hand-curate 2-3 adult PCP returning-patient cases with ground-truth questions, expected answers, citations, and known missing/conflicting facts. Existing demo data remains useful only for empty/missing-data behavior.

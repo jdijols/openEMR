@@ -2,7 +2,7 @@
 date: 2026-05-01
 topic: Gate 6 closed — repaired phantom prior-session work (G6-15 source, eval runner refactor) + delivered G6-20 structural backfill
 related_milestone: ../../15-gate6-complete.md
-related_task_list: ../../../implementation/clinical-copilot-task-list.md
+related_task_list: ../../../../../TASKS.md
 ---
 
 # Gate 6 — Eval + Observability + Deploy — closed (engineering)
@@ -95,7 +95,7 @@ the prior summary.
   Re-delete the stale test files so the working tree is internally
   consistent, leave the source-deletion as inherited, document the
   discrepancy in the Gate 6 status block as an operator decision.
-- **Outcome:** Status block in `clinical-copilot-task-list.md` calls
+- **Outcome:** Status block in `TASKS.md` calls
   out the drift; G5-06 row content untouched; vitest stays green
   because both source and tests are absent together.
 
@@ -163,7 +163,7 @@ the prior summary.
     — 2 → 5 tests / 87 assertions (G6-20)
   - `docker/agentforge/secrets.env.example` — Azure OpenAI keys
     documented
-  - `Documentation/AgentForge/implementation/clinical-copilot-task-list.md`
+  - `TASKS.md`
     — Gate 6 status header + per-row done-proof for G6-01..G6-18 +
     G6-20; verification recap; pre-existing-debt + recap-drift
     callouts
@@ -214,6 +214,6 @@ the prior summary.
 ## Links
 
 - Numbered milestone: [process/15-gate6-complete.md](../../15-gate6-complete.md)
-- Task list: [implementation/clinical-copilot-task-list.md](../../../implementation/clinical-copilot-task-list.md)
+- Task list: [implementation/TASKS.md](../../../../../TASKS.md)
 - Prior milestone: [process/14-gate4-complete.md](../../14-gate4-complete.md)
 - Inherited drift: [post-deploy-bug-log.md](../../../implementation/post-deploy-bug-log.md)

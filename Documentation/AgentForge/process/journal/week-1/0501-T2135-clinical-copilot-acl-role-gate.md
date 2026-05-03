@@ -1,14 +1,14 @@
 ---
 date: 2026-05-01
-topic: Clinical co-pilot GACL role gate — policy + examiner documentation
+topic: Clinical Copilot GACL role gate — policy + examiner documentation
 related_milestone: process/16-clinical-copilot-acl-role-gate.md
 ---
 
-# Clinical co-pilot GACL role gate — session journal
+# Clinical Copilot GACL role gate — session journal
 
 ## Goal
 
-Capture **process documentation** so Gauntlet **instructors** can see how Clinical Co-Pilot access is permissioned (**who gets the tool vs who does not**), link it from the README trail and module README, and record the decisions behind the **`agentforge/use`** layer and default seeded groups.
+Capture **process documentation** so Gauntlet **instructors** can see how Clinical Copilot access is permissioned (**who gets the tool vs who does not**), link it from the README trail and module README, and record the decisions behind the **`agentforge/use`** layer and default seeded groups.
 
 ## Context
 
@@ -24,14 +24,14 @@ Prior implementation added a module-owned **`agentforge` / `use`** product gate 
 
 ### Decision: Emergency Login + propose-write parity for seeded clinical groups
 
-- **Prompt:** User chose **Emergency Login** may access AgentForge; **Administrators**, **Physicians**, **Clinicians** get **both** co-pilot use and confirmed-write entitlement by default.
+- **Prompt:** User chose **Emergency Login** may access AgentForge; **Administrators**, **Physicians**, **Clinicians** get **both** copilot use and confirmed-write entitlement by default.
 - **Recommendation:** Mirror that in **`DEFAULT_PRIVILEGED_GROUP_VALUES`** and grant **`use`** + **`propose_write`** to **`breakglass`** along with **`admin`**, **`doc`**, **`clin`**.
 - **Outcome:** **process/16** and installer constant document **`admin`**, **`doc`**, **`clin`**, **`breakglass`** only.
 
 ### Decision: Exclude Front Office and Accounting from default AgentForge entitlement
 
-- **Prompt:** Restrict Clinical Co-Pilot to administrators / physicians / clinicians; accounting and front office should not have access without explicit intent.
-- **Recommendation:** Do **not** seed **`agentforge/use`** or **`propose_write`** for **`front`** or **`back`**; they may retain **`patients/demo`** for workflows OpenEMR already grants — insufficient for Clinical Co-Pilot rail without explicit admin ACL edits.
+- **Prompt:** Restrict Clinical Copilot to administrators / physicians / clinicians; accounting and front office should not have access without explicit intent.
+- **Recommendation:** Do **not** seed **`agentforge/use`** or **`propose_write`** for **`front`** or **`back`**; they may retain **`patients/demo`** for workflows OpenEMR already grants — insufficient for Clinical Copilot rail without explicit admin ACL edits.
 - **Outcome:** Default grant list excludes **`front`**/**`back`**; denial behavior documented for examiners on **process/16** and module README §4.9.
 
 ### Decision: examiner-facing README linkage
@@ -42,7 +42,7 @@ Prior implementation added a module-owned **`agentforge` / `use`** product gate 
 
 ## Trade-offs and alternatives
 
-- **`patients/demo` only** — would keep Accounting/Front Office on co-pilot; rejected for instructor alignment and narrower PHI/agent surface by role.
+- **`patients/demo` only** — would keep Accounting/Front Office on copilot; rejected for instructor alignment and narrower PHI/agent surface by role.
 - **Separate app-level permission DB** — rejected to avoid dual privilege planes and stay consistent with **`AUDIT.md`** / PRD §4.9 language.
 
 ## Tools, dependencies, commands
@@ -64,7 +64,7 @@ Examiner-visible **process/16** describes the **`demo`** + **`use`** stack, writ
 ## Next steps
 
 - [ ] Gate 7 / submission checklist: cite **process/16** if rubric expects explicit permissioning prose.
-- [ ] Sites that need Accounting/Front Office co-pilot: assign **`agentforge/use`** (**and **`propose_write`** for writes**) in OpenEMR ACL admin.
+- [ ] Sites that need Accounting/Front Office copilot: assign **`agentforge/use`** (**and **`propose_write`** for writes**) in OpenEMR ACL admin.
 
 ## Links
 

@@ -7,9 +7,9 @@ last-updated: 2026-05-02
 
 ## Purpose
 
-Capture post-V1 candidates for the Clinical Co-Pilot, organized by theme, with an architectural-fit note for each. V1 ships against the Week 1 brief's narrow scope: chart-data verification, three use cases (UC-A pre-room, UC-B in-room, UC-C post-room), five confirmed-write targets, deferral on general medical knowledge questions. V2 is the natural next surface — what the agent could become once V1 demonstrates the safe baseline.
+Capture post-V1 candidates for the Clinical Copilot, organized by theme, with an architectural-fit note for each. V1 ships against the Week 1 brief's narrow scope: chart-data verification, three use cases (UC-A pre-room, UC-B in-room, UC-C post-room), five confirmed-write targets, deferral on general medical knowledge questions. V2 is the natural next surface — what the agent could become once V1 demonstrates the safe baseline.
 
-This is a **planning artifact**, not a binding plan. Each candidate has a fit note (clean extension vs. requires redesign) and a rough effort estimate. Use this as the starting point for V2 scoping conversations; once a V2 brief lands, this doc gets superseded by a real V2 PRD + task list in the same shape as V1's [clinical-copilot-task-list.md](clinical-copilot-task-list.md).
+This is a **planning artifact**, not a binding plan. Each candidate has a fit note (clean extension vs. requires redesign) and a rough effort estimate. Use this as the starting point for V2 scoping conversations; once a V2 brief lands, this doc gets superseded by a real V2 PRD + task list in the same shape as V1's [TASKS.md](../../../TASKS.md).
 
 ## Anchoring assumptions
 
@@ -25,7 +25,7 @@ This is a **planning artifact**, not a binding plan. Each candidate has a fit no
 
 **Goal:** ground general medical knowledge questions in peer-reviewed sources, the same way V1 grounds patient-specific claims in the chart.
 
-**Why now / why V2:** V1's verification layer only catches *chart-fidelity* failures. General knowledge questions ("what's the recommended A1c target for a 68-year-old with type 2 diabetes and hypertension?") have no chart record to verify against, so V1 falls back to deferral language — the system prompt instructs the model to redirect those questions to clinician judgment. That keeps V1 honest, but it also means the agent can't help with the kind of treatment-threshold questions a more capable co-pilot would ideally answer. V2 closes the gap without inviting "subjective AI recommendations."
+**Why now / why V2:** V1's verification layer only catches *chart-fidelity* failures. General knowledge questions ("what's the recommended A1c target for a 68-year-old with type 2 diabetes and hypertension?") have no chart record to verify against, so V1 falls back to deferral language — the system prompt instructs the model to redirect those questions to clinician judgment. That keeps V1 honest, but it also means the agent can't help with the kind of treatment-threshold questions a more capable copilot would ideally answer. V2 closes the gap without inviting "subjective AI recommendations."
 
 **Architectural fit:** clean extension. The verification layer's citation enforcement already operates on a UUID set from any tool source. A new tool — `lookup_clinical_evidence` — that returns rows with their own UUIDs (alongside `get_allergies`, `get_problems`, etc.) extends the same logic. No verification redesign required.
 
@@ -128,5 +128,5 @@ Pick one workstream, write a real PRD with stop-the-line invariants and eval cas
 - [VERIFICATION.md §7](../../../VERIFICATION.md) — the V1 limitation that triggered Theme 1.
 - [USERS.md §7.1](../../../USERS.md) — V1 "does not include" list, source for Theme 2 candidates.
 - [ARCHITECTURE.md](../../../ARCHITECTURE.md) — V1 architecture reference, including Compliance-2 and Cost-snapshot anchors used here.
-- [clinical-copilot-task-list.md](clinical-copilot-task-list.md) — V1 task list shape; V2 PRDs should follow the same gate structure.
+- [TASKS.md](../../../TASKS.md) — V1 task list shape; V2 PRDs should follow the same gate structure.
 - [Submission-Checklist.md](Submission-Checklist.md) — V1 ship gate.

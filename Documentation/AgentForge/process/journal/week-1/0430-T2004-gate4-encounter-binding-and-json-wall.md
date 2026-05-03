@@ -1,7 +1,7 @@
 ---
 date: 2026-04-30
 topic: Gate 4 chat hardening — Postgres readiness, JSON-wall fix, encounter binding
-related_milestone: Documentation/AgentForge/implementation/clinical-copilot-task-list.md (Gate 4)
+related_milestone: TASKS.md (Gate 4)
 ---
 
 # Gate 4 chat hardening — session journal
@@ -106,7 +106,7 @@ curl -s http://localhost:3000/health | python3 -m json.tool   # expect ok:true, 
   - `interface/modules/custom_modules/oe-module-agentforge/public/cui/agentforge-cui.js` — built bundle
   - `interface/modules/custom_modules/oe-module-agentforge/public/cui/agentforge-cui-index.css` — built bundle
   - `docker/agentforge/README.md` — `dev:host` guidance + `/health` postgres readiness note
-  - `Documentation/AgentForge/implementation/clinical-copilot-task-list.md` — Gate 4 rows G4-04 .. G4-11 marked `[x]` except G4-10 (manual)
+  - `TASKS.md` — Gate 4 rows G4-04 .. G4-11 marked `[x]` except G4-10 (manual)
 
 ## Outcomes
 

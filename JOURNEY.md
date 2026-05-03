@@ -1,4 +1,4 @@
-# Physician Journey — AgentForge Clinical Co-Pilot
+# Physician Journey — AgentForge Clinical Copilot
 
 > **Status:** Working draft, kept in sync with the shipped CUI as of Gate 6 close. This document narrates one full encounter — and the clinic day around it — from the physician's point of view, through the lens of a single conversational thread.
 
@@ -165,7 +165,7 @@ Each journey moment has a corresponding eval case in [`agentforge/api/eval/cases
 
 ## Where to go next
 
-- Spec and invariants: [`PRD.md`](./PRD.md), with stop-the-line tests in [`Documentation/AgentForge/implementation/clinical-copilot-task-list.md`](./Documentation/AgentForge/implementation/clinical-copilot-task-list.md).
+- Spec and invariants: [`PRD.md`](./PRD.md), with stop-the-line tests in [`TASKS.md`](./TASKS.md).
 - Architecture: [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 - User and use-case definitions: [`USERS.md`](./USERS.md).
 - Process trail and decisions: [`Documentation/AgentForge/README.md`](./Documentation/AgentForge/README.md).

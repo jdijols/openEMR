@@ -15,15 +15,19 @@ function readDocumentHints(): {
   launchCode: string | null;
   patientUuid: string | null;
   copilotTitle: string | null;
+  boundEncounterId: number | null;
 } {
   const root = document.documentElement;
   const launch = root.getAttribute('data-launch-code');
   const patient = root.getAttribute('data-patient-uuid');
   const title = root.getAttribute('data-patient-copilot-title');
+  const encRaw = root.getAttribute('data-bound-encounter-id');
+  const encParsed = encRaw !== null && encRaw !== '' ? Number.parseInt(encRaw, 10) : NaN;
   return {
     launchCode: launch !== null && launch !== '' ? launch : null,
     patientUuid: patient !== null && patient !== '' ? patient : null,
     copilotTitle: title !== null && title !== '' ? title : null,
+    boundEncounterId: Number.isFinite(encParsed) && encParsed > 0 ? encParsed : null,
   };
 }
 
@@ -32,6 +36,67 @@ function newConversationId(): string {
     return crypto.randomUUID();
   }
   return `cui-${Date.now().toString(16)}-${Math.random().toString(16).slice(2, 10)}`;
+}
+
+/**
+ * Ask the host shell to navigate the OpenEMR Dashboard tab to this patient
+ * (open if closed, refresh if already open). Same NAV_REQUEST envelope used
+ * by chart citations; the parent listener routes `kind: 'patient_dashboard'`
+ * into `loadCurrentPatient()` — the same global the top-bar patient-name
+ * link is bound to, so the UX is identical to that pattern.
+ */
+function requestPatientDashboardNavigation(expectedPatientUuid: string): void {
+  if (typeof window.parent === 'undefined' || window.parent === null) {
+    return;
+  }
+  window.parent.postMessage(
+    {
+      type: 'NAV_REQUEST',
+      hint: { kind: 'patient_dashboard', params: {} },
+      expected_patient_uuid: expectedPatientUuid,
+    },
+    window.location.origin,
+  );
+}
+
+/**
+ * Ask the host shell to open a specific encounter in the OpenEMR "enc" tab.
+ * Used by the header "Today" link, which targets the encounter the
+ * AppointmentEncounterBinder picked at panel render time (i.e. today's
+ * appointment-driven encounter).
+ */
+function requestEncounterNavigation(encounterId: number, expectedPatientUuid: string): void {
+  if (typeof window.parent === 'undefined' || window.parent === null) {
+    return;
+  }
+  window.parent.postMessage(
+    {
+      type: 'NAV_REQUEST',
+      hint: { kind: 'encounter', params: { encounter_id: encounterId } },
+      expected_patient_uuid: expectedPatientUuid,
+    },
+    window.location.origin,
+  );
+}
+
+/**
+ * Ask the host shell to open the patient's Visit History (encounter list) in
+ * the OpenEMR "enc" tab — mirrors the clock icon left of "Select Encounter"
+ * in the OpenEMR top patient panel (`clickEncounterList` → `encounterList()`
+ * → `/interface/patient_file/history/encounters.php`).
+ */
+function requestVisitHistoryNavigation(expectedPatientUuid: string): void {
+  if (typeof window.parent === 'undefined' || window.parent === null) {
+    return;
+  }
+  window.parent.postMessage(
+    {
+      type: 'NAV_REQUEST',
+      hint: { kind: 'visit_history', params: {} },
+      expected_patient_uuid: expectedPatientUuid,
+    },
+    window.location.origin,
+  );
 }
 
 /**
@@ -109,10 +174,36 @@ function IconPanelSync(): ReactElement {
   );
 }
 
-const DEFAULT_COPILOT_HEADER = 'Clinical Co-Pilot';
+/**
+ * Outline clock — same stroke-only treatment as IconPanelSync so the two
+ * header buttons read as a matching pair. Mirrors the `fa-history` glyph
+ * OpenEMR uses for the same action in the top patient panel.
+ */
+function IconVisitHistory(): ReactElement {
+  return (
+    <svg
+      className="agentforge-cui__refresh-icon"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <polyline points="12 7 12 12 15 14" />
+    </svg>
+  );
+}
+
+const DEFAULT_COPILOT_HEADER = 'Clinical Copilot';
 
 export default function App(): ReactElement {
-  const { launchCode, patientUuid, copilotTitle } = useMemo(() => readDocumentHints(), []);
+  const { launchCode, patientUuid, copilotTitle, boundEncounterId } = useMemo(() => readDocumentHints(), []);
   const handshake = useHandshake(launchCode, patientUuid);
   const headerTitle = copilotTitle ?? DEFAULT_COPILOT_HEADER;
   const [input, setInput] = useState('');
@@ -488,18 +579,64 @@ export default function App(): ReactElement {
    * (no `title` — matches OpenEMR tab chrome).
    */
   const headerIsReady = handshake.status === 'ready';
+  // The patient label (name/age/sex from server-side `agentforge_patient_copilot_header_title`)
+  // is only meaningful as a Dashboard link when both a copilot title and a bound patient UUID
+  // are present. Default "Clinical Copilot" stays plain text.
+  const titleIsPatientLink =
+    copilotTitle !== null && patientUuid !== null && patientUuid !== '';
+  // "Today" link is meaningful only when a chart is bound AND the
+  // AppointmentEncounterBinder picked an encounter at panel render time —
+  // without one there's nothing to navigate to.
+  const todayIsAvailable =
+    titleIsPatientLink && boundEncounterId !== null;
   const renderPanelHeader = (showRefresh: boolean): ReactElement => (
     <header className="agentforge-cui__header">
-      <h1 className="agentforge-cui__title">{headerTitle}</h1>
+      <div className="agentforge-cui__title-group">
+        <h1 className="agentforge-cui__title">
+          {titleIsPatientLink ?
+            <button
+              type="button"
+              className="agentforge-cui__title-link"
+              onClick={() => requestPatientDashboardNavigation(patientUuid)}
+              title="Open patient dashboard"
+            >
+              {headerTitle}
+            </button>
+          : headerTitle}
+        </h1>
+        {todayIsAvailable ?
+          <button
+            type="button"
+            className="agentforge-cui__today-button"
+            onClick={() => requestEncounterNavigation(boundEncounterId, patientUuid)}
+            title="Open today's encounter"
+          >
+            Today
+          </button>
+        : null}
+      </div>
       {showRefresh ?
-        <button
-          type="button"
-          className="agentforge-cui__refresh"
-          onClick={headerIsReady ? refreshChartBinding : reloadPanel}
-          aria-label={headerIsReady ? 'Refresh clinical co-pilot' : 'Reload clinical co-pilot panel'}
-        >
-          <IconPanelSync />
-        </button>
+        <div className="agentforge-cui__header-actions">
+          {titleIsPatientLink ?
+            <button
+              type="button"
+              className="agentforge-cui__refresh"
+              onClick={() => requestVisitHistoryNavigation(patientUuid)}
+              aria-label="Open visit history"
+              title="Visit history"
+            >
+              <IconVisitHistory />
+            </button>
+          : null}
+          <button
+            type="button"
+            className="agentforge-cui__refresh"
+            onClick={headerIsReady ? refreshChartBinding : reloadPanel}
+            aria-label={headerIsReady ? 'Refresh clinical copilot' : 'Reload clinical copilot panel'}
+          >
+            <IconPanelSync />
+          </button>
+        </div>
       : <span className="agentforge-cui__header-action-slot" aria-hidden="true" />}
     </header>
   );
@@ -528,7 +665,7 @@ export default function App(): ReactElement {
                 Open a patient chart to begin.
               </h2>
               <p className="agentforge-cui__empty-body">
-                AgentForge needs an active chart to read or propose anything.
+                Clinical Copilot needs an active chart to read or propose anything.
               </p>
             </>
           ) : (

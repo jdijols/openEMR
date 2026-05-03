@@ -1,6 +1,6 @@
 ---
 date: 2026-05-01
-topic: Clinical Co-Pilot auto-brief stuck on “could not be displayed” — Session Storage payload cache poisoning
+topic: Clinical Copilot auto-brief stuck on “could not be displayed” — Session Storage payload cache poisoning
 related_milestone: [process/13-gate3-complete.md](../../13-gate3-complete.md)
 ---
 
@@ -8,13 +8,13 @@ related_milestone: [process/13-gate3-complete.md](../../13-gate3-complete.md)
 
 ## Goal
 
-Explain why some patients (initially Marcus Hill, then Harold Jensen) showed only *“The assistant returned a response that could not be displayed…”* in the Clinical Co-Pilot rail despite other charts working, and record the operator-side fix that restored those charts.
+Explain why some patients (initially Marcus Hill, then Harold Jensen) showed only *“The assistant returned a response that could not be displayed…”* in the Clinical Copilot rail despite other charts working, and record the operator-side fix that restored those charts.
 
 ## Context
 
 Auto case presentation (`POST /present-patient`) returns structured `blocks`. When the model output looks like a `{"blocks":[...]}` envelope but no block passes Zod validation, the API substitutes a single `text` block with that fallback message (see [`agentforge/api/src/agent/orchestrator.ts`](../../../../../agentforge/api/src/agent/orchestrator.ts) — `parseBlocksFromModelText`). The CUI then persists successful-looking payloads in **Session Storage** under `agentforge:brief_payload:<patient_uuid>` and `agentforge:conversation_payload:<patient_uuid>` (see [`agentforge/cui/src/chat/brief_cache.ts`](../../../../../agentforge/cui/src/chat/brief_cache.ts), [`agentforge/cui/src/App.tsx`](../../../../../agentforge/cui/src/App.tsx) replay order). A bad brief therefore replays on every reopen for that patient until TTL eviction or manual removal. Related prior work: [`0501-T1500-brief-consistency-cache.md`](./0501-T1500-brief-consistency-cache.md), [`0501-T2105-cui-conversation-cache-refresh-icon-two-hour-ttl.md`](./0501-T2105-cui-conversation-cache-refresh-icon-two-hour-ttl.md).
 
-Browser console showed unrelated noise (`background_service/$run` 500, `patient_picture` 403); those do not explain the Co-Pilot message, which matched the cached payload pattern.
+Browser console showed unrelated noise (`background_service/$run` 500, `patient_picture` 403); those do not explain the Copilot message, which matched the cached payload pattern.
 
 ## Key decisions
 
@@ -32,7 +32,7 @@ Browser console showed unrelated noise (`background_service/$run` 500, `patient_
 
 ### Decision: ignore background_service / patient_picture console errors for this incident
 
-- **Prompt:** User pasted many 500/403 lines alongside the Co-Pilot symptom.
+- **Prompt:** User pasted many 500/403 lines alongside the Copilot symptom.
 - **Recommendation:** Treat OpenEMR background service and missing patient photo fetches as **orthogonal** unless `/present-patient` or `/chat` shows a matching failure.
 - **Outcome:** Resolution did not require fixing those endpoints; the rail behavior aligned with cached AgentForge payloads.
 

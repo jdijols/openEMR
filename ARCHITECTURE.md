@@ -1,7 +1,9 @@
-# AgentForge Stage 5 — Clinical Co-Pilot Architecture
+# Clinical Copilot — Architecture
+
+> Built on OpenEMR. Developed during the Gauntlet AI AgentForge program. Stage 5 hard-gate deliverable.
 
 > **What this is:** The AI integration plan for our OpenEMR fork. It ties together [`AUDIT.md`](AUDIT.md) (what OpenEMR forces us to respect) and [`USERS.md`](USERS.md) (who we build for and which use cases are in scope).  
-> **V1 use cases:** UC-A pre-room briefing, UC-B in-room transcript + confirmed writes, UC-C post-room thread — see [`USERS.md` §4](USERS.md).
+> **V1 use cases (8 total):** UC-A pre-room case presentation, UC-B / UC-C read-shaped Q&A (single- and cross-domain), UC-D / UC-E / UC-F / UC-G confirmed writes across the CRUD surface (chief complaint / vitals / tobacco-allergy / clinical notes), UC-H refusal posture — see [`USERS.md` §4](USERS.md).
 
 > **Working document:** This file may be revised up to **MVP submission** (Gauntlet deadline). Keep the instructor table + executive summary aligned with whatever ships.
 
@@ -14,10 +16,10 @@
 | Decision | Choice | Why it’s justified |
 | --- | --- | --- |
 | **Hosting** | **Linux VPS** + Docker Compose (MVP deployed on **Vultr**) | Matches our **single-VM + Compose** plan ([Stage 2 decision](Documentation/AgentForge/process/05-stage2-deployment-decision.md)). OpenEMR is a long-lived PHP + MariaDB stack; a single VM with Compose is what upstream expects. A cohort peer shipped a working demo this way — low surprise, workable ops. *Course/synthetic data:* a standard VPS footprint is appropriate. *Future production under strict infrastructure BAA:* evaluate managed/regulated hosting separately — not a Gauntlet MVP blocker. |
-| **CUI (Conversational UI)** | **React** (e.g. Vite + TypeScript) | Team comfort and speed; isolates the co-pilot in an **iframe SPA** so we are not rewriting OpenEMR’s legacy Angular. The iframe mounts in a toggleable **right rail** launched from a header icon; if the host shell would scroll horizontally, the rail overlays instead of forcing a broken layout. Same language family as the **Agent API** (TypeScript) for shared types and simpler reasoning. |
+| **CUI (Conversational UI)** | **React** (e.g. Vite + TypeScript) | Team comfort and speed; isolates the copilot in an **iframe SPA** so we are not rewriting OpenEMR’s legacy Angular. The iframe mounts in a toggleable **right rail** launched from a header icon; if the host shell would scroll horizontally, the rail overlays instead of forcing a broken layout. Same language family as the **Agent API** (TypeScript) for shared types and simpler reasoning. |
 | **Agent backend** | **Node 20 + TypeScript + Vercel AI SDK** | Bounded **read → propose → confirm → write** flow — not multi-agent “planning.” Typed tools (Zod), provider swap without rewrites. |
 | **Visit capture (STT + transcript)** | **`agentforge-api` streaming relay** → default **Deepgram** (AssemblyAI acceptable); transcript in **Postgres**; **tap start/stop** or **hold-to-talk** | UC-B threads **chart context + physician dictation**; proposals appear as visible messages → confirm → module writes. **No ambient scope**, **no audio retention** ([`USERS.md` §3.2](USERS.md)); BAA egress like LLMs ([`Compliance-5`](AUDIT.md#compliance-5-no-outbound-network-egress-controls-the-llm-call-would-be-the-first-phi-bearing-outbound)). |
-| **Chart reads / writes in OpenEMR** | **PHP custom module** (`oe-module-agentforge`) | OpenEMR’s **supported extension path** is PHP: `globals.php` session, GACL, existing services, audit hooks ([`Architecture-1`](AUDIT.md#architecture-1-openemr-is-a-hybrid-legacymodern-system-with-interfaceglobalsphp-as-the-shared-runtime-bridge), [`Architecture-4`](AUDIT.md#architecture-4-custom-modules-plus-event-hooks-are-the-most-plausible-in-repo-integration-path-for-a-v1-embedded-read-only-co-pilot)). We are **not** avoiding PHP for integration—we use it **where OpenEMR lives**. The **Agent Context Service** stays bounded (UUID in/out, explicit columns) so we do not inherit naive N+1 read patterns ([`Performance-7`](AUDIT.md#performance-7-n1-query-patterns-and-select--survive-in-services)). The **CUI has no standalone permissions** — bounded chart reads and writes run only through the module under that user’s established OpenEMR session/GACL (no parallel privilege plane for chat). |
+| **Chart reads / writes in OpenEMR** | **PHP custom module** (`oe-module-agentforge`) | OpenEMR’s **supported extension path** is PHP: `globals.php` session, GACL, existing services, audit hooks ([`Architecture-1`](AUDIT.md#architecture-1-openemr-is-a-hybrid-legacymodern-system-with-interfaceglobalsphp-as-the-shared-runtime-bridge), [`Architecture-4`](AUDIT.md#architecture-4-custom-modules-plus-event-hooks-are-the-most-plausible-in-repo-integration-path-for-a-v1-embedded-read-only-copilot)). We are **not** avoiding PHP for integration—we use it **where OpenEMR lives**. The **Agent Context Service** stays bounded (UUID in/out, explicit columns) so we do not inherit naive N+1 read patterns ([`Performance-7`](AUDIT.md#performance-7-n1-query-patterns-and-select--survive-in-services)). The **CUI has no standalone permissions** — bounded chart reads and writes run only through the module under that user’s established OpenEMR session/GACL (no parallel privilege plane for chat). |
 | **Safety** | **Verification before display** + **active-chart binding** | Case study + audit: claims must cite chart sources; staff API paths need **session/chart binding** ([`Security-3`](AUDIT.md#security-3-fhir-patient-context-reads-and-staff-acl-reads-follow-different-enforcement-paths)). Citations expose actionable links where the **source pack** supports navigation; MVP wires limited host navigation first, then expands surfaces. |
 | **Observability** | **Self-hosted Langfuse** (same Compose stack) | Agent traces often include prompts, tool payloads, and model output—**PHI-adjacent** once real charts are in play. **Self-hosted Langfuse** on **the same VPS** keeps that telemetry **inside our boundary** instead of shipping it to another vendor that would need its own BAA and retention story ([`Compliance-2`](AUDIT.md#compliance-2-external-llm-use-requires-a-phi-boundary-decision-before-any-real-chart-data-leaves-openemr)). It still gives turn-level tracing, latency, tool failures, and token/cost visibility—the case study asks for real observability, not “installed and ignored.” |
 
@@ -27,7 +29,7 @@
 
 ## Executive summary (~1 page)
 
-We are building an **embedded co-pilot** for **Dr. Maya Reynolds** (adult primary care, returning patients, non-emergent visits — [`USERS.md` §2](USERS.md)). Three moments: **before the room** (briefing), **in the room** (physician-only dictation, narrow structured writes **after explicit confirm**), **after the room** (same thread, Q&A, no silent writes).
+We are building an **embedded copilot** for **Dr. Maya Reynolds** (adult primary care, new or returning patients, non-emergent visits — [`USERS.md` §2](USERS.md)). Three moments: **before the room** (intake-driven, source-cited case presentation), **in the room** (physician-only dictation; narrow structured writes across the V1 CRUD surface — chief complaint, vitals, tobacco, allergy, clinical notes — **after explicit confirm**), **after the room** (same thread, Q&A, recap, no silent writes).
 
 **Shape:** Two software pieces on **one Linux VPS**, **Docker Compose**:
 
@@ -44,7 +46,7 @@ We are building an **embedded co-pilot** for **Dr. Maya Reynolds** (adult primar
 
 **Verification** is mandatory: structured answers with **citations** tied to **source packs** from tools; deterministic checks drop uncited claims and surface conflicts (e.g. med list vs prescriptions — [`DataQuality-2`](AUDIT.md#dataquality-2-adult-pcp-chart-facts-come-from-multiple-source-families-with-different-identifiers-statuses-and-freshness-semantics)). **Vitals and lab numbers** are filled by **deterministic parsers**, not LLM prose, to limit numeric hallucination.
 
-**Writes (UC-B only, after confirm):** chief complaint, vitals (incl. pain, height, weight), tobacco status, allergy add/update per [`USERS.md` §3.2](USERS.md). The agent **never** touches the DB directly; the **module** executes writes with the physician’s session and ACL.
+**Writes (UC-D through UC-G, all gated on explicit confirm):** chief complaint (create/update/clear), vitals incl. pain/height/weight (create/update/soft-delete), tobacco status (create/update), allergy add/update reaction/update severity, and clinical notes (create/update/soft-delete) per [`USERS.md` §3.2 and §4](USERS.md). Soft-deletes set `forms.activity = 0` — rows are hidden from the chart but preserved in the database for HIPAA-compliant audit. The agent **never** touches the DB directly; the **module** executes writes with the physician’s session and GACL.
 
 **Compliance posture:** Demo = synthetic data + case-study “act as if” BAA for providers. Real PHI later = documented BAA, retention, logging defaults fixed ([`Security-4`](AUDIT.md#security-4-current-logging-surfaces-can-retain-phi-rich-request-sql-and-api-payload-details)), **`log_from='agent'`** ([`Compliance-6`](AUDIT.md#compliance-6-log-tamper-evidence-is-partial-and-optional-there-is-no-first-class-agent-actor)), and a revisit of the accepted **`admin/super`** access risk before any real-PHI deployment ([`Security-10`](AUDIT.md#security-10-gacl-semantics-superuser-bypass-and-fail-open-caller-bugs)).
 
@@ -147,7 +149,7 @@ Citations may request **in-chart navigation** through the parent OpenEMR shell; 
 ## Security rules we do not relax
 
 - **Active-chart binding:** every read/write checks **requested patient UUID == chart session UUID** ([`Security-3`](AUDIT.md#security-3-fhir-patient-context-reads-and-staff-acl-reads-follow-different-enforcement-paths), [`DataQuality-7`](AUDIT.md#dataquality-7-id-multiplicity-and-inconsistent-soft-delete-orphan-rows-are-a-possible-state)).
-- **Admin/super may use the co-pilot.** Active-chart binding and the explicit-confirm write gate still apply at the module layer, but `admin/super` bypasses GACL ([`Security-10`](AUDIT.md#security-10-gacl-semantics-superuser-bypass-and-fail-open-caller-bugs)), so role-scoped ACL guarantees do not hold for that role. Accepted risk for demo/synthetic data; revisit before any real-PHI deployment.
+- **Admin/super may use the copilot.** Active-chart binding and the explicit-confirm write gate still apply at the module layer, but `admin/super` bypasses GACL ([`Security-10`](AUDIT.md#security-10-gacl-semantics-superuser-bypass-and-fail-open-caller-bugs)), so role-scoped ACL guarantees do not hold for that role. Accepted risk for demo/synthetic data; revisit before any real-PHI deployment.
 - **Writes:** proposal → **explicit confirm** → module executes → user sees accept/reject ([`USERS.md` §3.2](USERS.md)).
 - **Deploy-time hygiene** (from audit): CORS allowlist, safer API error responses, tighten cookies/logging for any real-PHI environment ([`Security-6`](AUDIT.md#security-6-cors-reflects-request-origin-while-emitting-credentialed-responses), [`Security-8`](AUDIT.md#security-8-api-500-responses-leak-raw-exception-messages), [`Security-7`](AUDIT.md#security-7-core-session-cookie-is-not-httponly-and-is-not-secure-by-default)).
 
@@ -157,7 +159,7 @@ Citations may request **in-chart navigation** through the parent OpenEMR shell; 
 
 Bounded POST endpoints under the module, e.g. identity, encounters, problems, allergies, medications, vitals, labs, note **metadata** (full text only on demand), social history. Each returns **source packs** (table/resource id, uuid, dates, retrieval path) so verification can cite.
 
-**Writes** (module only, after confirm): chief complaint / encounter reason, vitals, `history_data` tobacco, allergy row per existing services — see [`AUDIT.md` §Architecture-3](AUDIT.md#architecture-3-restfhir-apis-provide-the-cleanest-read-boundary-but-identifier-and-resource-coverage-are-uneven) and [`USERS.md` §7](USERS.md) for scope limits.
+**Writes** (module only, after confirm): chief complaint create/update/clear, vitals create/update/void (soft-delete via `forms.activity=0`), `history_data` tobacco create/update, allergy add/update via existing services, clinical-note create/update/soft-delete via `ClinicalNotesService` — see [`AUDIT.md` §Architecture-3](AUDIT.md#architecture-3-restfhir-apis-provide-the-cleanest-read-boundary-but-identifier-and-resource-coverage-are-uneven) and [`USERS.md` §7](USERS.md) for scope limits.
 
 ---
 
@@ -228,16 +230,24 @@ Anything not in [`USERS.md` §7.1 “V1 does not include”](USERS.md) stays out
 
 ## Traceability — capability ↔ use case
 
-| Capability | UC-A | UC-B | UC-C |
-| --- | :---: | :---: | :---: |
-| Pre-room briefing / what changed | ✓ | | |
-| CUI + launch handshake | ✓ | ✓ | ✓ |
-| Chart reads + citations | ✓ | ✓ | ✓ |
-| Physician-only visit capture + STT | | ✓ | ✓ |
-| Write proposals + explicit confirm | | ✓ | |
-| Post-room Q&A (no auto-writes) | | ✓ | ✓ |
-| Verification gate | ✓ | ✓ | ✓ |
-| Audit / active-chart binding | ✓ | ✓ | ✓ |
+V1 has eight use cases (UC-A through UC-H) per [`USERS.md` §4](USERS.md). UC-A is the auto-fired pre-room case presentation; UC-B / UC-C are read-shaped Q&A; UC-D through UC-G are the four confirmed-write surfaces (chief complaint, vitals, tobacco / allergy, clinical notes); UC-H is the refusal posture.
+
+| Capability | A | B | C | D | E | F | G | H |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| Pre-room intake-driven case presentation | ✓ | | | | | | | |
+| Single-domain chart Q&A | | ✓ | | | | | | |
+| Cross-domain reconciliation Q&A | | | ✓ | | | | | |
+| CUI + launch handshake | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Chart reads + citations | ✓ | ✓ | ✓ | | | | | |
+| Physician-only visit capture + STT | | | | ✓ | ✓ | ✓ | ✓ | |
+| Confirmed write: chief complaint (C/U/clear) | | | | ✓ | | | | |
+| Confirmed write: vitals (C/U/void) | | | | | ✓ | | | |
+| Confirmed write: tobacco / allergy add/update | | | | | | ✓ | | |
+| Confirmed write: clinical note (C/U/soft-delete) | | | | | | | ✓ | |
+| Post-room recap and Q&A continuation | | | ✓ | | | | | |
+| Refusal / graceful degradation | | | | | | | | ✓ |
+| Verification gate (citation + neg-claim + range + med-status) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Audit / active-chart binding | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 ---
 

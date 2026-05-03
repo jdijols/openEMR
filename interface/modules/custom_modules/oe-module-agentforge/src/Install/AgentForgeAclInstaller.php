@@ -44,13 +44,13 @@ final class AgentForgeAclInstaller
     private static function ensureAcosRegistered(GaclApi $gacl): void
     {
         if (!$gacl->get_object_section_section_id(null, AclMap::MODULE_SECTION, 'ACO')) {
-            $gacl->add_object_section('AgentForge', AclMap::MODULE_SECTION, 100, 0, 'ACO');
+            $gacl->add_object_section('Clinical Copilot', AclMap::MODULE_SECTION, 100, 0, 'ACO');
         }
 
         $acos = [
-            [AclMap::USE_COPILOT, 'AgentForge use clinical co-pilot'],
-            [AclMap::PROPOSE_WRITE, 'AgentForge propose write'],
-            [AclMap::MODULE_ADMIN, 'AgentForge module admin'],
+            [AclMap::USE_COPILOT, 'Clinical Copilot use'],
+            [AclMap::PROPOSE_WRITE, 'Clinical Copilot propose write'],
+            [AclMap::MODULE_ADMIN, 'Clinical Copilot module admin'],
         ];
 
         foreach ($acos as [$value, $title]) {
@@ -62,7 +62,7 @@ final class AgentForgeAclInstaller
 
     /**
      * Idempotent grants: Administrators, Physicians, Clinicians, and Emergency Login
-     * (`admin`, `doc`, `clin`, `breakglass`) receive Clinical Co-Pilot use + propose_write.
+     * (`admin`, `doc`, `clin`, `breakglass`) receive Clinical Copilot use + propose_write.
      * Front Office (`front`), Accounting (`back`), parent `users`, custom groups: no implicit grant.
      */
     private static function ensureDefaultAclGrants(GaclApi $gacl): void
@@ -133,7 +133,7 @@ final class AgentForgeAclInstaller
             1,
             1,
             'write',
-            'AgentForge default entitlement (' . $acoValue . '); adjust in ACL admin',
+            'Clinical Copilot default entitlement (' . $acoValue . '); adjust in ACL admin',
             'system',
         );
     }

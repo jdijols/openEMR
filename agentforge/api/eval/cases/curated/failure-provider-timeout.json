@@ -1,0 +1,13 @@
+{
+  "case_id": "failure-provider-timeout-typed-error",
+  "check": "provider_timeout_typed_error",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-failure-provider-timeout",
+  "use_case": "Resilience: upstream LLM/STT provider times out. API surfaces 504 with correlation_id so the failure is traceable in Langfuse.",
+  "context": {
+    "outcome": "provider_timeout",
+    "http_status": 504,
+    "correlation_id_present": true,
+    "message": "Upstream provider exceeded timeout; refusal returned to client."
+  }
+}

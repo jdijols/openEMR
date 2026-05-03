@@ -1,4 +1,6 @@
-# OpenEMR Pre-AgentForge Audit — Clinical Co-Pilot Stage 3
+# Clinical Copilot — OpenEMR Audit
+
+> Built on OpenEMR. Developed during the Gauntlet AI AgentForge program. Stage 3 hard-gate deliverable.
 
 > **Status:** Stage 3 hard-gate evidence and constraints document. Static review of the OpenEMR fork at HEAD on 2026-04-28. No live runtime, no production data, no profiler output. This document synthesizes two parallel audits ([`AUDIT.md`](AUDIT.md), [`audit2.md`](audit2.md)) into a single defensible deliverable. Severity legend used throughout: **Critical** (active risk to PHI, patient safety, or compliance — must address before agent touches production data), **High** (material gap that constrains agent design — address before Stage 4 build), **Medium** (notable risk shaping design choices), **Low** (hygiene), **Informational** (observation worth recording).
 
@@ -6,7 +8,7 @@
 
 ## Executive summary
 
-OpenEMR couples a legacy `library/`/`interface/` UI (session/`globals.php` patient and encounter context) with modern `src/` APIs (FHIR R4, SMART on FHIR). A read-only clinical co-pilot is feasible; Stage 3 is **pre-code**—architecture must reflect chart context, identity, and risk before any LLM reads PHI. Nine constraints on Stage 4–5:
+OpenEMR couples a legacy `library/`/`interface/` UI (session/`globals.php` patient and encounter context) with modern `src/` APIs (FHIR R4, SMART on FHIR). A read-only clinical copilot is feasible; Stage 3 is **pre-code**—architecture must reflect chart context, identity, and risk before any LLM reads PHI. Nine constraints on Stage 4–5:
 
 - **Cleartext PHI at rest** on `patient_data` (e.g. SSN, DOB, contact fields); [`CryptoGen`](src/Common/Crypto/CryptoGen.php) is not wired to clinical demographics. (→ §Security-5)
 - **Browser/API session risk:** [`CORSListener`](src/RestControllers/Subscriber/CORSListener.php) reflects `Origin` with credentialed preflight; [`SessionConfigurationBuilder::forCore`](src/Common/Session/SessionConfigurationBuilder.php) sets `cookie_httponly=false` for the main UI cookie—cross-origin and XSS paths matter. (→ §Security-6, §Security-7)
@@ -51,7 +53,7 @@ OpenEMR couples a legacy `library/`/`interface/` UI (session/`globals.php` patie
     - [`src/RestControllers/Authorization/BearerTokenAuthorizationStrategy.php`](src/RestControllers/Authorization/BearerTokenAuthorizationStrategy.php) verifies bearer tokens, sets session `authUser` / `authUserID` / `authProvider` for `users`, requires `api:oemr` for standard API routes and `api:port` for portal routes, and allows `users` access to API/FHIR while allowing `patient` access to portal/FHIR and `system` access to FHIR.
     - [`src/Common/Auth/UuidUserAccount.php`](src/Common/Auth/UuidUserAccount.php) resolves API subjects only as `users`, `patient`, or `system`.
     - [`src/RestControllers/Authorization/BearerTokenAuthorizationStrategy.php`](src/RestControllers/Authorization/BearerTokenAuthorizationStrategy.php) has `checkUserHasAccessToPatient()` returning `true` with a TODO describing future provider/clinic patient filtering.
-- **Implications for the agent:** A read-only co-pilot cannot infer clinician-specific read policy from API token role alone. The open handoff is not "OAuth or no OAuth"; it is whether the exact route/resource path also applies the OpenEMR ACLs and patient-binding semantics needed for the v1 clinician persona.
+- **Implications for the agent:** A read-only copilot cannot infer clinician-specific read policy from API token role alone. The open handoff is not "OAuth or no OAuth"; it is whether the exact route/resource path also applies the OpenEMR ACLs and patient-binding semantics needed for the v1 clinician persona.
 - **Mitigation / next step:** Test candidate chart-read routes with distinct OpenEMR ACL users (physician, nurse, resident) before claiming role-specific behavior; document each route's effective enforcement layer in Stage 5 ARCHITECTURE.md.
 - **Related:** `Architecture-3`, `Security-3`, `Security-10`.
 
@@ -107,7 +109,7 @@ OpenEMR couples a legacy `library/`/`interface/` UI (session/`globals.php` patie
     - [`src/RestControllers/Subscriber/CORSListener.php:67`](src/RestControllers/Subscriber/CORSListener.php) — the `getInitialResponse()` OPTIONS handler returns `'Access-Control-Allow-Credentials' => 'true'` plus an Origin reflection at line 73.
     - [`src/RestControllers/Subscriber/CORSListener.php:69`](src/RestControllers/Subscriber/CORSListener.php) — syntax error: `"Access-Control-Allow-Methods", "GET, HEAD, POST, PUT, DELETE, PATCH, TRACE, OPTIONS"` uses a comma instead of `=>` in the array literal, so the `Allow-Methods` header is silently dropped from the preflight (the entry becomes two unkeyed array values).
     - [`src/RestControllers/Subscriber/CORSListener.php:55, 72`](src/RestControllers/Subscriber/CORSListener.php) — TODO comments by `@adunsulag` already flag the open question of whether to allow all origins or restrict.
-- **Implications for the agent:** Any browser-embedded co-pilot UI that reads chart data through the OpenEMR API inherits this trust boundary. Adding an LLM call from the same browser context multiplies the attack surface, because a malicious origin that gets a CORS-authenticated session can also read whatever the agent fetches into the DOM.
+- **Implications for the agent:** Any browser-embedded copilot UI that reads chart data through the OpenEMR API inherits this trust boundary. Adding an LLM call from the same browser context multiplies the attack surface, because a malicious origin that gets a CORS-authenticated session can also read whatever the agent fetches into the DOM.
 - **Mitigation / next step:** Replace reflection with an explicit allowlist of registered SMART app origins (and any internal AgentForge UI host) before any deployment carries real PHI. Fix the line-69 syntax bug at the same time.
 - **Related:** `Security-7`, `Security-11`, `Compliance-5`.
 
@@ -120,7 +122,7 @@ OpenEMR couples a legacy `library/`/`interface/` UI (session/`globals.php` patie
     - [`src/Common/Session/SessionConfigurationBuilder.php:83–91`](src/Common/Session/SessionConfigurationBuilder.php) — `forCore()` calls `->setCookieHttpOnly(false)` with no compensating `setCookieSecure(true)`.
     - [`src/Common/Session/SessionConfigurationBuilder.php:94–101, 105–112`](src/Common/Session/SessionConfigurationBuilder.php) — by contrast, `forOAuth()` and `forApi()` correctly set `cookie_secure=true` (and `forOAuth()` sets `cookie_samesite='None'` for cross-site OAuth flows). The asymmetry is intentional but means the **most privileged** session has the **weakest** cookie defaults.
     - [`src/Common/Session/SessionConfigurationBuilder.php:115–122`](src/Common/Session/SessionConfigurationBuilder.php) — the portal preset (`forPortal`) also leaves `cookie_secure=false` (default).
-- **Implications for the agent:** A clinical co-pilot embedded in the OpenEMR UI runs in the same JavaScript context as the core session cookie. Any new page the agent introduces is a new XSS attack surface for that cookie. The agent's own UI must set CSP, sanitize all rendered model output, and prefer iframe isolation if model output ever reaches the DOM.
+- **Implications for the agent:** A clinical copilot embedded in the OpenEMR UI runs in the same JavaScript context as the core session cookie. Any new page the agent introduces is a new XSS attack surface for that cookie. The agent's own UI must set CSP, sanitize all rendered model output, and prefer iframe isolation if model output ever reaches the DOM.
 - **Mitigation / next step:** Set `cookie_secure=true` for `forCore()` and `forPortal()` in any production-like deployment. Identify the script(s) that need JS access to `OpenEMR` cookies and migrate them off cookie reads; do not weaken the cookie. Independently, treat the embedded UI as a high-CSP surface from day one.
 - **Related:** `Security-1`, `Security-6`, `Security-11`.
 
@@ -167,7 +169,7 @@ OpenEMR couples a legacy `library/`/`interface/` UI (session/`globals.php` patie
     - [`interface/login/login.php`](interface/login/login.php) and [`portal/index.php`](portal/index.php) set frame-denial headers; encounter/chart surfaces do not have the same simple global deny posture because they need to render normal authenticated UI.
     - [`src/Common/Session/SessionConfigurationBuilder.php`](src/Common/Session/SessionConfigurationBuilder.php) sets the OAuth session to `SameSite=None; Secure`, which is necessary for cross-site OAuth/iframe flows but means chat/tool endpoints must validate bearer tokens on every call rather than relying on cookie same-site behavior.
     - `Security-7` documents that the core UI session cookie is readable by JavaScript, making model-output rendering and iframe boundaries part of the security story.
-- **Implications for the agent:** Passing OAuth tokens in an iframe URL is too leaky for a PHI-bearing co-pilot. Referrer headers, server access logs, browser history, screenshots, or support tooling can all capture the token-bearing URL. A malicious framed parent/child relationship also needs to be constrained explicitly.
+- **Implications for the agent:** Passing OAuth tokens in an iframe URL is too leaky for a PHI-bearing copilot. Referrer headers, server access logs, browser history, screenshots, or support tooling can all capture the token-bearing URL. A malicious framed parent/child relationship also needs to be constrained explicitly.
 - **Mitigation / next step:** Prefer a parent-to-iframe `postMessage` handshake or short-lived one-time launch code over bearer tokens in URLs. Serve the sidecar with a narrow `Content-Security-Policy: frame-ancestors` allowlist for the OpenEMR origin, sanitize all rendered model output, and validate bearer/launch state on every chat/tool request.
 - **Related:** `Security-6`, `Security-7`, `Architecture-4`, `Compliance-5`.
 
@@ -312,7 +314,7 @@ OpenEMR couples a legacy `library/`/`interface/` UI (session/`globals.php` patie
 
 OpenEMR is best understood as a legacy PHP clinical application with modern layers added around it. The older application is concentrated in [`interface/`](interface/) browser pages and [`library/`](library/) helpers; the newer code is concentrated in [`src/`](src/) services, REST/FHIR controllers, events, and module infrastructure. The practical bridge between those worlds is [`interface/globals.php`](interface/globals.php), which acts as the shared application bootstrap: it establishes site context, session state, database access, global settings, authentication, current patient/encounter context, and module loading.
 
-For AgentForge, the most important fact is that OpenEMR already owns the hard application context: logged-in user, selected patient, selected encounter, site, permissions, and chart data. A new read-only co-pilot should attach through supported extension points instead of bypassing that context. The architecture evidence points to an embedded custom module as the most practical v1 demo surface, while REST/FHIR remains the cleanest read boundary to preserve testability and future extraction.
+For AgentForge, the most important fact is that OpenEMR already owns the hard application context: logged-in user, selected patient, selected encounter, site, permissions, and chart data. A new read-only copilot should attach through supported extension points instead of bypassing that context. The architecture evidence points to an embedded custom module as the most practical v1 demo surface, while REST/FHIR remains the cleanest read boundary to preserve testability and future extraction.
 
 ### Architecture-1: OpenEMR is a hybrid legacy/modern system with `interface/globals.php` as the shared runtime bridge
 
@@ -325,7 +327,7 @@ For AgentForge, the most important fact is that OpenEMR already owns the hard ap
     - [`interface/globals.php`](interface/globals.php) (~809 lines) creates the `HttpRestRequest`, initializes `OEGlobalsBag`, derives the site, opens the SQL layer, loads site `config.php`, conditionally includes [`library/auth.inc.php`](library/auth.inc.php), initializes modules, then writes active `pid`, `encounter`, and authorization context back into the globals bag.
     - Three template engines coexist: Twig 3.x (modern), Smarty 4.5 (legacy), and PHP file rendering. Frontend uses Angular 1.8 (past EOL Jan 2022), jQuery 3.7, Bootstrap 4.6.
     - Example UI pages still follow the legacy bootstrap pattern: [`interface/main/main_screen.php`](interface/main/main_screen.php) sets `$sessionAllowWrite = true` and then `require_once('../globals.php')`; [`interface/patient_file/summary/demographics.php`](interface/patient_file/summary/demographics.php) requires `../../globals.php` and legacy library includes before rendering the chart summary.
-- **Implications for the agent:** Any in-process AgentForge feature must account for two worlds at once: modern services and events are available, but request context and chart state still come from legacy globals/session variables. A read-only co-pilot should minimize direct dependence on `$GLOBALS`/ambient `$pid` where possible, and isolate any unavoidable use at the boundary.
+- **Implications for the agent:** Any in-process AgentForge feature must account for two worlds at once: modern services and events are available, but request context and chart state still come from legacy globals/session variables. A read-only copilot should minimize direct dependence on `$GLOBALS`/ambient `$pid` where possible, and isolate any unavoidable use at the boundary.
 - **Mitigation / next step:** Prefer an integration path that uses supported module/API/event seams while keeping AgentForge-specific chart aggregation in a small, testable boundary; carry detailed permission-scoping risks forward through `Security-2` and `Security-3`.
 - **Related:** `Security-1`, `Security-7`, `Architecture-4`.
 
@@ -359,7 +361,7 @@ For AgentForge, the most important fact is that OpenEMR already owns the hard ap
 - **Mitigation / next step:** Use FHIR/REST as the preferred data-access boundary where practical, but prototype v1 chart reads against the exact resources needed before committing to API-only integration. Decide explicitly whether MVP skips SOAP, mirrors synthetic note content into `form_clinical_notes`, or adds a narrow custom SOAP endpoint.
 - **Related:** `Security-2`, `Security-3`, `DataQuality-5`, `DataQuality-7`, `Performance-3`, `Performance-6`.
 
-### Architecture-4: Custom modules plus event hooks are the most plausible in-repo integration path for a v1 embedded read-only co-pilot
+### Architecture-4: Custom modules plus event hooks are the most plausible in-repo integration path for a v1 embedded read-only copilot
 
 - **Severity:** Informational
 - **Description:** OpenEMR has first-class extension seams for custom modules, menu/page-heading hooks, route extension events, and a polled background-service registry. A custom module can provide an embedded read-only UI and optionally register new read-only API routes without editing core services for a course demo.
@@ -507,7 +509,7 @@ For AgentForge, the most important fact is that OpenEMR already owns the hard ap
     - [`sql/database.sql`](sql/database.sql) `audit_master` / `audit_details` model approval/change-tracking records with approval statuses, comments, and field values. They are not a per-read PHI access log and should not be confused with `log` / `api_log` access evidence.
     - Disclosure tracking exists: [`interface/patient_file/summary/record_disclosure.php`](interface/patient_file/summary/record_disclosure.php) plus `list_options` `disclosure_type` (treatment / payment / healthcareoperations / etc.). An agent that fetches a chart on behalf of a third party (e.g., a referral) should write to this surface.
     - Amendments are tracked via `amendments` and `amendments_history` tables; portal access uses `patient_access_onsite.portal_pwd` for hashed credentials.
-- **Implications for the agent:** HIPAA-style auditability requires more than "the UI was open." A clinical co-pilot needs a defensible record that a specific authenticated user accessed a specific patient/source set for a specific generated answer, while avoiding full PHI duplication in logs. `audit_master` does not satisfy that access-provenance need; `log` / `api_log` provide useful evidence but still lack agent-specific fields and should be treated as inputs to, not substitutes for, an AgentForge read-audit model. Where the agent acts on behalf of a disclosure (third-party request), the existing `record_disclosure` surface should be used.
+- **Implications for the agent:** HIPAA-style auditability requires more than "the UI was open." A clinical copilot needs a defensible record that a specific authenticated user accessed a specific patient/source set for a specific generated answer, while avoiding full PHI duplication in logs. `audit_master` does not satisfy that access-provenance need; `log` / `api_log` provide useful evidence but still lack agent-specific fields and should be treated as inputs to, not substitutes for, an AgentForge read-audit model. Where the agent acts on behalf of a disclosure (third-party request), the existing `record_disclosure` surface should be used.
 - **Mitigation / next step:** In Stage 4/5, define an agent read-audit event shape that records user, patient, source identifiers, timestamp, and answer/session id without storing full chart text by default. Wire disclosure-triggered agent actions into `record_disclosure`.
 - **Related:** `Security-4`, `Compliance-6`, `Performance-9`.
 

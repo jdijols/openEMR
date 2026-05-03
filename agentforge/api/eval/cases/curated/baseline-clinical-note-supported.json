@@ -1,0 +1,10 @@
+{
+  "case_id": "baseline-clinical-note-supported",
+  "check": "unsupported_write_target_rejected",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-baseline-note-supported",
+  "use_case": "Baseline: clinical_note is a V1 supported write target (added with the clinical-notes CRUD ship). The unsupported-target rule trivially holds for supported targets — this fixture proves the V1_WRITE_TARGETS set was updated.",
+  "context": {
+    "write_target": "clinical_note"
+  }
+}

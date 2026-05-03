@@ -134,7 +134,7 @@ Diagnosis surfaced four genuinely independent bugs, not one:
 
 ### Docs sweep
 
-- [`Documentation/AgentForge/implementation/clinical-copilot-task-list.md`](../../../implementation/clinical-copilot-task-list.md) — Gate 5 status header notes G5-06/G5-07/G5-08 cut on 2026-05-01; G5-06/G5-07/G5-08 rows marked `[-]` with cut rationale + back-reference to this journal; G3-11 row rewritten to reflect the new auto-fire-as-singular-path + `(user_id, patient_uuid)` cache + Retry button architecture; G6-14 storyboard reference to UC-C recap struck through; cut-tier matrix row 1 updated (UC-C recap polish struck, G5-07/G5-08 polish struck); cross-reference appendix Gate 5 row notes UC-C recap cut.
+- [`TASKS.md`](../../../../../TASKS.md) — Gate 5 status header notes G5-06/G5-07/G5-08 cut on 2026-05-01; G5-06/G5-07/G5-08 rows marked `[-]` with cut rationale + back-reference to this journal; G3-11 row rewritten to reflect the new auto-fire-as-singular-path + `(user_id, patient_uuid)` cache + Retry button architecture; G6-14 storyboard reference to UC-C recap struck through; cut-tier matrix row 1 updated (UC-C recap polish struck, G5-07/G5-08 polish struck); cross-reference appendix Gate 5 row notes UC-C recap cut.
 - [`PRD.md`](../../../../../PRD.md) — §0.3 UC-A bullet rewritten to drop "Brief me" wording and document the auto-fire-as-singular-path + Retry-on-failure surface; §5.9 UC-C recap bullet struck through with cut date and rationale (tables stay for proposal/confirmation/refusal audit); §13.2 Loom script Section 2 rewritten (no "Brief me" prompt — auto-fire) and Section 4 retitled to UC-B post-room confirm trail (recap removed).
 
 ## Outcomes
@@ -160,5 +160,5 @@ Diagnosis surfaced four genuinely independent bugs, not one:
 - Bug log: [`Documentation/AgentForge/implementation/post-deploy-bug-log.md`](../../../implementation/post-deploy-bug-log.md).
 - Prior session journal: [`./0501-T1430-post-deploy-bugs-p1-p3-closed.md`](./0501-T1430-post-deploy-bugs-p1-p3-closed.md).
 - Cross-reference journal (older "kill Brief me / what did we capture" intent): [`./0430-T2314-dictation-agent-parity.md`](./0430-T2314-dictation-agent-parity.md).
-- Task list: [`Documentation/AgentForge/implementation/clinical-copilot-task-list.md`](../../../implementation/clinical-copilot-task-list.md).
+- Task list: [`TASKS.md`](../../../../../TASKS.md).
 - PRD: [`PRD.md`](../../../../../PRD.md) §0.3 UC-A, §5.9 UC-C, §13.2 Loom.

@@ -3,17 +3,17 @@ date: 2026-04-30
 topic: Gate 2 — session handoff (historical; G2-12 closed 2026-04-30)
 superseded_by: 0430-T1830-gate2-closed-g212-manual-smoke.md
 related_docs:
-  - Documentation/AgentForge/implementation/clinical-copilot-task-list.md
+  - TASKS.md
   - PRD.md (Gate 2 spine)
 ---
 
 # Gate 2 session handoff — what landed, what’s left
 
-**Update:** **G2-12 closed** and Gate 2 marked **CLOSED** in `clinical-copilot-task-list.md` with live smoke evidence in [`0430-T1830-gate2-closed-g212-manual-smoke.md`](./0430-T1830-gate2-closed-g212-manual-smoke.md). **Follow-up:** active chart ↔ rail sync is **G3-12** (Gate 3) in the task list (historical notes below may say “G2-14”).
+**Update:** **G2-12 closed** and Gate 2 marked **CLOSED** in `TASKS.md` with live smoke evidence in [`0430-T1830-gate2-closed-g212-manual-smoke.md`](./0430-T1830-gate2-closed-g212-manual-smoke.md). **Follow-up:** active chart ↔ rail sync is **G3-12** (Gate 3) in the task list (historical notes below may say “G2-14”).
 
 ## Goal of this session
 
-Unblock the Clinical Co-Pilot **end-to-end read slice**: rail + `panel.php` + CUI handshake + Agent API chat + OpenEMR context endpoints + Anthropic LLM, with dev ergonomics and prod-shaped API exposure. Close gaps blocking **G2-12** manual smoke; host UX for patient switches without reload is now **G3-12** (Gate 3).
+Unblock the Clinical Copilot **end-to-end read slice**: rail + `panel.php` + CUI handshake + Agent API chat + OpenEMR context endpoints + Anthropic LLM, with dev ergonomics and prod-shaped API exposure. Close gaps blocking **G2-12** manual smoke; host UX for patient switches without reload is now **G3-12** (Gate 3).
 
 ## Summary — what we shipped or fixed
 
@@ -35,7 +35,7 @@ Unblock the Clinical Co-Pilot **end-to-end read slice**: rail + `panel.php` + CU
 - **Prod API**: Caddy TLS reverse proxy; API not published on host `3000` in prod overlay.
 - **`OPENEMR_MODULE_BASE_URL`**: internal `http://openemr/...` for container API; dev uses `http://localhost:8300/...`; `openemr` on `agentforge_internal` network.
 
-### Task list (`clinical-copilot-task-list.md`)
+### Task list (`TASKS.md`)
 
 - **G2-12** row points to an **operator checklist** (stack, host API, one patient, rail order, allergy + citation, S1 cross-patient note, journal path).
 - **Active chart sync** (now **G3-12**): reload `panel.php` / re-handshake when `pid` changes; was deferred post–G2-12; documents current `panelLoaded` single-load behavior.
@@ -62,13 +62,13 @@ Unblock the Clinical Co-Pilot **end-to-end read slice**: rail + `panel.php` + CU
 
 ### G2-12 — close the gate
 
-1. Run operator checklist in `clinical-copilot-task-list.md` (**G2-12 operator checklist**).
+1. Run operator checklist in `TASKS.md` (**G2-12 operator checklist**).
 2. Capture **journal** under this folder: cited allergy answer; **S1** cross-patient attempt (document refusal / mismatch / no leak; use **full reload** between patients for a strict A→B check if needed).
-3. In `clinical-copilot-task-list.md`: mark **G2-12** `[x]`, set Gate 2 **Status** to **CLOSED** with date.
+3. In `TASKS.md`: mark **G2-12** `[x]`, set Gate 2 **Status** to **CLOSED** with date.
 
 ### G3-12 — active chart sync (Gate 3)
 
-- On OpenEMR active patient change: reset iframe/`panelLoaded` or set `frame.src` to `panel.php` again (or `postMessage` + re-handshake), so CUI `data-patient-uuid` and token binding match the main chart **without** full page reload. (`clinical-copilot-task-list.md` — **G3-12**.)
+- On OpenEMR active patient change: reset iframe/`panelLoaded` or set `frame.src` to `panel.php` again (or `postMessage` + re-handshake), so CUI `data-patient-uuid` and token binding match the main chart **without** full page reload. (`TASKS.md` — **G3-12**.)
 
 ## Files touched in this workstream (reference)
 
@@ -88,7 +88,7 @@ Unblock the Clinical Co-Pilot **end-to-end read slice**: rail + `panel.php` + CU
 
 **Docs**
 
-- `Documentation/AgentForge/implementation/clinical-copilot-task-list.md`
+- `TASKS.md`
 - This journal file
 
 ## Quick commands (next session)

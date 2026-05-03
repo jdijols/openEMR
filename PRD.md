@@ -1,6 +1,6 @@
-# AgentForge V1 — Clinical Co-Pilot PRD
+# AgentForge V1 — Clinical Copilot PRD
 
-> **What this is:** Engineer-facing implementation spec for the **full V1 Clinical Co-Pilot**, shipping by **Sun May 3, 2026 — 12:00 local** (Gauntlet AgentForge final submission). This document operationalizes the decisions already made in [`AUDIT.md`](AUDIT.md), [`USERS.md`](USERS.md), and [`ARCHITECTURE.md`](ARCHITECTURE.md). It does not re-decide architecture; it turns those decisions into sections, contracts, file paths, and acceptance criteria that map 1:1 to weekend task lists.
+> **What this is:** Engineer-facing implementation spec for the **full V1 Clinical Copilot**, shipping by **Sun May 3, 2026 — 12:00 local** (Gauntlet AgentForge final submission). This document operationalizes the decisions already made in [`AUDIT.md`](AUDIT.md), [`USERS.md`](USERS.md), and [`ARCHITECTURE.md`](ARCHITECTURE.md). It does not re-decide architecture; it turns those decisions into sections, contracts, file paths, and acceptance criteria that map 1:1 to weekend task lists.
 
 > **Audience:** the engineer (human + AI pair) executing this weekend. Opinionated, file-pathed, task-able. Light on background, heavy on contracts.
 
@@ -31,7 +31,7 @@
 The Gauntlet AgentForge submission requires four artifacts. The PRD's "done" definition is anchored to all four landing successfully:
 
 - [ ] **Repo deliverables in this fork:** [`AUDIT.md`](AUDIT.md), [`USERS.md`](USERS.md), [`ARCHITECTURE.md`](ARCHITECTURE.md), this [`PRD.md`](PRD.md), and the implementation code under `interface/modules/custom_modules/oe-module-agentforge/`, `agentforge/api/`, `agentforge/cui/`, and `docker/agentforge/`.
-- [ ] **Live URL** — public HTTPS endpoint served by Caddy on a Linux VPS (default: Vultr per [`process/09-vps-live-deployment.md`](Documentation/AgentForge/process/09-vps-live-deployment.md)). OpenEMR shell + co-pilot reachable to graders.
+- [ ] **Live URL** — public HTTPS endpoint served by Caddy on a Linux VPS (default: Vultr per [`process/09-vps-live-deployment.md`](Documentation/AgentForge/process/09-vps-live-deployment.md)). OpenEMR shell + copilot reachable to graders.
 - [ ] **Loom** — **~5 min walkthrough (≤7 min cap)** per Gauntlet PDF Submission Requirements row 5 ("Demo Video (3–5 min)"); hitting architecture decisions, UC-A, UC-B (with at least one confirmed write demonstrated end-to-end), and UC-C.
 - [ ] **Social post** — X or LinkedIn thread per the case study, tagging `@GauntletAI`.
 
@@ -216,7 +216,7 @@ openEMR/
 ### 3.3 Why this layout (rationale, captured here so §3 can be challenged in isolation)
 
 - **Single `git push` deploys all three runtimes.** Eliminates inter-repo drift on a 4-day deadline. This is the #1 risk called out in [`ARCHITECTURE.md` "PHP + Node integration seams"](ARCHITECTURE.md).
-- **PHP module at the OpenEMR-conventional path** so OpenEMR module discovery, GACL hooks, and event-dispatcher registration Just Work (see [`AUDIT.md` Architecture-4](AUDIT.md#architecture-4-custom-modules-plus-event-hooks-are-the-most-plausible-in-repo-integration-path-for-a-v1-embedded-read-only-co-pilot)).
+- **PHP module at the OpenEMR-conventional path** so OpenEMR module discovery, GACL hooks, and event-dispatcher registration Just Work (see [`AUDIT.md` Architecture-4](AUDIT.md#architecture-4-custom-modules-plus-event-hooks-are-the-most-plausible-in-repo-integration-path-for-a-v1-embedded-read-only-copilot)).
 - **`agentforge/` namespace** keeps non-PHP code clearly separated from upstream OpenEMR for any future extraction. Helps preserve the GPLv3 boundary discussion in [`AUDIT.md` Compliance-4](AUDIT.md#compliance-4-gplv3-constrains-release-shape-for-in-repomodule-integration).
 - **One Compose graph** under `docker/agentforge/` extending `docker/development-easy/` gives laptop-parity with the VPS, closing the Stage 2 "deploy drift" risk.
 - **Typed HTTP contract is release-locked.** Any change to a Context Service endpoint or a write endpoint must update both the PHP request/response classes and the TypeScript client in the same commit. Enforced by §3.4 below.
@@ -232,7 +232,7 @@ openEMR/
 ### 3.5 Cross-references
 
 - [`ARCHITECTURE.md` "PHP + Node: integration seams"](ARCHITECTURE.md) — risk table this layout is mitigating.
-- [`AUDIT.md` Architecture-4](AUDIT.md#architecture-4-custom-modules-plus-event-hooks-are-the-most-plausible-in-repo-integration-path-for-a-v1-embedded-read-only-co-pilot) — module path is the supported integration surface.
+- [`AUDIT.md` Architecture-4](AUDIT.md#architecture-4-custom-modules-plus-event-hooks-are-the-most-plausible-in-repo-integration-path-for-a-v1-embedded-read-only-copilot) — module path is the supported integration surface.
 - [`AUDIT.md` Compliance-4](AUDIT.md#compliance-4-gplv3-constrains-release-shape-for-in-repomodule-integration) — release-shape constraint.
 
 ---
@@ -251,14 +251,14 @@ This section operationalizes the OpenEMR-side of [`ARCHITECTURE.md` "Three parts
 
 #### 4.1.2 Done means
 
-- [ ] Module appears in the OpenEMR module manager under a discoverable name (e.g. "AgentForge Co-Pilot").
+- [ ] Module appears in the OpenEMR module manager under a discoverable name (e.g. "AgentForge Copilot").
 - [ ] Module can be installed/activated/uninstalled cleanly from the module manager UI.
 - [ ] PSR-4 autoload resolves `OpenEMR\Modules\AgentForge\Bootstrap` without composer regeneration on the host.
 - [ ] No globals leak from `Bootstrap` into request scope; all state lives on injected services.
 
 #### 4.1.3 Cross-references
 
-- [`AUDIT.md` Architecture-4](AUDIT.md#architecture-4-custom-modules-plus-event-hooks-are-the-most-plausible-in-repo-integration-path-for-a-v1-embedded-read-only-co-pilot) — module-plus-events is the supported path.
+- [`AUDIT.md` Architecture-4](AUDIT.md#architecture-4-custom-modules-plus-event-hooks-are-the-most-plausible-in-repo-integration-path-for-a-v1-embedded-read-only-copilot) — module-plus-events is the supported path.
 - [`CLAUDE.md`](CLAUDE.md) "Service Layer Pattern" — extend `BaseService` where applicable.
 
 ### 4.2 Header chat-icon hook + right-rail container shim + `panel.php` iframe loader
@@ -603,12 +603,12 @@ Scenario: OpenEMR rejects the write
 
 - `OpenEMR\Modules\AgentForge\Acl\AclMap` centralizes the ACL specs used by the module:
   - **Chart floor:** read paths (`Context Service`), rail launch (`panel.php`/`launch.php`), and header chrome remain gated first on OpenEMR chart-demographics ACL `patients/demo` ("can this session see demographics for the active chart" — identical floor to ordinary chart workflows).
-  - **Product entitlement:** the Clinical Co-Pilot UX additionally requires module-owned **`agentforge` / `use`**. Opens with `patients/demo` alone (but without `agentforge/use`) therefore stay denied unless an admin assigns the AgentForge ACO via GACL — e.g. default seed grants `agentforge/use` + `agentforge/propose_write` to stock groups **Administrators, Physicians, Clinicians**, and **Emergency Login** only; Accounting and Front Office are not seeded.
+  - **Product entitlement:** the Clinical Copilot UX additionally requires module-owned **`agentforge` / `use`**. Opens with `patients/demo` alone (but without `agentforge/use`) therefore stay denied unless an admin assigns the AgentForge ACO via GACL — e.g. default seed grants `agentforge/use` + `agentforge/propose_write` to stock groups **Administrators, Physicians, Clinicians**, and **Emergency Login** only; Accounting and Front Office are not seeded.
   - **Writes:** UC-B endpoints require **`agentforge` / `propose_write`** on top of Context Service ingress (chart floor + product use + binding + tokens); `AclMap::userPassesAgentForgeProposeWriteGate()` folds the stack for write scripts.
   - Module-owned **`agentforge` / `module_admin`** remains available for future module administration tooling; it is distinct from Runtime read/write gates.
 - Each authorization decision is expressed through `AclMain::aclCheckCore('<section>', '<value>')` (or helpers that compose only non-empty specs). This closes the [`AUDIT.md` Security-10](AUDIT.md#security-10-gacl-semantics-superuser-bypass-and-fail-open-caller-bugs) "empty ACO spec → fail-open" hole.
-- `admin/super` users are allowed to launch and use the co-pilot under the same OpenEMR session semantics as physicians. The accepted risk is that `admin/super` bypasses normal GACL, so role-scoped ACL guarantees do not apply to that account class; active-chart binding, launch-code/token hygiene, explicit-confirm writes, and V1 write-target limits still apply.
-- The co-pilot is not a parallel privilege plane: if OpenEMR would deny an action for the current session, the module denies it too; if OpenEMR grants it (including superuser grant), the co-pilot may use it within V1 scope.
+- `admin/super` users are allowed to launch and use the copilot under the same OpenEMR session semantics as physicians. The accepted risk is that `admin/super` bypasses normal GACL, so role-scoped ACL guarantees do not apply to that account class; active-chart binding, launch-code/token hygiene, explicit-confirm writes, and V1 write-target limits still apply.
+- The copilot is not a parallel privilege plane: if OpenEMR would deny an action for the current session, the module denies it too; if OpenEMR grants it (including superuser grant), the copilot may use it within V1 scope.
 
 #### 4.9.2 Done means
 
@@ -1513,16 +1513,16 @@ Scenario: No tokens in URLs
 
 Cross-references: [`AUDIT.md` Security-11](AUDIT.md#security-11-embedded-ui-iframe-and-oauth-token-exposure).
 
-### 8.3 No privilege bypass through the co-pilot
+### 8.3 No privilege bypass through the copilot
 
 ```gherkin
-Scenario: Co-pilot mirrors OpenEMR authorization
+Scenario: Copilot mirrors OpenEMR authorization
   Given the active OpenEMR user is authenticated and can open the chart
    When the user opens the AgentForge rail
    Then the launch handshake succeeds for that session
     And the session token is bound to the same user and active chart
     And every read/write endpoint still enforces its non-empty ACL spec and active-chart binding
-    And `admin/super` receives no additional co-pilot bypass beyond normal OpenEMR superuser semantics
+    And `admin/super` receives no additional copilot bypass beyond normal OpenEMR superuser semantics
 ```
 
 Cross-references: [`AUDIT.md` Security-10](AUDIT.md#security-10-gacl-semantics-superuser-bypass-and-fail-open-caller-bugs); [`ARCHITECTURE.md` "Security rules we do not relax"](ARCHITECTURE.md).

@@ -45,6 +45,6 @@ $encounterId = (new AppointmentEncounterBinder())->bindForCurrentPatient($pid)->
 $service = new LaunchCode(new OpenEmrLaunchCodeStore());
 $code = $service->mint($userId, $patientUuid, $encounterId, new \DateTimeImmutable('now'));
 $attr = \htmlspecialchars($code, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8');
-$html = '<!DOCTYPE html><html lang="en" data-launch-code="' . $attr . '"><head><meta charset="utf-8"><title>AgentForge</title></head><body></body></html>';
+$html = '<!DOCTYPE html><html lang="en" data-launch-code="' . $attr . '"><head><meta charset="utf-8"><title>Clinical Copilot</title></head><body></body></html>';
 
 \agentforge_emit_html(200, $html);

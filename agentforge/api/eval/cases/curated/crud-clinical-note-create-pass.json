@@ -1,0 +1,11 @@
+{
+  "case_id": "crud-clinical-note-create-no-write-without-confirm",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-crud-note-create-pass",
+  "use_case": "UC-E clinical note CREATE: proposal → confirm → write happy path.",
+  "steps": [
+    { "kind": "proposal", "proposal_id": "prop-note-create-1" },
+    { "kind": "confirm", "proposal_id": "prop-note-create-1" },
+    { "kind": "openemr_write", "proposal_id": "prop-note-create-1" }
+  ]
+}

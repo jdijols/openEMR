@@ -1,0 +1,10 @@
+{
+  "case_id": "baseline-clinical-note-delete-supported",
+  "check": "unsupported_write_target_rejected",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-baseline-note-delete-supported",
+  "use_case": "Baseline: clinical_note_delete (soft-delete via forms.activity = 0) is a V1 supported write target.",
+  "context": {
+    "write_target": "clinical_note_delete"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "case_id": "baseline-vitals-delete-supported",
+  "check": "unsupported_write_target_rejected",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-baseline-vitals-delete-supported",
+  "use_case": "Baseline: vitals_delete (soft-delete via forms.activity = 0) is a V1 supported write target. Implemented in propose_writes.ts (propose_vitals_delete) + public/write/vitals_delete.php.",
+  "context": {
+    "write_target": "vitals_delete"
+  }
+}

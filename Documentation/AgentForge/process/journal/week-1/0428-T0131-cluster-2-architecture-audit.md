@@ -8,7 +8,7 @@ related_milestone: process/06-stage3-audit.md
 
 ## Goal
 
-Document how OpenEMR is organized, where v1 chart data lives, how browser/API layers interact, and which integration surfaces are plausible for adding a read-only AgentForge clinical co-pilot.
+Document how OpenEMR is organized, where v1 chart data lives, how browser/API layers interact, and which integration surfaces are plausible for adding a read-only AgentForge clinical copilot.
 
 ## Context
 
@@ -38,7 +38,7 @@ Cluster 1.5 locked the v1 persona as adult PCP / family medicine, non-emergent v
 
 - **Prompt:** "Recommend the most plausible integration path for v1, but only as far as architecture evidence supports."
 - **Recommendation:** Choose an OpenEMR custom module as the strongest in-repo v1 path because the repo has first-class module bootstrap, namespace loading, menu/page-heading hooks, REST/FHIR route extension events, and active-module access checks. Keep API-only extraction as a design constraint, not the immediate demo surface.
-- **Outcome:** [`AUDIT.md` §Architecture-4](../../../../AUDIT.md#architecture-4-custom-modules-plus-event-hooks-are-the-most-plausible-in-repo-integration-path-for-a-v1-embedded-read-only-co-pilot) landed; presearch §15 now has a partial hosting/rollback answer based on module architecture.
+- **Outcome:** [`AUDIT.md` §Architecture-4](../../../../AUDIT.md#architecture-4-custom-modules-plus-event-hooks-are-the-most-plausible-in-repo-integration-path-for-a-v1-embedded-read-only-copilot) landed; presearch §15 now has a partial hosting/rollback answer based on module architecture.
 
 ## Trade-offs and alternatives
 

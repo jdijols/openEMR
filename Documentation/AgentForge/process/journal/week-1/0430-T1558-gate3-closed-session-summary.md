@@ -1,7 +1,7 @@
 ---
 date: 2026-04-30
 topic: Gate 3 formal close + CUI/case presentation/session doc (task list, parser, citations)
-related_milestone: process/13-gate3-complete.md, implementation/clinical-copilot-task-list.md
+related_milestone: process/13-gate3-complete.md, implementation/TASKS.md
 ---
 
 # Gate 3 closed — session journal
@@ -38,7 +38,7 @@ Gate 3 engineering (endpoints, verification, auto case presentation, G3-00 / G3-
 
 - **Prompt:** Mark G3-01 / G3-11 complete without blocking on small changes; move polish to a later gate if needed.
 - **Recommendation:** **`[x]`** G3-01 / G3-11 for shipped MUST scope; **G6-20** = Context HTTP matrix backfill; **G6-14** = ≥3 chart-open case presentation rehearsals + demo storyboard; **G7-08** = case presentation + CUI polish (tier 1). Gate 3 status **CLOSED (2026-04-30)**; add **process/13-gate3-complete.md** and README trail row 13.
-- **Outcome:** `clinical-copilot-task-list.md` (Gate 3 header, G6-14/20, G7-08, cut-tier matrix); `README.md`; `dev-spend-log.md` row; this journal; **`process/13-gate3-complete.md`**.
+- **Outcome:** `TASKS.md` (Gate 3 header, G6-14/20, G7-08, cut-tier matrix); `README.md`; `dev-spend-log.md` row; this journal; **`process/13-gate3-complete.md`**.
 
 ### Decision: Remove “Refresh case presentation” control
 
@@ -57,7 +57,7 @@ Gate 3 engineering (endpoints, verification, auto case presentation, G3-00 / G3-
 
 ## Files touched
 
-- **Modified:** `Documentation/AgentForge/implementation/clinical-copilot-task-list.md`
+- **Modified:** `TASKS.md`
 - **Modified:** `Documentation/AgentForge/README.md`
 - **Modified:** `Documentation/AgentForge/implementation/dev-spend-log.md`
 - **Created:** `Documentation/AgentForge/process/13-gate3-complete.md`
@@ -72,11 +72,11 @@ Gate 3 engineering (endpoints, verification, auto case presentation, G3-00 / G3-
 
 ## Next steps
 
-- [ ] Start **Gate 4** in a new session from [`clinical-copilot-task-list.md` § Gate 4](../../../implementation/clinical-copilot-task-list.md#gate-4--uc-b-confirmed-writes).
+- [ ] Start **Gate 4** in a new session from [`TASKS.md` § Gate 4](../../../../../TASKS.md#gate-4--uc-b-confirmed-writes).
 - [ ] During **Gate 6 / 7:** complete **G6-14** storyboard + case presentation captures, optional **G6-20** HTTP matrix, optional **G7-08** polish before Loom.
 - [ ] Optional: add **`process/14-…`** when Gate 4 closes (per README “How to extend”).
 
 ## Links
 
 - Milestone: [process/13-gate3-complete.md](../../13-gate3-complete.md)
-- Task list: [clinical-copilot-task-list.md](../../../implementation/clinical-copilot-task-list.md)
+- Task list: [TASKS.md](../../../../../TASKS.md)

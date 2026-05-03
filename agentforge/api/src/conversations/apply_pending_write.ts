@@ -5,7 +5,9 @@ import { fetchPendingProposal, markProposalFinal } from './store.js';
 
 const WRITE_TARGETS = [
   'chief_complaint',
+  'chief_complaint_delete',
   'vitals',
+  'vitals_delete',
   'tobacco',
   'allergy',
   'clinical_note',
@@ -20,7 +22,9 @@ function isWriteTarget(v: string): v is WriteTarget {
 
 const RELATIVE_PATH: Record<WriteTarget, string> = {
   chief_complaint: 'write/chief_complaint.php',
+  chief_complaint_delete: 'write/chief_complaint_delete.php',
   vitals: 'write/vitals.php',
+  vitals_delete: 'write/vitals_delete.php',
   tobacco: 'write/tobacco.php',
   allergy: 'write/allergy.php',
   clinical_note: 'write/clinical_note.php',
@@ -30,7 +34,9 @@ const RELATIVE_PATH: Record<WriteTarget, string> = {
 
 const ENCOUNTER_REQUIRED_TARGETS: ReadonlySet<WriteTarget> = new Set([
   'chief_complaint',
+  'chief_complaint_delete',
   'vitals',
+  'vitals_delete',
   'clinical_note',
   'clinical_note_update',
   'clinical_note_delete',

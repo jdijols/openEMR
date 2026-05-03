@@ -1,0 +1,10 @@
+{
+  "case_id": "crud-vitals-delete-write-without-confirm-fails",
+  "expect_pass_for_eval_report": false,
+  "correlation_id": "eval-crud-vitals-delete-no-confirm",
+  "use_case": "Negative case: vitals soft-delete write attempted with no clinician confirm. The no_write_without_confirm rule MUST detect this — proves the gate covers delete-shaped writes too. expect_pass_for_eval_report=false because the harness inverts: rule must FAIL on this trace, harness PASSES.",
+  "steps": [
+    { "kind": "proposal", "proposal_id": "prop-vitals-delete-2" },
+    { "kind": "openemr_write", "proposal_id": "prop-vitals-delete-2" }
+  ]
+}

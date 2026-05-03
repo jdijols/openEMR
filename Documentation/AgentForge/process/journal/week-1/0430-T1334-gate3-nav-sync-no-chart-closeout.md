@@ -1,14 +1,14 @@
 ---
 date: 2026-04-30
 topic: Gate 3 UX — citation shell navigation, chart_section routing, closing chart clears CUI + session wrap
-related_milestone: Documentation/AgentForge/process/12-gate1-gate2-complete.md, implementation/clinical-copilot-task-list.md (Gate 3)
+related_milestone: Documentation/AgentForge/process/12-gate1-gate2-complete.md, implementation/TASKS.md (Gate 3)
 ---
 
 # Gate 3 navigation, active chart sync, no-chart UX — session journal
 
 ## Goal
 
-Finish Gate 3 UX and safety behaviors for the Clinical Co-Pilot rail: citations must not bust the OpenEMR tabs chrome; non-encounter citations should land on meaningful chart surfaces; active patient switches must reload the iframe; closing the chart must clear stale chat / PHI from the rail. Capture evidence for handoff to the next chat to finish remaining Gate 3 rows (PHPUnit pack, task-list closeout).
+Finish Gate 3 UX and safety behaviors for the Clinical Copilot rail: citations must not bust the OpenEMR tabs chrome; non-encounter citations should land on meaningful chart surfaces; active patient switches must reload the iframe; closing the chart must clear stale chat / PHI from the rail. Capture evidence for handoff to the next chat to finish remaining Gate 3 rows (PHPUnit pack, task-list closeout).
 
 ## Context
 
@@ -61,7 +61,7 @@ _Local verification invoked during development (not exhaustive):_
 
 _Earlier in the same Gate 3 thread (summary; not necessarily re-listed in git here):_
 
-- Orchestrator/tool evidence/handshake/MessageList/context endpoints, `Documentation/AgentForge/implementation/dev-spend-log.md`, `docker/agentforge/README.md`, `Documentation/AgentForge/implementation/clinical-copilot-task-list.md`, `PRD.md`, Vitest/PHPUnit additions under `agentforge/api/test/`, `agentforge/cui/src/chat/*.test.*`.
+- Orchestrator/tool evidence/handshake/MessageList/context endpoints, `Documentation/AgentForge/implementation/dev-spend-log.md`, `docker/agentforge/README.md`, `TASKS.md`, `PRD.md`, Vitest/PHPUnit additions under `agentforge/api/test/`, `agentforge/cui/src/chat/*.test.*`.
 
 ## Outcomes
 
@@ -71,7 +71,7 @@ _Earlier in the same Gate 3 thread (summary; not necessarily re-listed in git he
 
 ## Next steps
 
-- [x] In `clinical-copilot-task-list.md`: refresh Gate 3 **Implementation status**; see [`0430-T1437-gate3-g300-tasklist-closeout.md`](./0430-T1437-gate3-g300-tasklist-closeout.md).
+- [x] In `TASKS.md`: refresh Gate 3 **Implementation status**; see [`0430-T1437-gate3-g300-tasklist-closeout.md`](./0430-T1437-gate3-g300-tasklist-closeout.md).
 - [ ] **G3-11 done proof:** append at least three storyboard transcripts (patient ids + cited “what changed” / briefing) — same week folder; template in 0430-T1437.
 - [x] **G3-00:** migrate proof cited in `docker/agentforge/README.md` + [`0430-T1437`](./0430-T1437-gate3-g300-tasklist-closeout.md).
 - [ ] **Optional G3-01:** PHPUnit four-scenario packs per Context endpoint (`tier 6`).
@@ -79,5 +79,5 @@ _Earlier in the same Gate 3 thread (summary; not necessarily re-listed in git he
 
 ## Links
 
-- Task list: [clinical-copilot-task-list.md](../../../implementation/clinical-copilot-task-list.md)
+- Task list: [TASKS.md](../../../../../TASKS.md)
 - Prior handoff (Gate 2): [0430-T0050-gate2-session-handoff-g212-g214.md](./0430-T0050-gate2-session-handoff-g212-g214.md)

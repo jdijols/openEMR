@@ -18,7 +18,7 @@ Validated services include `openemr`, `agentforge-api`, `postgres`, `mysql`, `ca
 Run when OpenEMR + module SQL are applied and `secrets.env` is present (or equivalent env on PHP + Node):
 
 1. **S5** — Open `panel.php` or `launch.php` authenticated; response HTML contains `data-launch-code` only (no `?launch_code=` in address bar).
-2. **S4** — As `admin` or admin-super user, `panel.php` mints a launch code when the normal OpenEMR session/ACL permits it; there is no co-pilot-only admin block and no empty ACL spec.
+2. **S4** — As `admin` or admin-super user, `panel.php` mints a launch code when the normal OpenEMR session/ACL permits it; there is no copilot-only admin block and no empty ACL spec.
 3. **S1/S5** — `curl` redeem: POST `handshake_redeem.php` with `X-Internal-Auth` + JSON `{"launch_code":"…"}`; second POST with same code returns `401` `invalid_launch_code`.
 4. **S6** — Trigger agent API `500` path (any thrown error); body must be `internal_error` + `correlation_id` only (no SQL/PHI strings).
 

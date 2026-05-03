@@ -7,7 +7,7 @@
 #
 #   §8.1 Active-chart binding (defense in depth) — both module + agent layers
 #   §8.2 No tokens in URLs
-#   §8.3 No co-pilot privilege bypass (auth required)
+#   §8.3 No copilot privilege bypass (auth required)
 #   §8.4 CORS allowlist enforced (not reflective)
 #   §8.5 Generic 500s + correlation id (no exception leakage)
 #   §8.7 Redacted Langfuse trace bodies (covered by Vitest unit tests; this
@@ -139,7 +139,7 @@ echo
 	fi
 }
 
-# ── §8.3 No co-pilot privilege bypass ─────────────────────────────────────────
+# ── §8.3 No copilot privilege bypass ─────────────────────────────────────────
 # present-patient without auth must 401 (cannot read a chart without session).
 {
 	body="${tmp_root}/body-83.txt"

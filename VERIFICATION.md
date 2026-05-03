@@ -1,8 +1,10 @@
-# Verification
+# Clinical Copilot — Verification
+
+> Built on OpenEMR. Developed during the Gauntlet AI AgentForge program.
 
 ## Summary
 
-Every chat response the Clinical Co-Pilot produces passes through a deterministic verification layer before it reaches the clinician. The layer answers a single question: *is the agent claiming something the patient's chart actually supports?* If the answer is no, the offending claim is stripped; if every claim in the response is stripped, the entire turn is replaced with a refusal block. There is no path by which a clinician sees an unattributed assertion presented as fact.
+Every chat response the Clinical Copilot produces passes through a deterministic verification layer before it reaches the clinician. The layer answers a single question: *is the agent claiming something the patient's chart actually supports?* If the answer is no, the offending claim is stripped; if every claim in the response is stripped, the entire turn is replaced with a refusal block. There is no path by which a clinician sees an unattributed assertion presented as fact.
 
 Verification runs after the LLM has produced its draft response and after every tool call has returned. It is a post-hoc gate over the agent's output, not a runtime guardrail inside the model loop. That choice is deliberate — the model is fast, fluent, and unreliable; verification is slow, narrow, and deterministic. We let the model write whatever it wants, then we check its work against the actual tool evidence we gathered for that turn.
 
@@ -194,7 +196,7 @@ Verification operates on the final assembled response. We do not stream tokens t
 
 Verification checks claims against the patient's chart. It does not check claims against the medical literature. If a clinician asks *"what's the recommended A1c target for a 68-year-old with type 2 diabetes and hypertension?"*, the question is not about this patient's data — it's about general medical knowledge. There is no chart record to verify against, and the existing four layers do not fire.
 
-V1's posture on these questions is **deferral**: the system prompt instructs the model to redirect general medical knowledge questions to clinician judgment rather than answer them with a recommendation. That keeps the verification layer's chart-only scope honest — the agent does not ship "subjective AI recommendations" dressed as evidence-backed answers — but it does mean the agent can't help with the kind of treatment-threshold questions a more capable co-pilot would ideally answer.
+V1's posture on these questions is **deferral**: the system prompt instructs the model to redirect general medical knowledge questions to clinician judgment rather than answer them with a recommendation. That keeps the verification layer's chart-only scope honest — the agent does not ship "subjective AI recommendations" dressed as evidence-backed answers — but it does mean the agent can't help with the kind of treatment-threshold questions a more capable copilot would ideally answer.
 
 The natural V2 extension is *evidence-based citation*: a separate safety layer that grounds general medical knowledge in peer-reviewed sources via a `lookup_clinical_evidence` tool over PubMed, NEJM, OpenEvidence, or similar. The existing citation-enforcement architecture already does the right thing on UUIDs from any tool, including external ones — adding the new tool wouldn't require redesigning the verification layer, only registering a new source pack and extending citation rendering to handle external URLs alongside in-chart navigation. See [Documentation/AgentForge/implementation/v2-roadmap.md](Documentation/AgentForge/implementation/v2-roadmap.md) for the design sketch.
 

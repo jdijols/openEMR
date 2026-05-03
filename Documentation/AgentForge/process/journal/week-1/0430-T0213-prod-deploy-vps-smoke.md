@@ -8,7 +8,7 @@ related_milestone: process/11-gate0-complete.md
 
 ## Goal
 
-Push the AgentForge Clinical Co-Pilot stack to the Vultr VPS (`108-61-145-220.nip.io`) and reproduce the dev Gate 2 smoke (cited allergy/identity read + S1 cross-patient probe) in production. Take it one step at a time so any issue surfaces a single clean signal.
+Push the AgentForge Clinical Copilot stack to the Vultr VPS (`108-61-145-220.nip.io`) and reproduce the dev Gate 2 smoke (cited allergy/identity read + S1 cross-patient probe) in production. Take it one step at a time so any issue surfaces a single clean signal.
 
 ## Context
 
@@ -44,7 +44,7 @@ Earlier today: Gate 2 closed in dev (G2-12 smoke), and G2-14 was renamed/moved t
 
 - **Prompt:** "Should we add a task to the task list that tries to make the module enabled by default? Do we have that ability to do that in production…"
 - **Recommendation:** OpenEMR doesn’t block self-registration, but bypassing **Modules → Manage Modules** risks surprising admins, clobbering ACLs, and tangling with future upgrades. Best path: idempotent ops script (e.g. `bin/agentforge-enable.php` or `sql/002_module_register.sql`) that inserts the `modules` + `modules_hooks` rows on a fresh DB and is a no-op on re-runs. Schedule under **Gate 6 / deploy hardening**, not pre-submission.
-- **Outcome:** Added **`G6-18`** to `clinical-copilot-task-list.md` with depends `G2-01..G2-03, G6-05`, criticality High, cut tier 6.
+- **Outcome:** Added **`G6-18`** to `TASKS.md` with depends `G2-01..G2-03, G6-05`, criticality High, cut tier 6.
 
 ### Decision: HTTPS curl `verify result` warning on VPS is benign
 
@@ -71,7 +71,7 @@ Earlier today: Gate 2 closed in dev (G2-12 smoke), and G2-14 was renamed/moved t
 
 ## Files touched
 
-- **Modified:** [`Documentation/AgentForge/implementation/clinical-copilot-task-list.md`](../../../implementation/clinical-copilot-task-list.md) — added **G6-18** under Gate 6.
+- **Modified:** [`TASKS.md`](../../../../../TASKS.md) — added **G6-18** under Gate 6.
 - **Created (this file):** `Documentation/AgentForge/process/journal/week-1/0430-T0213-prod-deploy-vps-smoke.md`.
 - **VPS-only (not in repo this session):** `/opt/openemr/docker/agentforge/docker-compose.prod.yml` (added `../../agentforge/contracts:/contracts` mount), `/opt/openemr/docker/development-easy/Caddyfile` (symlink to `agentforge/Caddyfile`), `/opt/openemr/docker/agentforge/secrets.prod.env` (filled).
 
@@ -90,6 +90,6 @@ Earlier today: Gate 2 closed in dev (G2-12 smoke), and G2-14 was renamed/moved t
 
 ## Links
 
-- Task list: [`Documentation/AgentForge/implementation/clinical-copilot-task-list.md`](../../../implementation/clinical-copilot-task-list.md) — see **Gate 6 / G6-18**.
+- Task list: [`TASKS.md`](../../../../../TASKS.md) — see **Gate 6 / G6-18**.
 - Earlier same-day journals: [`0430-T0050-gate2-session-handoff-g212-g214.md`](./0430-T0050-gate2-session-handoff-g212-g214.md), [`0430-T1830-gate2-closed-g212-manual-smoke.md`](./0430-T1830-gate2-closed-g212-manual-smoke.md).
 - Prior VPS deploy reference: [`process/09-vps-live-deployment.md`](../../09-vps-live-deployment.md).

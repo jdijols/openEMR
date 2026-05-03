@@ -8,7 +8,7 @@ related_milestone: process/10-prd.md
 
 ## Goal
 
-Capture AgentForge Clinical Co-Pilot execution planning after [`PRD.md`](../../../../../PRD.md) landed: agree on gate ordering and observability timing, produce a comprehensive PRD-rooted task list, then **process-document** for handoff (numbered milestone `10-prd.md`, README trail row #10, journal) before starting Gate 0 in a new chat.
+Capture AgentForge Clinical Copilot execution planning after [`PRD.md`](../../../../../PRD.md) landed: agree on gate ordering and observability timing, produce a comprehensive PRD-rooted task list, then **process-document** for handoff (numbered milestone `10-prd.md`, README trail row #10, journal) before starting Gate 0 in a new chat.
 
 ## Context
 
@@ -20,7 +20,7 @@ Capture AgentForge Clinical Co-Pilot execution planning after [`PRD.md`](../../.
 
 - **Prompt:** Align on scaffolding Langfuse early, full task list across all gates before Gate 0 coding, then execute.
 - **Recommendation:** Organize work by ship gates with explicit dependencies, stop-the-line tests, and §15.1 cut-tier columns — not one flat checklist mirroring PRD § order.
-- **Outcome:** [`implementation/clinical-copilot-task-list.md`](../../../implementation/clinical-copilot-task-list.md) (93 tasks, Gates 0–7).
+- **Outcome:** [`TASKS.md`](../../../../../TASKS.md) (93 tasks, Gates 0–7).
 
 ### Decision: Langfuse in Gate 0 vs only at deploy
 
@@ -45,7 +45,7 @@ _None installed._ Documentation-only session.
 
 ## Files touched
 
-- **Created:** [`implementation/clinical-copilot-task-list.md`](../../../implementation/clinical-copilot-task-list.md)
+- **Created:** [`TASKS.md`](../../../../../TASKS.md)
 - **Created:** [`process/10-prd.md`](../../10-prd.md)
 - **Created:** [`process/journal/week-1/0429-T2100-task-list-process-10.md`](0429-T2100-task-list-process-10.md) (this file)
 - **Modified:** [`Documentation/AgentForge/README.md`](../../../README.md) (process trail row #10)
@@ -56,11 +56,11 @@ There is a gate-ordered implementation task list with stop-the-line tests and §
 
 ## Next steps
 
-- [ ] New chat: execute Gate 0 from [`implementation/clinical-copilot-task-list.md`](../../../implementation/clinical-copilot-task-list.md) (G0-01 onward).
+- [ ] New chat: execute Gate 0 from [`TASKS.md`](../../../../../TASKS.md) (G0-01 onward).
 - [ ] Optional: bump [`0429-T2200-prd-implementation-complete.md`](0429-T2200-prd-implementation-complete.md) “Next steps” to link `process/10-prd.md` (not required for correctness).
 
 ## Links
 
 - Milestone: [`process/10-prd.md`](../../10-prd.md)
-- Task list: [`implementation/clinical-copilot-task-list.md`](../../../implementation/clinical-copilot-task-list.md)
+- Task list: [`TASKS.md`](../../../../../TASKS.md)
 - PRD: [`PRD.md`](../../../../../PRD.md)

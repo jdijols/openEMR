@@ -1,6 +1,6 @@
 name: AgentForge Eval Suite
 
-# Deterministic regression gate for the Clinical Co-Pilot's stop-the-line invariants.
+# Deterministic regression gate for the Clinical Copilot's stop-the-line invariants.
 # Runs `npm run eval` from agentforge/api. Pure CPU + filesystem — no network, no LLM,
 # no DB. Architecture: agentforge/api/eval/README.md and EVALUATION.md at repo root.
 

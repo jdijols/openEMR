@@ -3,7 +3,7 @@ date: 2026-05-01
 topic: CUI — full-thread sessionStorage cache (proposal resolution survives reload), sync-style refresh icon, 2-hour brief/conversation/server TTL
 related_prior_journal: ./0501-T1500-brief-consistency-cache.md
 related_cross_journal: ./0430-T2004-gate4-encounter-binding-and-json-wall.md
-related_task_list: ../../../implementation/clinical-copilot-task-list.md
+related_task_list: ../../../../../TASKS.md
 ---
 
 # CUI conversation persistence + refresh control polish + aligned 2-hour cache TTL
@@ -93,7 +93,7 @@ Close three product gaps raised and implemented in the same thread:
 - [`agentforge/cui/src/types/chat.ts`](../../../../../agentforge/cui/src/types/chat.ts) — `ProposalResolution`; proposal block `resolved?`.
 - [`agentforge/cui/src/chat/MessageList.tsx`](../../../../../agentforge/cui/src/chat/MessageList.tsx) — `phaseFromResolution` / `resolutionFromPhase`; `ProposalBlock` persistence callback; `onProposalResolved` prop.
 - [`agentforge/cui/src/App.tsx`](../../../../../agentforge/cui/src/App.tsx) — conversation read/write effects; `onProposalResolved`; voice-confirm stamp; `IconPanelSync`; refresh button markup + `aria-label`s; comments (2h cache).
-- [`agentforge/cui/src/App.test.tsx`](../../../../../agentforge/cui/src/App.test.tsx) — conversation replay tests; refresh tests wait on `/refresh clinical co-pilot/i`.
+- [`agentforge/cui/src/App.test.tsx`](../../../../../agentforge/cui/src/App.test.tsx) — conversation replay tests; refresh tests wait on `/refresh clinical copilot/i`.
 - [`agentforge/cui/src/index.css`](../../../../../agentforge/cui/src/index.css) — icon-only refresh button + `.agentforge-cui__refresh-icon`.
 - [`agentforge/cui/src/chat/brief_cache.ts`](../../../../../agentforge/cui/src/chat/brief_cache.ts) — 2h TTL; docblock bounds.
 - [`agentforge/cui/src/chat/brief_cache.test.ts`](../../../../../agentforge/cui/src/chat/brief_cache.test.ts) — 2h timer edges; removed unused `beforeEach` import.
@@ -115,7 +115,7 @@ Close three product gaps raised and implemented in the same thread:
 
 ## Next steps
 
-- [ ] **Optional — docs sweep:** [`PRD.md`](../../../../../PRD.md) and [`clinical-copilot-task-list.md`](../../../implementation/clinical-copilot-task-list.md) still mention **30-min** windows in places; align copy to **2h** where it describes this cache, or add a footnote that JWT lifetime in `redeem.ts` remains separate.
+- [ ] **Optional — docs sweep:** [`PRD.md`](../../../../../PRD.md) and [`TASKS.md`](../../../../../TASKS.md) still mention **30-min** windows in places; align copy to **2h** where it describes this cache, or add a footnote that JWT lifetime in `redeem.ts` remains separate.
 - [ ] **Optional — binding automation:** postMessage (or host hook) on encounter change to re-mint launch code without operator hitting refresh ([`0430-T2004`](./0430-T2004-gate4-encounter-binding-and-json-wall.md) deferred work).
 - [ ] **Commit:** suggested message: `feat(agentforge): persist CUI conversation in sessionStorage; proposal resolved state; 2h case-presentation TTL; sync refresh icon`.
 

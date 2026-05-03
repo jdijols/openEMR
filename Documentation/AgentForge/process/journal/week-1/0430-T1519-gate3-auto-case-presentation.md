@@ -1,7 +1,7 @@
 ---
 date: 2026-04-30
 topic: Gate 3 G3-11 — auto case presentation on chart open (SOAP-style outpatient)
-related_milestone: clinical-copilot-task-list.md (G3-11), PRD.md §1.3 §1.4 §4.2 §6.2
+related_milestone: TASKS.md (G3-11), PRD.md §1.3 §1.4 §4.2 §6.2
 ---
 
 # Auto case presentation — implementation record

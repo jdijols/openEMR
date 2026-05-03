@@ -1,7 +1,7 @@
 <?php
 
 /**
- * AgentForge Clinical Co-Pilot — product ACL gate drift guard.
+ * AgentForge Clinical Copilot — product ACL gate drift guard.
  *
  * Enforces PRD §4.9 layering: chart `patients/demo` floor plus module `agentforge/use`
  * entitlement; installer seeds default grants only to stock clinical groups (not front/back).

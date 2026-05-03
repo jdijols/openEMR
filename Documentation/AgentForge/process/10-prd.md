@@ -6,8 +6,8 @@ This milestone closes the loop from Stage 5 architecture into an engineer-facing
 
 | Artifact | Purpose |
 | -------- | ------- |
-| [`PRD.md`](../../../PRD.md) | Full V1 Clinical Co-Pilot implementation spec (AUDIT/USERS/ARCHITECTURE operationalized). |
-| [`implementation/clinical-copilot-task-list.md`](../implementation/clinical-copilot-task-list.md) | Dependency-first gates (0–7), stop-the-line tests, PRD tracebacks, cut-tier mapping from §15.1. |
+| [`PRD.md`](../../../PRD.md) | Full V1 Clinical Copilot implementation spec (AUDIT/USERS/ARCHITECTURE operationalized). |
+| [`TASKS.md`](../../../TASKS.md) | Dependency-first gates (0–7), stop-the-line tests, PRD tracebacks, cut-tier mapping from §15.1. |
 
 Prior journal that wrote the PRD: [`journal/week-1/0429-T2200-prd-implementation-complete.md`](journal/week-1/0429-T2200-prd-implementation-complete.md).
 
@@ -22,8 +22,8 @@ Session that added this milestone + task list + Gate 0 handoff: [`journal/week-1
 
 ## Next execution step
 
-Begin **Gate 1** — security primitives — from [`implementation/clinical-copilot-task-list.md`](../implementation/clinical-copilot-task-list.md#gate-1--security-primitives-first).
+Begin **Gate 1** — security primitives — from [`TASKS.md`](../../../TASKS.md#gate-1--security-primitives-first).
 
 ## Decisions (update 2026-04-30)
 
-- **Gate 0 closed:** Scaffold + contract spine verified on engineer host and pushed to GitLab. Milestone: [`process/11-gate0-complete.md`](11-gate0-complete.md); journal: [`journal/week-1/0429-T2015-gate0-verified-gitlab.md`](journal/week-1/0429-T2015-gate0-verified-gitlab.md). Task list rows marked `[x]` in [`implementation/clinical-copilot-task-list.md`](../implementation/clinical-copilot-task-list.md).
+- **Gate 0 closed:** Scaffold + contract spine verified on engineer host and pushed to GitLab. Milestone: [`process/11-gate0-complete.md`](11-gate0-complete.md); journal: [`journal/week-1/0429-T2015-gate0-verified-gitlab.md`](journal/week-1/0429-T2015-gate0-verified-gitlab.md). Task list rows marked `[x]` in [`TASKS.md`](../../../TASKS.md).

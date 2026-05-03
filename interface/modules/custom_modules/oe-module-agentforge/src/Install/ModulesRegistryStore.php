@@ -18,9 +18,18 @@ interface ModulesRegistryStore
 {
     /**
      * Returns the existing module row for the given mod_directory, or null
-     * if no row exists. Returned shape: ['mod_id' => int, 'mod_active' => int].
+     * if no row exists. Display fields are returned alongside mod_active so
+     * the registrar can detect drift and refresh stale labels (e.g. after a
+     * brand rename) without admin intervention.
      *
-     * @return array{mod_id: int, mod_active: int}|null
+     * @return array{
+     *     mod_id: int,
+     *     mod_active: int,
+     *     mod_name: string,
+     *     mod_ui_name: string,
+     *     mod_nick_name: string,
+     *     mod_description: string,
+     * }|null
      */
     public function findByDirectory(string $modDirectory): ?array;
 
@@ -35,6 +44,7 @@ interface ModulesRegistryStore
      *     mod_directory: string,
      *     mod_relative_link: string,
      *     mod_ui_name: string,
+     *     mod_nick_name: string,
      *     mod_description: string,
      *     directory: string,
      *     type: int,
@@ -43,4 +53,25 @@ interface ModulesRegistryStore
      * } $row
      */
     public function insertActive(array $row): void;
+
+    /**
+     * Refreshes only display strings on an existing row. Leaves mod_active,
+     * sql_version, acl_version, and other operational fields untouched so the
+     * admin's enable/disable decision and any installer state are preserved.
+     *
+     * The WHERE clause must scope by both `mod_id` AND `mod_directory` because
+     * the table's PRIMARY KEY is the composite `(mod_id, mod_directory)` —
+     * `mod_id` alone is NOT unique. Scoping by `mod_id` only would silently
+     * clobber another module that happened to share the same auto-increment
+     * value (observed in the wild on stock installs that include Laminas
+     * fixture rows).
+     *
+     * @param array{
+     *     mod_name: string,
+     *     mod_ui_name: string,
+     *     mod_nick_name: string,
+     *     mod_description: string,
+     * } $fields
+     */
+    public function updateDisplayFields(int $modId, string $modDirectory, array $fields): void;
 }

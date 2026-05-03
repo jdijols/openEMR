@@ -1,6 +1,6 @@
 # OpenEMR Audit
 
-> Read-only static analysis of `openemr/openemr` (commit at `research/openemr-recon/`, ~957MB, v8.0.0.3 line). Hard-gate deliverable for AgentForge Clinical Co-Pilot. Audit date: 2026-04-28. Builds on `research/openemr-recon-brief.md`. All findings cited file:line.
+> Read-only static analysis of `openemr/openemr` (commit at `research/openemr-recon/`, ~957MB, v8.0.0.3 line). Hard-gate deliverable for AgentForge Clinical Copilot. Audit date: 2026-04-28. Builds on `research/openemr-recon-brief.md`. All findings cited file:line.
 
 ## Summary
 

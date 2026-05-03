@@ -1,21 +1,21 @@
 # oe-module-agentforge
 
-OpenEMR custom module for **AgentForge V1 Clinical Co-Pilot** ([`PRD.md`](../../../../PRD.md)). Gate 0 scaffold; Context Service endpoints and GACL wiring land in later gates.
+OpenEMR custom module for **AgentForge V1 Clinical Copilot** ([`PRD.md`](../../../../PRD.md)). Gate 0 scaffold; Context Service endpoints and GACL wiring land in later gates.
 
-**Instructor grading / access policy (who may use Clinical Co-Pilot):** **[`Documentation/AgentForge/process/16-clinical-copilot-acl-role-gate.md`](../../../../Documentation/AgentForge/process/16-clinical-copilot-acl-role-gate.md)** (summary table plus **`admin`/`doc`/`clin`/`breakglass`** vs **`front`**/**`back`**). Session journal: **[`0501-T2135-clinical-copilot-acl-role-gate.md`](../../../../Documentation/AgentForge/process/journal/week-1/0501-T2135-clinical-copilot-acl-role-gate.md)**.
+**Instructor grading / access policy (who may use Clinical Copilot):** **[`Documentation/AgentForge/process/16-clinical-copilot-acl-role-gate.md`](../../../../Documentation/AgentForge/process/16-clinical-copilot-acl-role-gate.md)** (summary table plus **`admin`/`doc`/`clin`/`breakglass`** vs **`front`**/**`back`**). Session journal: **[`0501-T2135-clinical-copilot-acl-role-gate.md`](../../../../Documentation/AgentForge/process/journal/week-1/0501-T2135-clinical-copilot-acl-role-gate.md)**.
 
 ## §4.9 ACL declarations + no parallel privilege plane
 
 ### 4.9.1 Implementation surface
 
 - `OpenEMR\Modules\AgentForge\Acl\AclMap` centralizes the ACL specs used by the module:
-  - **Chart floor:** Clinical Co-Pilot read paths and launch (`panel.php`, `launch.php`, Context Service via `ChartContextGate`, header/rail chrome via `Bootstrap`) require OpenEMR chart-demographics ACL **`patients` / `demo`** first.
-  - **Product entitlement:** the co-pilot UX additionally requires module-owned **`agentforge` / `use`**. This is *not* redundant with `demo` — it restricts the AI surface to operators your practice explicitly entitles (default seed: **Administrators**, **Physicians**, **Clinicians**, **Emergency Login**; Front Office and Accounting are intentionally *not* seeded).
+  - **Chart floor:** Clinical Copilot read paths and launch (`panel.php`, `launch.php`, Context Service via `ChartContextGate`, header/rail chrome via `Bootstrap`) require OpenEMR chart-demographics ACL **`patients` / `demo`** first.
+  - **Product entitlement:** the copilot UX additionally requires module-owned **`agentforge` / `use`**. This is *not* redundant with `demo` — it restricts the AI surface to operators your practice explicitly entitles (default seed: **Administrators**, **Physicians**, **Clinicians**, **Emergency Login**; Front Office and Accounting are intentionally *not* seeded).
   - **`agentforge` / `propose_write`** remains the confirmed-write gate (`public/write/`); write scripts use `AclMap::userPassesAgentForgeProposeWriteGate()`.
   - **`agentforge` / `module_admin`** is reserved for module administration (not yet wired on HTTP entrypoints).
 - Each endpoint's request handler calls `AclMain::aclCheckCore('<section>', '<value>')` with a non-empty spec (directly or via `AclMap` helpers that only compose non-empty checks). This closes the [`AUDIT.md` Security-10](../../../../AUDIT.md#security-10-gacl-semantics-superuser-bypass-and-fail-open-caller-bugs) "empty ACO spec → fail-open" hole.
-- `admin/super` users are allowed to launch and use the co-pilot under the same OpenEMR session semantics as physicians. The accepted risk is that `admin/super` bypasses normal GACL, so role-scoped ACL guarantees do not apply to that account class; active-chart binding, launch-code/token hygiene, explicit-confirm writes, and V1 write-target limits still apply.
-- The co-pilot is not a parallel privilege plane: if OpenEMR would deny an action for the current session, the module denies it too; if OpenEMR grants it (including superuser grant), the co-pilot may use it within V1 scope.
+- `admin/super` users are allowed to launch and use the copilot under the same OpenEMR session semantics as physicians. The accepted risk is that `admin/super` bypasses normal GACL, so role-scoped ACL guarantees do not apply to that account class; active-chart binding, launch-code/token hygiene, explicit-confirm writes, and V1 write-target limits still apply.
+- The copilot is not a parallel privilege plane: if OpenEMR would deny an action for the current session, the module denies it too; if OpenEMR grants it (including superuser grant), the copilot may use it within V1 scope.
 
 ### UC-B confirmed writes (`public/write/`)
 

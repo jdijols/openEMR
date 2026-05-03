@@ -19,7 +19,7 @@ Walk section by section through root [`ARCHITECTURE.md`](../../../../ARCHITECTUR
 ### Decision: CUI naming and host integration
 
 - **Prompt:** "Change the name of that from panel UI to CUI with Conversational UI in parenthesis... describe how the conversational UI will work with the existing UI."
-- **Recommendation:** Treat the co-pilot as a React/Vite/TypeScript **CUI** embedded in an iframe, launched by one OpenEMR header icon into a fixed right rail. Keep OpenEMR chrome responsibility in PHP/module code and keep chat/citations/confirm/STT inside React.
+- **Recommendation:** Treat the copilot as a React/Vite/TypeScript **CUI** embedded in an iframe, launched by one OpenEMR header icon into a fixed right rail. Keep OpenEMR chrome responsibility in PHP/module code and keep chat/citations/confirm/STT inside React.
 - **Outcome:** [`ARCHITECTURE.md`](../../../../ARCHITECTURE.md) now uses **CUI (Conversational UI)**, describes the header-toggle right rail, overlay fallback, no-chart empty state, and Host UX integration.
 
 ### Decision: PHP + Node split and agent stack

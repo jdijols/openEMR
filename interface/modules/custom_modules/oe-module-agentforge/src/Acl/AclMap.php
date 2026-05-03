@@ -23,7 +23,7 @@ final class AclMap
     public const MODULE_SECTION = 'agentforge';
 
     /**
-     * Product-level gate for the Clinical Co-Pilot UX (rail, launch, Context Service reads).
+     * Product-level gate for the Clinical Copilot UX (rail, launch, Context Service reads).
      * Chart access ({@see CHART_READ_VALUE}) remains a separate floor enforced first.
      */
     public const USE_COPILOT = 'use';

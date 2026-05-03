@@ -64,6 +64,21 @@ const vitalsSchema = z.object({
   vitals: vitalsInnerSchema,
 });
 
+const vitalsDeleteSchema = z
+  .object({
+    patient_uuid: z.string().min(1),
+    encounter_id: z.number().int().positive(),
+    vitals_uuid: z.string().min(1),
+  })
+  .strict();
+
+const chiefComplaintDeleteSchema = z
+  .object({
+    patient_uuid: z.string().min(1),
+    encounter_id: z.number().int().positive(),
+  })
+  .strict();
+
 const tobaccoStatusSchema = z.enum([
   'never_smoker',
   'former_smoker',
@@ -375,6 +390,103 @@ export function createProposeWriteTools(
       },
     }),
 
+    propose_vitals_delete: tool({
+      description:
+        'Propose voiding (soft-delete) a specific vitals row by UUID. Use this when the physician asks to remove an erroneously dictated vitals entry — e.g. "delete the BP reading I just saved" or "void today\'s vitals, I want to redo them". Get the vitals_uuid from a prior get_vitals call (it is the row\'s "uuid" field). The row is hidden from the chart but preserved with audit (forms.activity = 0) for HIPAA traceability — never hard-deleted. The row must belong to the active encounter — cross-encounter deletes are rejected.',
+      inputSchema: vitalsDeleteSchema,
+      execute: async (input) => {
+        const bound = assertBoundPatient(env, sessionToken, input.patient_uuid);
+        if (!bound.ok) {
+          return { ok: false as const, error: bound.error };
+        }
+
+        const span = await obs.recordToolCall({
+          correlationId,
+          toolName: 'propose_vitals_delete',
+          meta: {},
+        });
+        try {
+          const proposalId = randomUUID();
+          const vitalsUuid = input.vitals_uuid.toLowerCase();
+
+          await insertPendingProposal(pool, {
+            proposalId,
+            conversationInternalId: ctx.conversationInternalId,
+            patientUuid: input.patient_uuid.toLowerCase(),
+            encounterId: input.encounter_id,
+            writeTarget: 'vitals_delete',
+            payload: { vitals_uuid: vitalsUuid },
+          });
+
+          const preview = `Void vitals (encounter #${input.encounter_id}) → row ${vitalsUuid.slice(0, 8)}…`;
+
+          await span.end({
+            meta: { proposal_id: proposalId, write_target: 'vitals_delete' },
+          });
+          return {
+            ok: true as const,
+            proposal_id: proposalId,
+            write_target: 'vitals_delete',
+            preview,
+            patient_uuid: input.patient_uuid.toLowerCase(),
+            encounter_id: input.encounter_id,
+            payload: { vitals_uuid: vitalsUuid },
+          };
+        } catch (e) {
+          await span.end({ error: e });
+          throw e;
+        }
+      },
+    }),
+
+    propose_chief_complaint_delete: tool({
+      description:
+        'Propose clearing the chief complaint / reason-for-visit field on the active encounter. Use this only when the physician explicitly asks to remove the chief complaint (e.g. "clear the reason for visit, it was wrong"). For corrections to a non-empty value, prefer propose_chief_complaint_write with the corrected reason — that is the more common workflow. The audit row records write_target=chief_complaint_delete.',
+      inputSchema: chiefComplaintDeleteSchema,
+      execute: async (input) => {
+        const bound = assertBoundPatient(env, sessionToken, input.patient_uuid);
+        if (!bound.ok) {
+          return { ok: false as const, error: bound.error };
+        }
+
+        const span = await obs.recordToolCall({
+          correlationId,
+          toolName: 'propose_chief_complaint_delete',
+          meta: {},
+        });
+        try {
+          const proposalId = randomUUID();
+
+          await insertPendingProposal(pool, {
+            proposalId,
+            conversationInternalId: ctx.conversationInternalId,
+            patientUuid: input.patient_uuid.toLowerCase(),
+            encounterId: input.encounter_id,
+            writeTarget: 'chief_complaint_delete',
+            payload: {},
+          });
+
+          const preview = `Clear chief complaint (encounter #${input.encounter_id})`;
+
+          await span.end({
+            meta: { proposal_id: proposalId, write_target: 'chief_complaint_delete' },
+          });
+          return {
+            ok: true as const,
+            proposal_id: proposalId,
+            write_target: 'chief_complaint_delete',
+            preview,
+            patient_uuid: input.patient_uuid.toLowerCase(),
+            encounter_id: input.encounter_id,
+            payload: {},
+          };
+        } catch (e) {
+          await span.end({ error: e });
+          throw e;
+        }
+      },
+    }),
+
     propose_allergy_write: tool({
       description: 'Propose allergy add/update (reaction / severity fields). Delete is intentionally not represented.',
       inputSchema: allergySchema,
@@ -440,9 +552,11 @@ export function createProposeWriteTools(
 
 export const exportedSchemasGate4 = {
   chiefSchema,
+  chiefComplaintDeleteSchema,
   clinicalNoteSchema,
   clinicalNoteEditSchema,
   vitalsSchema,
+  vitalsDeleteSchema,
   tobaccoSchema,
   allergySchema,
 };

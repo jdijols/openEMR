@@ -9,7 +9,7 @@
      style="--agentforge-rail-width: {{ rail_width }}px;">
     <iframe id="agentforge-cui-frame"
             class="agentforge-rail__iframe"
-            title="{{ 'AgentForge panel'|xl }}"
+            title="{{ 'Clinical Copilot panel'|xl }}"
             src="about:blank"
             data-panel-src="{{ panel_src|e('html_attr') }}"
             sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
@@ -18,7 +18,7 @@
      class="agentforge-rail-splitter"
      role="separator"
      aria-orientation="vertical"
-     aria-label="{{ 'Resize Clinical Co-Pilot panel'|xla }}"
+     aria-label="{{ 'Resize Clinical Copilot panel'|xla }}"
      tabindex="0"></div>
 <style>
     /* #mainFrames_div is .d-flex.flex-row; we live as flex children alongside #framesDisplay. */
@@ -98,6 +98,26 @@
             return;
         }
 
+        // Probe the active OpenEMR theme's `.btn-outline-secondary` color and
+        // expose it as `--toggle-active-color` on the toggle button. The
+        // [aria-expanded="true"] CSS in header_icon.html.twig uses that var
+        // for fill/border so the panel-open look stays in sync with the
+        // closed-hover look across all themes (default #1f2937, cobalt
+        // #467ac2, solar #002b36, etc.) without hardcoding any one swatch.
+        try {
+            var probe = document.createElement('span');
+            probe.className = 'btn btn-outline-secondary';
+            probe.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none;';
+            document.body.appendChild(probe);
+            var themedColor = window.getComputedStyle(probe).color;
+            document.body.removeChild(probe);
+            if (themedColor && themedColor !== '') {
+                toggle.style.setProperty('--toggle-active-color', themedColor);
+            }
+        } catch (ignored) {
+            // Fall back to the inline-style default in header_icon.html.twig.
+        }
+
         var defaultWidth = parseInt(rail.getAttribute('data-rail-width') || '420', 10) || 420;
         var panelSrc = frame ? frame.getAttribute('data-panel-src') || '' : '';
         var panelLoaded = false;
@@ -138,8 +158,32 @@
             return w;
         }
 
+        // Fresh sessions (no stored width) default to the maximum width so
+        // the copilot opens with the most vertical-room-for-chat layout.
+        // Returning sessions keep whatever width they last dragged to.
         var storedWidth = parseInt(safeSessionGet(STORAGE_KEY_WIDTH) || '', 10);
-        applyWidth(isFinite(storedWidth) && storedWidth > 0 ? storedWidth : defaultWidth);
+        applyWidth(isFinite(storedWidth) && storedWidth > 0 ? storedWidth : MAX_WIDTH);
+
+        // One-shot per session: collapse the OpenEMR top patient panel
+        // (`#attendantData`, toggled by `#patient_caret`) so the copilot
+        // takes over the encounter-strip's role and frees vertical space.
+        // Sticky for the session — if the user re-expands, we don't fight
+        // them; new tab/session starts collapsed again.
+        try {
+            var ATTENDANT_INIT_KEY = 'agentforge.attendant.initialized';
+            if (window.sessionStorage && !window.sessionStorage.getItem(ATTENDANT_INIT_KEY)) {
+                var attendantData = document.getElementById('attendantData');
+                var patientCaret = document.getElementById('patient_caret');
+                if (attendantData && patientCaret) {
+                    attendantData.style.display = 'none';
+                    patientCaret.classList.remove('fa-caret-up');
+                    patientCaret.classList.add('fa-caret-down');
+                }
+                window.sessionStorage.setItem(ATTENDANT_INIT_KEY, '1');
+            }
+        } catch (ignored) {
+            /* storage blocked / DOM not yet rendered — fall back to default expanded */
+        }
 
         /** Prefer OpenEMR tab APIs / RTop; never assign window.top.location (drops rail + tabs chrome). */
         function baseWebRoot() {
@@ -162,6 +206,30 @@
                 encodeURIComponent(String(encId));
             if (typeof topWin.goToEncounter === 'function') {
                 topWin.goToEncounter(encId);
+                return;
+            }
+            if (typeof topWin.navigateTab === 'function') {
+                topWin.navigateTab(url, 'enc', function () {
+                    if (typeof topWin.activateTabByName === 'function') {
+                        topWin.activateTabByName('enc', true);
+                    }
+                });
+                return;
+            }
+            try {
+                if (topWin.RTop && topWin.RTop.location) {
+                    topWin.RTop.location = url;
+                }
+            } catch (ignored) {
+            }
+        }
+
+        function navigateVisitHistoryInChrome() {
+            var topWin = window.top;
+            var root = baseWebRoot();
+            var url = root + '/interface/patient_file/history/encounters.php';
+            if (typeof topWin.encounterList === 'function') {
+                topWin.encounterList();
                 return;
             }
             if (typeof topWin.navigateTab === 'function') {
@@ -516,6 +584,14 @@
             if (typeof window.top.restoreSession === 'function') {
                 window.top.restoreSession();
             }
+            if (hint.kind === 'patient_dashboard') {
+                // Mirrors the OpenEMR top-bar patient-name link (Knockout binding
+                // `click: refreshPatient` → `loadCurrentPatient()`). Activates the
+                // "pat" tab if open, otherwise navigates and activates it.
+                navigateDemographicsInChrome();
+                return;
+            }
+
             if (hint.kind === 'encounter') {
                 var rawEnc = hint.params && hint.params.encounter_id;
                 var encId =
@@ -528,6 +604,16 @@
                     return;
                 }
                 navigateEncounterInChrome(encId);
+                return;
+            }
+
+            if (hint.kind === 'visit_history') {
+                // Mirrors the OpenEMR top-patient-panel clock icon
+                // (`clickEncounterList` → `encounterList()` → loads
+                // `/interface/patient_file/history/encounters.php` in the
+                // "enc" tab). Prefer the host's own helper so any future
+                // tab-routing changes there carry into the copilot too.
+                navigateVisitHistoryInChrome();
                 return;
             }
 

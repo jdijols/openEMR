@@ -2,7 +2,7 @@
 date: 2026-05-01
 topic: Brief regression post-mortem — stale CUI bundle + missing panel.php cache-bust (G6-16 was a lie)
 related_prior_journal: ./0501-T1500-brief-consistency-cache.md
-related_task_list: ../../../implementation/clinical-copilot-task-list.md
+related_task_list: ../../../../../TASKS.md
 ---
 
 # Brief regression post-mortem — stale bundle + the cache-bust that never was
@@ -18,7 +18,7 @@ PR1 in the prior session refactored the auto-brief into a CUI-side state machine
 Two unrelated-but-stacked failures landed the panel in "blank rail forever" territory:
 
 1. **Stale build artifact.** The PR1 source edits were never followed by `npm run build`. `interface/modules/.../public/cui/agentforge-cui.js` was last regenerated **2026-04-30 23:09** — *before* PR1's source edits.
-2. **Missing cache-bust in `panel.php`.** Even after rebuilding, the iframe would still serve the old JS to operators with warmed tabs because `panel.php` emits `<script src=".../agentforge-cui.js">` with no version query string. `clinical-copilot-task-list.md` row G6-16 claimed `panel.php appends md5_file() hash query strings` — but the file has never had that code, and no test pinned the assertion. PR1 looked correct in source, looked correct in tests, and failed silently at runtime.
+2. **Missing cache-bust in `panel.php`.** Even after rebuilding, the iframe would still serve the old JS to operators with warmed tabs because `panel.php` emits `<script src=".../agentforge-cui.js">` with no version query string. `TASKS.md` row G6-16 claimed `panel.php appends md5_file() hash query strings` — but the file has never had that code, and no test pinned the assertion. PR1 looked correct in source, looked correct in tests, and failed silently at runtime.
 
 User-side smoking gun that caught it: DevTools → Application → Session storage showed three `agentforge:brief_auto_fired:<uuid>` entries with value `1`. That key name is from `brief_dedupe.ts`, which PR1 **deleted**. If the new bundle were running, the keys would be `agentforge:brief_payload:<uuid>` with a JSON value (`{blocks, citation_navigation, storedAt}`). The key shape was a fingerprint that the old bundle was still alive in the iframe.
 
@@ -97,6 +97,6 @@ User-side recovery commands (for the chat reply, not for CI):
 
 - Prior session journal (PR1 + PR2 source work): [`./0501-T1500-brief-consistency-cache.md`](./0501-T1500-brief-consistency-cache.md).
 - Earlier prior session (post-deploy P1–P3): [`./0501-T1430-post-deploy-bugs-p1-p3-closed.md`](./0501-T1430-post-deploy-bugs-p1-p3-closed.md).
-- Task list (G6-16, G3-11): [`Documentation/AgentForge/implementation/clinical-copilot-task-list.md`](../../../implementation/clinical-copilot-task-list.md).
+- Task list (G6-16, G3-11): [`TASKS.md`](../../../../../TASKS.md).
 - Patched panel: [`interface/modules/custom_modules/oe-module-agentforge/public/panel.php`](../../../../../interface/modules/custom_modules/oe-module-agentforge/public/panel.php).
 - New cache-bust test: [`tests/Tests/Isolated/Modules/AgentForge/PanelCacheBustStaticStructureTest.php`](../../../../../tests/Tests/Isolated/Modules/AgentForge/PanelCacheBustStaticStructureTest.php).

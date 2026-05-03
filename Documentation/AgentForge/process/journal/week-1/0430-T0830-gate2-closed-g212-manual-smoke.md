@@ -2,12 +2,12 @@
 date: 2026-04-30
 topic: Gate 2 CLOSED — G2-12 end-to-end manual smoke (cited read + S1 cross-patient)
 related_docs:
-  - Documentation/AgentForge/implementation/clinical-copilot-task-list.md
+  - TASKS.md
 ---
 
 # Gate 2 close — G2-12 manual smoke evidence
 
-Manual run: OpenEMR dev stack + Agent API (`agentforge/api`), cohort patient chart open, Clinical Co-Pilot rail opened **after** chart selection per operator checklist.
+Manual run: OpenEMR dev stack + Agent API (`agentforge/api`), cohort patient chart open, Clinical Copilot rail opened **after** chart selection per operator checklist.
 
 ## 1 — Cited read (identity + allergy negative)
 
@@ -23,4 +23,4 @@ Prompts such as “What do we know about this patient?” / allergy-oriented que
 
 ## Gate status
 
-**G2-12 satisfied; Gate 2 CLOSED** (documented same day in `clinical-copilot-task-list.md`). Active chart ↔ rail sync (no reload) is tracked as **Gate 3 / G3-12** in `clinical-copilot-task-list.md`.
+**G2-12 satisfied; Gate 2 CLOSED** (documented same day in `TASKS.md`). Active chart ↔ rail sync (no reload) is tracked as **Gate 3 / G3-12** in `TASKS.md`.

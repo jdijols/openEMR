@@ -30,6 +30,7 @@ namespace OpenEMR\Modules\AgentForge\Install;
 enum RegisterOutcome: string
 {
     case Inserted = 'inserted';
+    case Refreshed = 'refreshed';
     case Unchanged = 'unchanged';
     case OperatorDisabled = 'operator_disabled';
 }
@@ -39,15 +40,21 @@ final readonly class AgentForgeModuleRegistrar
     /** PRD §3.4 — directory name relative to interface/modules/custom_modules/. */
     public const MOD_DIRECTORY = 'oe-module-agentforge';
 
-    /** Display name shown in the Module Manager UI. */
-    public const MOD_NAME = 'AgentForge Clinical Co-Pilot';
+    /** Display name shown in the Module Manager "Module" column. */
+    public const MOD_NAME = 'Clinical Copilot by Jason Dijols';
+
+    /** Short label shown in the Module Manager "Menu Text" column. */
+    public const MOD_UI_NAME = 'Clinical Copilot';
+
+    /** URL-safe slug shown in the Module Manager "Nick Name" column. */
+    public const MOD_NICK_NAME = 'clinical-copilot';
 
     /** Custom module type discriminator (mirrors InstModuleTable::MODULE_TYPE_CUSTOM). */
     public const MODULE_TYPE_CUSTOM = 0;
 
     /** Module description shown in Manage Modules. */
     public const MOD_DESCRIPTION
-        = 'V1 embedded co-pilot: rail CUI, Context Service, Agent API handoff (PRD AgentForge).';
+        = 'V1 embedded copilot: rail CUI, Context Service, Agent API handoff (PRD Clinical Copilot).';
 
     /** Schema version stamp recorded on install. */
     public const SQL_VERSION = '0.1.0-gate6';
@@ -73,7 +80,8 @@ final readonly class AgentForgeModuleRegistrar
                 'mod_name' => self::MOD_NAME,
                 'mod_directory' => self::MOD_DIRECTORY,
                 'mod_relative_link' => 'custom_modules/' . self::MOD_DIRECTORY,
-                'mod_ui_name' => self::MOD_NAME,
+                'mod_ui_name' => self::MOD_UI_NAME,
+                'mod_nick_name' => self::MOD_NICK_NAME,
                 'mod_description' => self::MOD_DESCRIPTION,
                 'directory' => self::MOD_DIRECTORY,
                 'type' => self::MODULE_TYPE_CUSTOM,
@@ -84,10 +92,34 @@ final readonly class AgentForgeModuleRegistrar
             return RegisterOutcome::Inserted;
         }
 
+        // OperatorDisabled wins over display refresh: an admin's explicit disable
+        // means "leave this module alone" (PRD G6-17 incident-rollback path).
         if ($existing['mod_active'] === 0) {
             return RegisterOutcome::OperatorDisabled;
         }
 
+        if ($this->displayFieldsAreStale($existing)) {
+            $this->store->updateDisplayFields($existing['mod_id'], self::MOD_DIRECTORY, [
+                'mod_name' => self::MOD_NAME,
+                'mod_ui_name' => self::MOD_UI_NAME,
+                'mod_nick_name' => self::MOD_NICK_NAME,
+                'mod_description' => self::MOD_DESCRIPTION,
+            ]);
+
+            return RegisterOutcome::Refreshed;
+        }
+
         return RegisterOutcome::Unchanged;
+    }
+
+    /**
+     * @param array{mod_name: string, mod_ui_name: string, mod_nick_name: string, mod_description: string, ...} $existing
+     */
+    private function displayFieldsAreStale(array $existing): bool
+    {
+        return $existing['mod_name'] !== self::MOD_NAME
+            || $existing['mod_ui_name'] !== self::MOD_UI_NAME
+            || $existing['mod_nick_name'] !== self::MOD_NICK_NAME
+            || $existing['mod_description'] !== self::MOD_DESCRIPTION;
     }
 }

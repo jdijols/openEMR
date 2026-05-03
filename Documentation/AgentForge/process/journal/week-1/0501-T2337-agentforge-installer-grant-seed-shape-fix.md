@@ -1,18 +1,18 @@
 ---
 date: 2026-05-01
-topic: Donna Lee Clinical Co-Pilot missing — ACL installer group row shape
+topic: Donna Lee Clinical Copilot missing — ACL installer group row shape
 related_milestone: process/16-clinical-copilot-acl-role-gate.md
 ---
 
-# Donna Lee Clinical Co-Pilot missing — ACL installer grant seed bug
+# Donna Lee Clinical Copilot missing — ACL installer grant seed bug
 
 ## Goal
 
-Explain and record why demo user **Donna Lee** (`username`: `physician`) saw **no Clinical Co-Pilot chrome** despite belonging to **Physicians** in GACL, and document the fix so default **`agentforge` / `use`** (and **`propose_write`**) grants actually seed for stock clinical groups.
+Explain and record why demo user **Donna Lee** (`username`: `physician`) saw **no Clinical Copilot chrome** despite belonging to **Physicians** in GACL, and document the fix so default **`agentforge` / `use`** (and **`propose_write`**) grants actually seed for stock clinical groups.
 
 ## Symptom
 
-- Logged in as **physician** (Donna Lee): header/rail Co-Pilot UI absent.
+- Logged in as **physician** (Donna Lee): header/rail Copilot UI absent.
 - **Not** “wrong username”: she was active, authorized, and `AclExtended::aclGetGroupTitles()` returned **`["Physicians"]`**.
 - `AclMain::aclCheckCore('patients', 'demo', 'physician')` passed; `AclMain::aclCheckCore('agentforge', 'use', 'physician')` failed.
 
@@ -38,13 +38,13 @@ After deploy, invoking **`AgentForgeAclInstaller::ensureRegistered()`** (any cod
 - **`vendor/bin/phpunit -c phpunit-isolated.xml tests/Tests/Isolated/Modules/AgentForge/AgentForgeAclProductGateStructureTest.php`**
 - **`vendor/bin/phpunit -c phpunit-isolated.xml tests/Tests/Isolated/Modules/AgentForge`**
 
-User confirmed Co-Pilot available for Donna after refresh / session.
+User confirmed Copilot available for Donna after refresh / session.
 
 ## Key decisions log
 
 | User / context | Decision |
 | ---------------- | --------- |
-| Co-Pilot absent for **`physician`** despite “Physician” role | Treat as **engineering bug** in default ACL seed path, not as “add Donna to Physicians” (she already was). |
+| Copilot absent for **`physician`** despite “Physician” role | Treat as **engineering bug** in default ACL seed path, not as “add Donna to Physicians” (she already was). |
 | How to read `get_group_data` | Prefer **numeric index 3** (display name OpenEMR uses); keep associative fallback if row shape normalizes elsewhere. |
 
 ## Files touched

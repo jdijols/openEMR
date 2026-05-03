@@ -1,5 +1,5 @@
 /*
- * AgentForge Clinical Co-Pilot — CUI panel styles
+ * AgentForge Clinical Copilot — CUI panel styles
  *
  * The CUI lives inside a sandboxed iframe (panel.php → rail_container.html.twig)
  * that does NOT load OpenEMR's Bootstrap. Rather than ship ~150 KB of theme CSS
@@ -184,6 +184,23 @@ body {
   max-height: 64px;
 }
 
+/* Left column: patient-identity text link + "Today" pill button. Gap
+   matches `.agentforge-cui__header-actions` so the header reads as two
+   evenly-spaced pairs at the screen edges. `align-items: center` so the
+   bordered Today button sits vertically centred against the patient
+   name (baseline alignment would clip the button's box above the text
+   line). `min-width:0` on the wrapper is the standard fix for a flex
+   item that needs to shrink past its content's intrinsic width — keeps
+   long patient names truncatable without spilling into the right
+   column. */
+.agentforge-cui__title-group {
+  display: flex;
+  align-items: center;
+  gap: var(--af-s4);
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 .agentforge-cui__title {
   font-size: var(--af-text-title);
   font-weight: 600;
@@ -193,6 +210,85 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+}
+
+/* "Today" pill button — same chrome (border / background / radius / hover)
+   as the right-column icon buttons so the three actionable controls read
+   as one visual family. Auto-width to fit the label, but the same 2.25rem
+   min-height as the icon buttons so the row of controls aligns cleanly.
+   14 px / weight 500 lands at the same optical weight as the 14 px icons
+   inside `.agentforge-cui__refresh`. */
+.agentforge-cui__today-button {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.25rem;
+  flex-shrink: 0;
+  padding: 0 var(--af-s2);
+  font-family: inherit;
+  font-size: var(--af-text-body);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  border: 1px solid var(--af-border-strong);
+  background: var(--af-surface);
+  color: var(--af-text-subtle);
+  border-radius: var(--af-radius-control);
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+  white-space: nowrap;
+}
+
+.agentforge-cui__today-button:hover {
+  background: var(--af-gray-100);
+  border-color: var(--af-gray-500);
+}
+
+.agentforge-cui__today-button:focus-visible {
+  outline: none;
+  box-shadow: var(--af-focus-ring);
+}
+
+/* Right column: two icon buttons (visit-history + refresh). Gap matches
+   `.agentforge-cui__title-group` AND the header's own left/right padding
+   (`var(--af-s4)`) so every horizontal gap in the header strip — edge↔
+   name, name↔Today, clock↔refresh, refresh↔edge — reads as one
+   consistent rhythm. */
+.agentforge-cui__header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--af-s4);
+  flex-shrink: 0;
+}
+
+/* Resting state must look identical to plain `.agentforge-cui__title` text —
+   only the cursor and the hover/focus underline communicate "click to open
+   the Dashboard tab". Inherits font/color/size from the parent <h1>. */
+.agentforge-cui__title-link {
+  appearance: none;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-align: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.agentforge-cui__title-link:hover,
+.agentforge-cui__title-link:focus-visible {
+  text-decoration: underline;
+}
+
+.agentforge-cui__title-link:focus-visible {
+  outline: none;
+  box-shadow: var(--af-focus-ring);
+  border-radius: var(--af-radius-sm);
 }
 
 /* Icon-only refresh control (OpenEMR-tab-style circular arrows) — outline

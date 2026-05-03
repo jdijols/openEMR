@@ -1,6 +1,6 @@
 ---
 title: AgentForge V1 — Open Questions & Plan Gaps
-source: Cross-reference audit of clinical-copilot-task-list.md, PRD.md, ARCHITECTURE.md, and Week 1 - AgentForge.pdf
+source: Cross-reference audit of TASKS.md, PRD.md, ARCHITECTURE.md, and Week 1 - AgentForge.pdf
 created: 2026-04-29
 status: unresolved
 ---
@@ -66,7 +66,7 @@ This document records gaps, inconsistencies, and risks identified by auditing th
 **What Gate 1 requires (13 tasks, all test-first on security tasks):**
 - SQL schema + `LaunchCode` mint/redeem with TTL and single-use enforcement
 - `ActiveChartBinding::assert` with three Given/When/Then scenarios
-- no co-pilot privilege bypass: admin/super follows normal OpenEMR superuser semantics, while all endpoints retain non-empty ACL specs and active-chart binding
+- no copilot privilege bypass: admin/super follows normal OpenEMR superuser semantics, while all endpoints retain non-empty ACL specs and active-chart binding
 - `AclMap` with empty-spec PHPStan/PHPUnit guard
 - `AgentAuditLogger` with metadata-only assertion
 - TS handshake redeem endpoint with constant-time HMAC

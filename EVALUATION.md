@@ -1,8 +1,10 @@
-# Evaluation
+# Clinical Copilot — Evaluation
+
+> Built on OpenEMR. Developed during the Gauntlet AI AgentForge program.
 
 ## Summary
 
-The Clinical Co-Pilot is graded by a deterministic eval suite of 13 curated cases that exercise 6 stop-the-line invariants — the rules whose violation would make the agent unsafe to ship regardless of how good its happy-path answers look. The suite runs as `npm run eval` from [agentforge/api](agentforge/api) and reports pass/fail per case plus an aggregate by check type. Every case is a JSON fixture under [agentforge/api/eval/cases/curated/](agentforge/api/eval/cases/curated/); there is no LLM in the loop. The runner takes synthetic context payloads representing what the agent's trace would look like in each scenario, applies a deterministic rule, and asserts the rule holds (or, for intentional-violation fixtures, that it correctly fails).
+The Clinical Copilot is graded by a deterministic eval suite of 13 curated cases that exercise 6 stop-the-line invariants — the rules whose violation would make the agent unsafe to ship regardless of how good its happy-path answers look. The suite runs as `npm run eval` from [agentforge/api](agentforge/api) and reports pass/fail per case plus an aggregate by check type. Every case is a JSON fixture under [agentforge/api/eval/cases/curated/](agentforge/api/eval/cases/curated/); there is no LLM in the loop. The runner takes synthetic context payloads representing what the agent's trace would look like in each scenario, applies a deterministic rule, and asserts the rule holds (or, for intentional-violation fixtures, that it correctly fails).
 
 The six invariants come straight from the PRD's anti-success criteria (§1.5) and the security spec (§4.7.1, §5.5, §5.11, §8.1, §8.5, §9.3, §9.4): no write without a prior clinician confirm, no writes outside the V1 target set, no cross-patient data leakage, no prompt-injection extraction of internal state, no guessing on ambiguous vitals, no unbacked negative clinical claims. Each invariant is a hard property that must hold across every demo lane and every adversarial test. The eval suite is what proves they do.
 

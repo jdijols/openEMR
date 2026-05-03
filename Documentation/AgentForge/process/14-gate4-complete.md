@@ -1,6 +1,6 @@
 # Stage 14 — Gate 4 complete
 
-**Purpose:** Record closure of **Gate 4 — UC-B Confirmed Writes** from [`implementation/clinical-copilot-task-list.md`](../implementation/clinical-copilot-task-list.md): chief complaint + vitals + tobacco + allergy write targets, propose-write TS tools, conversation store + confirm/reject API, CUI proposal controls, eval **G4-11**, and **G4-10** manual end-to-end smoke on a storyboard patient with OpenEMR audit evidence **`log_from='agent'`**.
+**Purpose:** Record closure of **Gate 4 — UC-B Confirmed Writes** from [`TASKS.md`](../../../TASKS.md): chief complaint + vitals + tobacco + allergy write targets, propose-write TS tools, conversation store + confirm/reject API, CUI proposal controls, eval **G4-11**, and **G4-10** manual end-to-end smoke on a storyboard patient with OpenEMR audit evidence **`log_from='agent'`**.
 
 ## Verification
 
@@ -14,6 +14,6 @@
 
 ## Next
 
-**Gate 5** — [`clinical-copilot-task-list.md` § Gate 5](../implementation/clinical-copilot-task-list.md#gate-5--stt--uc-c): STT relay, transcript persistence, UC-C recap, voice + parser loop.
+**Gate 5** — [`TASKS.md` § Gate 5](../../../TASKS.md#gate-5--stt--uc-c): STT relay, transcript persistence, UC-C recap, voice + parser loop.
 
 **Prior milestone:** [Stage 13 — Gate 3 complete](13-gate3-complete.md).

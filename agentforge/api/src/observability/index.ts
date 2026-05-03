@@ -1,5 +1,5 @@
 /**
- * Observability — Langfuse-backed trace surface for the Clinical Co-Pilot.
+ * Observability — Langfuse-backed trace surface for the Clinical Copilot.
  *
  * One chat turn = one Langfuse trace, keyed by the request's `correlation_id`.
  * Inside that trace are three step types, each surfaced through a separate

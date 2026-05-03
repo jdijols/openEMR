@@ -9,10 +9,10 @@
  */
 
 return [
-    'name' => 'AgentForge Clinical Co-Pilot',
-    'description' => 'V1 embedded co-pilot: right rail CUI, Context Service, Agent API handoff (PRD AgentForge).',
+    'name' => 'Clinical Copilot by Jason Dijols',
+    'description' => 'V1 embedded copilot: right rail CUI, Context Service, Agent API handoff (PRD Clinical Copilot).',
     'version' => '0.1.0-gate0',
-    'author' => 'AgentForge',
+    'author' => 'Jason Dijols',
     'license' => 'GPL-3.0',
     'acl_category' => 'patients',
     'acl_section' => 'notes',

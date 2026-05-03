@@ -1,8 +1,10 @@
-# Observability
+# Clinical Copilot — Observability
+
+> Built on OpenEMR. Developed during the Gauntlet AI AgentForge program.
 
 ## Summary
 
-Every chat turn in the Clinical Co-Pilot produces a single Langfuse trace, keyed by the request's `correlation_id`. Inside that trace are spans for every tool call (with input, output, and latency), instantaneous events for every verification gate and security guard, an LLM generation entry tagged with the canonical model name, input and output token counts, and a dollar cost computed from the actual usage. Every byte that leaves this process for Langfuse passes through a deny-list PHI redactor first.
+Every chat turn in the Clinical Copilot produces a single Langfuse trace, keyed by the request's `correlation_id`. Inside that trace are spans for every tool call (with input, output, and latency), instantaneous events for every verification gate and security guard, an LLM generation entry tagged with the canonical model name, input and output token counts, and a dollar cost computed from the actual usage. Every byte that leaves this process for Langfuse passes through a deny-list PHI redactor first.
 
 The brief asks observability to answer four questions from logs at any time: *what did the agent do, in what order, did any tools fail and why, and how many tokens were consumed at what cost?* All four are answerable from a single Langfuse trace against the live URL. Observability is wired in, used in production, and is the primary debugging tool for prod issues — not a checkbox.
 

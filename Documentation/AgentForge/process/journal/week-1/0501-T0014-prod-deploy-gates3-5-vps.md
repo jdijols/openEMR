@@ -100,7 +100,7 @@ Earlier in the day Gates 3, 4, and the Gate 5 STT polish all closed in dev (see 
 
 - [ ] **Prod-compose Caddyfile path fix (one-line PR)** — change `./Caddyfile` to `../agentforge/Caddyfile` in [`docker/agentforge/docker-compose.prod.yml`](../../../../../docker/agentforge/docker-compose.prod.yml). Commit + push + pull to retire the symlink/copy band-aid permanently. *Should be the first work next session.*
 - [ ] **Triage bug log** — work [`Documentation/AgentForge/implementation/post-deploy-bug-log.md`](../../../implementation/post-deploy-bug-log.md) in P1 → P2 → P3 order; capture findings as a new dated journal.
-- [ ] **Open `G6-19 — agent hardening for prod parity`** in [`clinical-copilot-task-list.md`](../../../implementation/clinical-copilot-task-list.md) covering the M1 hardening targets (typed error frames on every failure path, server-side correlation IDs over WS, cache invalidation on Refresh chart, structured per-turn agent-decision log line).
+- [ ] **Open `G6-19 — agent hardening for prod parity`** in [`TASKS.md`](../../../../../TASKS.md) covering the M1 hardening targets (typed error frames on every failure path, server-side correlation IDs over WS, cache invalidation on Refresh chart, structured per-turn agent-decision log line).
 - [ ] **Mark G5-08 status carefully:** dictation pipeline is live on prod and AssemblyAI is confirmed via `/health`, but **end-to-end smoke is not green** because P2 blocks the encounter-bound dictation flow. Do not mark `[x]` until P2 is resolved on prod.
 - [ ] **Rotate the AssemblyAI key** if the value ever transited a chat transcript or screen-share outside the deploy session.
 

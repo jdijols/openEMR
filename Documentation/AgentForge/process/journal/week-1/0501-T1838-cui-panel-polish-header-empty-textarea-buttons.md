@@ -2,7 +2,7 @@
 date: 2026-05-01
 topic: CUI panel polish — header parity across states, white empty canvas, auto-grow textarea (no drag handle), Send + Mic flex-fill the compose column
 related_prior_journal: ./0501-T1557-brief-cache-bust-stale-bundle.md
-related_task_list: ../../../implementation/clinical-copilot-task-list.md
+related_task_list: ../../../../../TASKS.md
 ---
 
 # CUI panel polish — post-PR5 cleanup pass
@@ -26,7 +26,7 @@ PR1–PR5 (prior session, see chat summary) had:
 - Inverted the chrome — gray header + footer, full-width white message
   feed in the middle.
 - Stripped the assistant message card so agent text flows on the white
-  canvas with no border / radius / accent / avatar / "Co-Pilot" label.
+  canvas with no border / radius / accent / avatar / "Copilot" label.
 - Kept user messages as a right-aligned light-blue bubble with a 1 px
   border, with the dictation badge tucked inside the bubble at the top
   left.
@@ -72,7 +72,7 @@ two screenshots at session start:
   "Connecting…" can be reloaded), and the ready branch (where it does
   the real cache-busting `refreshChartBinding`).
 - **Outcome:** `aria-label` keeps state-specific wording —
-  `"Refresh chart binding"` on ready, `"Reload Co-Pilot panel"` on
+  `"Refresh chart binding"` on ready, `"Reload Copilot panel"` on
   recovery — so screen readers stay honest *and* the
   `App.test.tsx:126` `waitFor(... /refresh chart binding/i)` still
   synchronises with the handshake-ready transition. Header height now
@@ -236,7 +236,7 @@ two screenshots at session start:
 ## Next steps
 
 - [ ] **Operator: hard-refresh once on the production tab** if you have
-      an open Co-Pilot panel from before the redeploy — subsequent
+      an open Copilot panel from before the redeploy — subsequent
       operators inherit the new bundle through the URL hash.
 - [ ] **Stage + commit the CUI polish bundle as a single atomic
       commit.** Suggested message:

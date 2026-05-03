@@ -98,7 +98,7 @@ Gate 5 had closed earlier today for engineering (G5-01..G5-07) with G5-08 left f
 ## Next steps
 
 - [ ] **VPS deploy:** push to `origin/master`, then on the VPS run the playbook from [`0430-T0213-prod-deploy-vps-smoke.md`](./0430-T0213-prod-deploy-vps-smoke.md), including `npm run db:migrate` against the prod Postgres so `003_gate5_transcripts.sql` lands.
-- [ ] **G5-08 mark `[x]`** in [`clinical-copilot-task-list.md`](../../../implementation/clinical-copilot-task-list.md) once the VPS dictation smoke is green.
+- [ ] **G5-08 mark `[x]`** in [`TASKS.md`](../../../../../TASKS.md) once the VPS dictation smoke is green.
 - [ ] **Plumb correlation id over WS** so dictation failures echo a server-side id the user can paste back.
 - [x] **Vitals parser pass on AssemblyAI output** — resolved next session ([`0430-T2314-dictation-agent-parity.md`](./0430-T2314-dictation-agent-parity.md)). Root cause was not the parser — `onDictationFinal` wasn't calling `postChat` at all, so the orchestrator never ran. Fix routes dictation through the full `/chat` pipeline, so `BP 125 over 60` now produces a proposal identically to typed input.
 - [x] Drop the `[dictation]` prefix or move it to a non-text affordance — done in the same follow-up: prefix removed, `Dictation` badge added via `ChatMessage.source === 'dictation'`.

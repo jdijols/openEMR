@@ -8,14 +8,21 @@ $side-calendar-date-padding: 0.3rem !default;
 /* ── Calendar top toolbar layout ─────────────────────────────────────
  * Lifted OUT of the `@if $compact-theme == false { ... }` guard below
  * so the layout is identical in both full and compact themes (both are
- * served the same template markup, so both need the rules). Prior
- * Bootstrap `.row` + `.col-md-*` percentages reserved fixed widths and
- * pushed the Month button to a second line whenever the calendar iframe
- * was narrowed (Clinical Co-Pilot rail). Per design feedback the date
- * column should hug its content and the two button groups (#functions
- * left, #viewPicker right) should each absorb half of the slack, so the
- * right-hand button group always has far more room than its 5 buttons
- * need and Month physically can't wrap. */
+ * served the same template markup, so both need the rules).
+ *
+ * Distribution rules:
+ *   - #dateNAV    hugs its content (the long date string + chevrons).
+ *   - #viewPicker hugs its content too (5 buttons incl. Print/Refresh/
+ *                 Day/Week/Month). It does not grow into wasted space and
+ *                 — critically — does not shrink. This is the lever that
+ *                 keeps Month off a second line whenever the Clinical
+ *                 Copilot rail narrows the calendar iframe: the previous
+ *                 `flex: 1 1 0` made viewPicker share shrink with #functions
+ *                 even though viewPicker needs roughly twice the room, so
+ *                 viewPicker hit content limit first and Month wrapped.
+ *   - #functions  absorbs ALL the slack (grow + shrink). It only contains
+ *                 a few icon buttons, so it can take any extra width when
+ *                 wide and tolerate shrinking when narrow. */
 #topToolbarRight {
   display: flex;
   flex-wrap: nowrap;
@@ -40,8 +47,7 @@ $side-calendar-date-padding: 0.3rem !default;
 }
 
 #viewPicker {
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 0 0 auto;
   text-align: $right;
   white-space: nowrap;
   display: flex;

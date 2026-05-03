@@ -551,7 +551,7 @@ describe('runChatTurn (PRD §5.7 wiring)', () => {
       'propose_tobacco_write',
       'propose_vitals_write',
     ]);
-    expect(args.system).toMatch(/clinical co-pilot/i);
+    expect(args.system).toMatch(/clinical copilot/i);
     expect(args.prompt).toMatch(/pat-1/);
     expect(args.prompt).toMatch(/list allergies/);
 

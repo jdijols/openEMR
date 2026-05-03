@@ -1,7 +1,7 @@
 ---
 date: 2026-04-30
 topic: Gate 3 — G3-00 migrate proof, task-list refresh, G3-11 operator blocker
-related_milestone: clinical-copilot-task-list.md (Gate 3), 0430-T1334-gate3-nav-sync-no-chart-closeout.md
+related_milestone: TASKS.md (Gate 3), 0430-T1334-gate3-nav-sync-no-chart-closeout.md
 ---
 
 # Gate 3 closeout — DB baseline + checklist
@@ -42,7 +42,7 @@ See [0430-T1334-gate3-nav-sync-no-chart-closeout.md](./0430-T1334-gate3-nav-sync
 
 ## G3-11 blocker (MUST — task list over ad-hoc PRD interpretation)
 
-**UC-A “Brief me” / “what changed since last visit”** requires **three** manual transcript captures (≥3 storyboard patients), each with at least one cited “what changed” claim — per `clinical-copilot-task-list.md` **G3-11**.
+**UC-A “Brief me” / “what changed since last visit”** requires **three** manual transcript captures (≥3 storyboard patients), each with at least one cited “what changed” claim — per `TASKS.md` **G3-11**.
 
 This journal does **not** substitute for those captures (no fabricated PHI). **Operator:** when you run the storyboard, append a follow-up journal entry or extend this file with:
 

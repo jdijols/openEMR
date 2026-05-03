@@ -64,7 +64,7 @@ Requirements on the prod host:
 - Public DNS for `AGENTFORGE_PUBLIC_HOSTNAME` resolving to this host (`nip.io` works out of the box).
 
 Browser flow in prod: OpenEMR on `http://${HOST}:8300` (origin); the embedded
-co-pilot iframe makes CORS-allowed cross-origin fetches to `https://${HOST}` (Caddy → API).
+copilot iframe makes CORS-allowed cross-origin fetches to `https://${HOST}` (Caddy → API).
 
 ## VPS production runbook (Gate 2 smoke–level)
 
@@ -97,7 +97,7 @@ Do this on the server where Docker runs (same layout as `development-easy` + ove
    ```
    Expect JSON `ok: true`, `deps.postgres: "reachable"`. **`ok:false`** with `postgres: "degraded_chat_requires_migrations_or_url"` usually means **`002_gate4_conversations.sql`** was not applied (`cd agentforge/api && npm run db:migrate`). Symptom: **case presentation works** (no DB) but **chat send fails with a server error**.
 
-5. **OpenEMR smoke (browser)** — log in → open **one** demo/cohort chart → open Clinical Co-Pilot rail → allergy or identity prompt with cited **Claim**(s). If handshake fails, check CORS Origin, HTTPS vs HTTP mix, and that `OPENEMR_MODULE_SHARED_SECRET` matches between PHP and API.
+5. **OpenEMR smoke (browser)** — log in → open **one** demo/cohort chart → open Clinical Copilot rail → allergy or identity prompt with cited **Claim**(s). If handshake fails, check CORS Origin, HTTPS vs HTTP mix, and that `OPENEMR_MODULE_SHARED_SECRET` matches between PHP and API.
 
 6. **Logs** — `docker compose logs -f agentforge-api caddy openemr` (service names may vary slightly by profile).
 

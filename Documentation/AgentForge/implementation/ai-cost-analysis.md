@@ -1,8 +1,8 @@
-# AI Cost Analysis — AgentForge Clinical Co-Pilot
+# AI Cost Analysis — AgentForge Clinical Copilot
 
 > **Hard-gate deliverable:** Gate 7 task **G7-07**. The case-study brief asks for actual dev spend, projected production costs at 100 / 1K / 10K / 100K users, and the architectural inflection points each scale forces — *not* a token-rate multiplied by user count. This document is the single cost appendix for the submission bundle.
 >
-> **Source of measured data:** Langfuse traces (`https://us.cloud.langfuse.com` → OpenEMR → AgentForge), structured `console.info` JSON in `agentforge-api`, and the running token-rate table in [`agentforge/api/src/agent/cost_estimate.ts`](../../../agentforge/api/src/agent/cost_estimate.ts). Companion files: [`dev-spend-log.md`](dev-spend-log.md), [`clinical-copilot-task-list.md` § Gate 7](clinical-copilot-task-list.md#gate-7--submission-bundle).
+> **Source of measured data:** Langfuse traces (`https://us.cloud.langfuse.com` → OpenEMR → AgentForge), structured `console.info` JSON in `agentforge-api`, and the running token-rate table in [`agentforge/api/src/agent/cost_estimate.ts`](../../../agentforge/api/src/agent/cost_estimate.ts). Companion files: [`dev-spend-log.md`](dev-spend-log.md), [`TASKS.md` § Gate 7](../../../TASKS.md#gate-7--submission-bundle).
 >
 > **Compliance note:** All rates and projections below assume the Gauntlet "act as if BAA is in place" posture for all LLM and STT providers. PHI never appears in this document. Real-PHI deployments require a documented BAA per [`AUDIT.md`](../../../AUDIT.md) Compliance-2.
 

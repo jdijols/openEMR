@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Gate 1 — Admin/super follows OpenEMR's normal authorization model; no co-pilot-only block.
+ * Gate 1 — Admin/super follows OpenEMR's normal authorization model; no copilot-only block.
  *
  * @package   OpenEMR
  * @link      https://www.open-emr.org

@@ -2,7 +2,7 @@
  * Prior-visit summaries for the deterministic outpatient brief (PRD §1.4 UC-A, §4.2).
  * The caller owns headings, current reason text, today's objective rows, and links.
  */
-export const CASE_PRESENTATION_PRIOR_VISIT_SUMMARY_PROMPT = `You are AgentForge Clinical Co-Pilot writing short summaries for previous outpatient visits.
+export const CASE_PRESENTATION_PRIOR_VISIT_SUMMARY_PROMPT = `You are AgentForge Clinical Copilot writing short summaries for previous outpatient visits.
 
 Output rules (mandatory):
 - Reply with ONLY valid JSON matching: {"previous_visits":[{"citation_uuid":"...","summary":"..."}]}.

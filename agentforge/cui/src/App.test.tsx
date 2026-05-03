@@ -138,7 +138,7 @@ describe('App — panel refresh control (P3 cache-bust)', () => {
 
     render(<App />);
 
-    const refreshBtn = await waitFor(() => screen.getByRole('button', { name: /refresh clinical co-pilot/i }));
+    const refreshBtn = await waitFor(() => screen.getByRole('button', { name: /refresh clinical copilot/i }));
 
     const before = presentPatientCalls(fetchMock).length;
     fireEvent.click(refreshBtn);
@@ -184,7 +184,7 @@ describe('App — panel refresh control (P3 cache-bust)', () => {
     globalThis.fetch = fetchMock as typeof fetch;
 
     render(<App />);
-    const refreshBtn = await waitFor(() => screen.getByRole('button', { name: /refresh clinical co-pilot/i }));
+    const refreshBtn = await waitFor(() => screen.getByRole('button', { name: /refresh clinical copilot/i }));
 
     fireEvent.click(refreshBtn);
 
@@ -296,7 +296,7 @@ describe('App — brief auto-trigger (G3-11 v2)', () => {
     // The chart-required UI surfaces; the brief must NOT auto-fire.
     await screen.findByText(/Open a patient chart to begin/);
     expect(presentPatientCalls(fetchMock)).toHaveLength(0);
-    expect(screen.queryByRole('button', { name: /refresh clinical co-pilot/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /refresh clinical copilot/i })).not.toBeInTheDocument();
     expect(document.querySelector('.agentforge-cui__header-action-slot')).not.toBeNull();
   });
 });

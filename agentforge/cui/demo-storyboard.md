@@ -1,11 +1,11 @@
 ---
 title: AgentForge demo storyboard
 prd: ../../PRD.md §12.4 / §13.2
-task: G6-14 (clinical-copilot-task-list.md)
+task: G6-14 (TASKS.md)
 created: 2026-05-01
 ---
 
-# Demo storyboard — AgentForge V1 Clinical Co-Pilot
+# Demo storyboard — AgentForge V1 Clinical Copilot
 
 This is the **demo script** for the live URL submission (PRD §13.2 Loom) and
 the sponsor / grading rehearsal. It picks a stable set of cohort patients
@@ -134,4 +134,4 @@ After running the rehearsal, write a journal entry under
       the G3-12 chart-switch sync (auto re-handshake on `pid` change).
 
 When all six checkboxes are green, mark **G6-14** `[x]` in
-[`Documentation/AgentForge/implementation/clinical-copilot-task-list.md`](../../Documentation/AgentForge/implementation/clinical-copilot-task-list.md).
+[`TASKS.md`](../../TASKS.md).

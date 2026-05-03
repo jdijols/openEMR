@@ -1,0 +1,11 @@
+{
+  "case_id": "crud-chief-complaint-delete-no-write-without-confirm",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-crud-cc-delete-pass",
+  "use_case": "UC-D chief-complaint clear: proposal → confirm → write. Delete-shaped writes follow the same confirm gate as create/update.",
+  "steps": [
+    { "kind": "proposal", "proposal_id": "prop-cc-delete-1" },
+    { "kind": "confirm", "proposal_id": "prop-cc-delete-1" },
+    { "kind": "openemr_write", "proposal_id": "prop-cc-delete-1" }
+  ]
+}

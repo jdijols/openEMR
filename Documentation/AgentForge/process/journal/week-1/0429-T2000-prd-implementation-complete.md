@@ -8,7 +8,7 @@ related_milestone: none (trail still ends at process/09-vps-live-deployment.md; 
 
 ## Goal
 
-Produce a Gauntlet-ready **clinical co-pilot PRD**: first a structured plan tied to deadline (Sun May 3, noon local), then the full **`PRD.md`** at repo root beside `AUDIT.md`, `USERS.md`, and `ARCHITECTURE.md`, so execution can spawn section-by-section task lists in follow-up chats.
+Produce a Gauntlet-ready **clinical copilot PRD**: first a structured plan tied to deadline (Sun May 3, noon local), then the full **`PRD.md`** at repo root beside `AUDIT.md`, `USERS.md`, and `ARCHITECTURE.md`, so execution can spawn section-by-section task lists in follow-up chats.
 
 ## Context
 

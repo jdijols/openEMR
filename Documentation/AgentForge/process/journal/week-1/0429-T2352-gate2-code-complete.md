@@ -6,7 +6,7 @@ status: code-complete (G2-12 manual smoke pending)
 
 # Gate 2 — code-complete
 
-Closes implementation + automated tests for [task list G2-01..G2-11 + G2-13](../../../implementation/clinical-copilot-task-list.md#gate-2--first-vertical-read-slice-uc-a-spine). G2-12 (live cohort smoke) is the only remaining row and is gated on a real OpenEMR boot with an LLM API key configured.
+Closes implementation + automated tests for [task list G2-01..G2-11 + G2-13](../../../../../TASKS.md#gate-2--first-vertical-read-slice-uc-a-spine). G2-12 (live cohort smoke) is the only remaining row and is gated on a real OpenEMR boot with an LLM API key configured.
 
 ## Test snapshot
 

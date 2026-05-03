@@ -8,7 +8,7 @@ related_milestone: process/07-stage4-users.md
 
 ## Goal
 
-Lock the AgentForge Stage 4 hard gate: a repo-root [`USERS.md`](../../../../USERS.md) that defines the clinical co-pilot’s target physician, journey-shaped workflow (pre-room, in-room, post-room), use cases with “why not a dashboard,” non-goals, audit cross-check, and Stage 5 traceability — then mark it as the formal deliverable, clarify in-room capture boundaries, and add **process/07** plus README trail row **7**.
+Lock the AgentForge Stage 4 hard gate: a repo-root [`USERS.md`](../../../../USERS.md) that defines the clinical copilot’s target physician, journey-shaped workflow (pre-room, in-room, post-room), use cases with “why not a dashboard,” non-goals, audit cross-check, and Stage 5 traceability — then mark it as the formal deliverable, clarify in-room capture boundaries, and add **process/07** plus README trail row **7**.
 
 ## Context
 

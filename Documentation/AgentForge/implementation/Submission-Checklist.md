@@ -5,7 +5,7 @@ deadline: 2026-05-03 12:00 CT (cohort-confirmed; PDF page-level "10:59 PM" is a 
 created: 2026-05-02
 status: working — populated against current repo state
 related:
-  - clinical-copilot-task-list.md (Gate 7)
+  - TASKS.md (Gate 7)
   - ai-cost-analysis.md
   - dev-spend-log.md
   - post-deploy-bug-log.md
@@ -18,7 +18,7 @@ submission. It tracks the explicit deliverables table from
 [Week 1 - AgentForge.pdf](../references/Week%201%20-%20AgentForge.pdf) plus the
 Stage gates, Agent Requirements, and Interview Preparation that the PDF calls
 out elsewhere — every item here is something Gauntlet has explicitly named.
-Implementation depth lives in [`clinical-copilot-task-list.md`](./clinical-copilot-task-list.md);
+Implementation depth lives in [`TASKS.md`](../../../TASKS.md);
 this file is the **scoreboard** the user reads before submitting.
 
 How to use it: every section ends in a `Status` line and a `To-do` list. Tick
@@ -60,7 +60,7 @@ yet include the deployed link or an explicit AgentForge setup section**.
 
 **To-do:**
 - [ ] Confirm the GitLab repo is **publicly viewable** (or graders have access) and `master` is current with the deployed build
-- [ ] Add a top-level "AgentForge Clinical Co-Pilot" section to [`README.md`](../../../README.md) with:
+- [ ] Add a top-level "AgentForge Clinical Copilot" section to [`README.md`](../../../README.md) with:
   - [ ] **Deployed link** (live URL — currently `https://108-61-145-220.nip.io`)
   - [ ] **Setup guide** link or short block — point at [`docker/development-easy/`](../../../docker/development-easy/) plus [`process/04-stage1-local-dev-runbook.md`](../process/04-stage1-local-dev-runbook.md) and [`process/09-vps-live-deployment.md`](../process/09-vps-live-deployment.md)
   - [ ] **Architecture overview** link to [`ARCHITECTURE.md`](../../../ARCHITECTURE.md)
@@ -114,7 +114,7 @@ touched 2026-05-01).
 
 **Status:** Not yet recorded. Length budget locked at **~5 min, ≤7 min cap**
 (C2). [`PRD.md`](../../../PRD.md) §13.2 script + per-section timings already
-compressed; [`clinical-copilot-task-list.md`](./clinical-copilot-task-list.md)
+compressed; [`TASKS.md`](../../../TASKS.md)
 G7-01 row updated.
 
 **To-do:**
@@ -146,7 +146,7 @@ eval-runner refactor and Context HTTP-matrix coverage; see
 **Status:** [`ai-cost-analysis.md`](./ai-cost-analysis.md) exists with
 methodology, unit economics, projections at 100 / 1K / 10K / 100K MAU, and
 tier-by-tier inflection paragraphs.
-[`clinical-copilot-task-list.md`](./clinical-copilot-task-list.md) G7-07 is
+[`TASKS.md`](../../../TASKS.md) G7-07 is
 marked `[~]` — §3 actual dev-spend table awaits Anthropic + AssemblyAI console
 fill-in.
 
@@ -178,7 +178,7 @@ propose/confirm/write, UC-C, cross-patient refusal all confirmed working.
 > **PDF:** Share on X or LinkedIn: describe the project, show the agent, tag @GauntletAI.
 
 **Status:** Not yet drafted. Tracked as G7-02 in
-`clinical-copilot-task-list.md`; planned location
+`TASKS.md`; planned location
 `Documentation/AgentForge/social-post.md`.
 
 **To-do:**
@@ -264,5 +264,5 @@ When this list is fully green, submit at 12:00 CT.
 - **Status vs To-do.** `Status` is what exists today; `To-do` is what must
   happen before this section ticks green.
 - **Cross-references.** Implementation depth is **not** duplicated here — point
-  at [`clinical-copilot-task-list.md`](./clinical-copilot-task-list.md),
+  at [`TASKS.md`](../../../TASKS.md),
   [`ai-cost-analysis.md`](./ai-cost-analysis.md), and process journals instead.

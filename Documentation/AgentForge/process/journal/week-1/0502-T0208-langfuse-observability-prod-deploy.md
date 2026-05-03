@@ -104,7 +104,7 @@ Pre-session state was the close of Gate 6 (engineering) and a long evening of CU
 - `docker/agentforge/secrets.dev.env`, `docker/agentforge/secrets.prod.env` — three Langfuse keys flipped from placeholders to real cloud values (gitignored).
 - `Documentation/AgentForge/README.md` — process trail row 18.
 - `Documentation/AgentForge/process/02-tooling-and-skills.md` — changelog bullet for `langfuse@3.38.20`.
-- `Documentation/AgentForge/implementation/clinical-copilot-task-list.md` — G7-07 marked `[~]` partial.
+- `TASKS.md` — G7-07 marked `[~]` partial.
 - `Documentation/AgentForge/implementation/post-deploy-bug-log.md` — P1/P2/P3 status updated to "deployed to prod 2026-05-02; full re-smoke deferred to morning."
 
 ### Commits landed

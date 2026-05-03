@@ -104,7 +104,7 @@ $styleHref = \htmlspecialchars(
 $html = '<!DOCTYPE html><html lang="en" data-launch-code="' . $attr . '" data-patient-uuid="' . $patientAttr
     . '" data-patient-copilot-title="' . $copilotTitleAttr . '" data-bound-encounter-id="' . $encounterAttr
     . '" data-bound-encounter-date="' . $encounterDateAttr . '" data-bound-encounter-category="' . $encounterCategoryAttr
-    . '" data-bound-encounter-created="' . $encounterCreatedAttr . '"><head><meta charset="utf-8"><title>AgentForge panel</title>'
+    . '" data-bound-encounter-created="' . $encounterCreatedAttr . '"><head><meta charset="utf-8"><title>Clinical Copilot panel</title>'
     . '<link rel="stylesheet" href="' . $styleHref . '">'
     . '<script>window.__AGENTFORGE_CUI__={apiBase:' . $apiPublicJson . '};</script>'
     . '</head><body><div id="agentforge-panel-root"></div>'

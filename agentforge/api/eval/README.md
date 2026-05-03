@@ -1,6 +1,6 @@
 # Eval suite — `agentforge/api/eval/`
 
-Deterministic regression gate for the Clinical Co-Pilot's stop-the-line invariants. Runs offline, in CI, with no LLM in the loop. The full architectural narrative — runner design, the six checks, why 13 cases instead of 50, what the suite *does not* test — lives in [`EVALUATION.md`](../../../EVALUATION.md) at repo root. This README is the **operator-and-contributor reference**: what each case targets, how to run it, and how to add a new one.
+Deterministic regression gate for the Clinical Copilot's stop-the-line invariants. Runs offline, in CI, with no LLM in the loop. The full architectural narrative — runner design, the six checks, why 13 cases instead of 50, what the suite *does not* test — lives in [`EVALUATION.md`](../../../EVALUATION.md) at repo root. This README is the **operator-and-contributor reference**: what each case targets, how to run it, and how to add a new one.
 
 ---
 

@@ -1,6 +1,6 @@
 # Gate 5 manual smoke — STT + UC-C (G5-08)
 
-**Purpose:** Close **G5-08** in `clinical-copilot-task-list.md` after automated tests are green.
+**Purpose:** Close **G5-08** in `TASKS.md` after automated tests are green.
 
 ## Preconditions
 

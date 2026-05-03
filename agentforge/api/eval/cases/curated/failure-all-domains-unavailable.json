@@ -1,0 +1,14 @@
+{
+  "case_id": "failure-all-domains-unavailable-refused",
+  "check": "all_domains_unavailable_refused",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-failure-all-domains-down",
+  "use_case": "Resilience: every Context Service tool failed (e.g. module unreachable). Agent must refuse, not fabricate.",
+  "context": {
+    "tools_attempted": ["get_problems", "get_meds", "get_vitals", "get_allergies"],
+    "tools_failed": ["get_problems", "get_meds", "get_vitals", "get_allergies"],
+    "blocks": [
+      { "type": "refusal", "reason": "context_service_unavailable_all_domains" }
+    ]
+  }
+}

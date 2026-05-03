@@ -1,9 +1,50 @@
 {# AgentForge header control — toggles right rail (PRD §4.2). Loaded only for chart-authorized sessions in Bootstrap. #}
+{# Two-state styling pivots on `aria-expanded` (the rail-container JS already
+   flips this attribute when opening/closing the panel, so we don't need a
+   second state class). Closed = Bootstrap btn-outline-secondary defaults
+   (outline at rest, filled on hover). Open inverts: filled at rest (matches
+   the closed-hover look), outline on hover (so the button always previews the
+   *opposite* state, telegraphing what a click will do). Bootstrap colors
+   (#6c757d / #fff) match btn-outline-secondary's compiled hover declarations. #}
+<style>
+/* `--toggle-active-color` is set by rail_container.html.twig at init by
+   probing the active theme's `.btn-outline-secondary` color, so the open
+   state stays in sync with the closed-hover fill across every OpenEMR
+   theme. The fallback (#1f2937 = default theme) only kicks in if the
+   probe couldn't run. */
+#agentforge-rail-toggle[aria-expanded="true"] {
+    color: #fff;
+    background-color: var(--toggle-active-color, #1f2937);
+    border-color: var(--toggle-active-color, #1f2937);
+}
+#agentforge-rail-toggle[aria-expanded="true"]:hover {
+    color: var(--toggle-active-color, #1f2937);
+    background-color: transparent;
+    border-color: var(--toggle-active-color, #1f2937);
+}
+</style>
 <button type="button"
         id="agentforge-rail-toggle"
-        class="btn btn-sm btn-outline-secondary ml-1"
-        title="{{ 'AgentForge co-pilot'|xl }}"
+        class="btn btn-sm btn-outline-secondary mx-1"
+        title="{{ 'Clinical Copilot'|xl }}"
         aria-expanded="false"
-        aria-controls="agentforge-rail">
-    <i class="fa fa-brain" aria-hidden="true"></i>
+        aria-controls="agentforge-rail"
+        style="padding: 0.25rem; line-height: 1;">
+    {# Inline stroked SVG in the same outlined style as the CUI's refresh icon
+       (IconPanelSync). Two 4-pointed sparkles is the de-facto "AI" mark
+       (Gemini / Copilot / Notion AI), and reads cleanly at 14px without
+       colliding visually with OpenEMR's patient↔clinic message centre. #}
+    <svg xmlns="http://www.w3.org/2000/svg"
+         width="20" height="20"
+         viewBox="0 0 24 24"
+         fill="none"
+         stroke="currentColor"
+         stroke-width="1.75"
+         stroke-linecap="round"
+         stroke-linejoin="round"
+         aria-hidden="true"
+         style="display: block;">
+        <path d="M10 7 Q 10 13 16 13 Q 10 13 10 19 Q 10 13 4 13 Q 10 13 10 7 Z" />
+        <path d="M18 3 Q 18 6 21 6 Q 18 6 18 9 Q 18 6 15 6 Q 18 6 18 3 Z" />
+    </svg>
 </button>

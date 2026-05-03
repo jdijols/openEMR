@@ -1,6 +1,6 @@
 # Stage 13 — Gate 3 complete
 
-**Purpose:** Record closure of **Gate 3 — UC-A Read Completeness** from [`implementation/clinical-copilot-task-list.md`](../implementation/clinical-copilot-task-list.md): all nine Context Service endpoints, source-pack drift tests, TypeScript tools, verification (§9.1–§9.3), CUI warning/refusal/empty state and citation navigation, **G3-11** auto outpatient case presentation (`AGENTFORGE_PRESENT_PATIENT` → `POST /present-patient`, parallel prefetch, segmented inline citations, parse hardening), **G3-00** Agent Postgres baseline, **G3-12** active-chart rail sync, **G3-13** token/cost metadata. Stop-the-line **S8** (uncited claims) remains enforced by `verification.ts` before CUI.
+**Purpose:** Record closure of **Gate 3 — UC-A Read Completeness** from [`TASKS.md`](../../../TASKS.md): all nine Context Service endpoints, source-pack drift tests, TypeScript tools, verification (§9.1–§9.3), CUI warning/refusal/empty state and citation navigation, **G3-11** auto outpatient case presentation (`AGENTFORGE_PRESENT_PATIENT` → `POST /present-patient`, parallel prefetch, segmented inline citations, parse hardening), **G3-00** Agent Postgres baseline, **G3-12** active-chart rail sync, **G3-13** token/cost metadata. Stop-the-line **S8** (uncited claims) remains enforced by `verification.ts` before CUI.
 
 ## Verification
 
@@ -13,6 +13,6 @@
 
 ## Next
 
-**Gate 4** — [`clinical-copilot-task-list.md` § Gate 4](../implementation/clinical-copilot-task-list.md#gate-4--uc-b-confirmed-writes): UC-B confirmed writes (chief complaint first), proposal cards, S2/S9 boundaries.
+**Gate 4** — [`TASKS.md` § Gate 4](../../../TASKS.md#gate-4--uc-b-confirmed-writes): UC-B confirmed writes (chief complaint first), proposal cards, S2/S9 boundaries.
 
 **Prior milestone:** [Stage 12 — Gate 1 and Gate 2 complete](12-gate1-gate2-complete.md).

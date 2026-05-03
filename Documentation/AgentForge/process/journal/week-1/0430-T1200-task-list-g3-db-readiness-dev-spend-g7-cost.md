@@ -2,7 +2,7 @@
 date: 2026-04-30
 topic: Task list — Gate 3 DB readiness, dev spend logging, Gate 7 cost appendix
 related_docs:
-  - Documentation/AgentForge/implementation/clinical-copilot-task-list.md
+  - TASKS.md
   - Documentation/AgentForge/implementation/open-questions.md (audit that motivated DB + cost gaps)
   - PRD.md (§5.9 conversation store, §11 observability / tokens per turn)
 ---
@@ -11,9 +11,9 @@ related_docs:
 
 ## Why this change landed
 
-Cross-review of `clinical-copilot-task-list.md` against `open-questions.md` flagged two execution risks before Gate 4+: **no explicit Agent API Postgres migration baseline** (would block **G4-07** / **G5-01** cleanly) and **no tracked dev spend / token rollups** ahead of submission or sponsor cost questions. We intentionally **did not** change Loom length policy (internal PRD vs Gauntlet PDF) in this pass — out of scope for this edit.
+Cross-review of `TASKS.md` against `open-questions.md` flagged two execution risks before Gate 4+: **no explicit Agent API Postgres migration baseline** (would block **G4-07** / **G5-01** cleanly) and **no tracked dev spend / token rollups** ahead of submission or sponsor cost questions. We intentionally **did not** change Loom length policy (internal PRD vs Gauntlet PDF) in this pass — out of scope for this edit.
 
-## What changed in `clinical-copilot-task-list.md`
+## What changed in `TASKS.md`
 
 | Item | Gate | Summary |
 | ---- | ---- | -------- |

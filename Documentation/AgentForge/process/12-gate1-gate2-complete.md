@@ -1,6 +1,6 @@
 # Stage 12 — Gate 1 and Gate 2 complete
 
-**Purpose:** Record closure of **Gate 1 — Security Primitives First** and **Gate 2 — First Vertical Read Slice (UC-A spine)** from [`implementation/clinical-copilot-task-list.md`](../implementation/clinical-copilot-task-list.md): launch-code + redeem handshake, active-chart binding, ACL/audit alignment with OpenEMR (no parallel privilege plane), Agent API Hono edge (CORS, error normalization, session token), then rail + CUI + Context Service (identity, allergies) + orchestrator + **G2-12** cited read with S1 cross-patient smoke. Stops-the-line **S1, S4, S5, S6, S10** (module/API scope for Gate 1) and the Gate 2 architecture proof (“one chart-bound question with citations”) are satisfied per the task list.
+**Purpose:** Record closure of **Gate 1 — Security Primitives First** and **Gate 2 — First Vertical Read Slice (UC-A spine)** from [`TASKS.md`](../../../TASKS.md): launch-code + redeem handshake, active-chart binding, ACL/audit alignment with OpenEMR (no parallel privilege plane), Agent API Hono edge (CORS, error normalization, session token), then rail + CUI + Context Service (identity, allergies) + orchestrator + **G2-12** cited read with S1 cross-patient smoke. Stops-the-line **S1, S4, S5, S6, S10** (module/API scope for Gate 1) and the Gate 2 architecture proof (“one chart-bound question with citations”) are satisfied per the task list.
 
 ## Verification
 
@@ -10,7 +10,7 @@
 
 ## Decisions (lifted from journals)
 
-- **S4 / admin\|super:** Co-pilot mirrors OpenEMR session/GACL; **no** co-pilot-only block on `admin/super`. Accepted risk and binding still enforced via active-chart checks, token hygiene, and later explicit-confirm writes (see module README + task list G1-06).
+- **S4 / admin\|super:** Copilot mirrors OpenEMR session/GACL; **no** copilot-only block on `admin/super`. Accepted risk and binding still enforced via active-chart checks, token hygiene, and later explicit-confirm writes (see module README + task list G1-06).
 - **Rail read ACL:** Use existing chart-read expectations (e.g. `patients/demo` for launch/read paths); avoid a second `agentforge/read_chart` plane that could deny users who already have the chart open.
 - **Secrets:** Shared module/API secrets live in gitignored `docker/agentforge/` env files (`secrets.env` lineage; evolved to `secrets.dev.env` / `secrets.prod.env` + `AGENTFORGE_SECRETS_FILE` for Gate 2 topology). Prefer `docker compose … config --services` over full `config` in logs (secrets expand).
 - **S2S redeem:** `handshake_redeem.php` uses controlled `ignoreAuthForRequest` so browser auth does not intercept server-to-server redeem; **`X-Internal-Auth`** still required.
@@ -19,8 +19,8 @@
 
 ## Next
 
-**Gate 3** — **Closed** (2026-04-30); see [Stage 13 — Gate 3 complete](13-gate3-complete.md). Historical pointer: [`clinical-copilot-task-list.md` § Gate 3](../implementation/clinical-copilot-task-list.md#gate-3--uc-a-read-completeness).
+**Gate 3** — **Closed** (2026-04-30); see [Stage 13 — Gate 3 complete](13-gate3-complete.md). Historical pointer: [`TASKS.md` § Gate 3](../../../TASKS.md#gate-3--uc-a-read-completeness).
 
-**Gate 4** — [`clinical-copilot-task-list.md` § Gate 4](../implementation/clinical-copilot-task-list.md#gate-4--uc-b-confirmed-writes): UC-B confirmed writes.
+**Gate 4** — [`TASKS.md` § Gate 4](../../../TASKS.md#gate-4--uc-b-confirmed-writes): UC-B confirmed writes.
 
 **Prior milestone:** [Stage 11 — Gate 0 complete](11-gate0-complete.md).

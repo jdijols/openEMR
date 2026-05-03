@@ -1,6 +1,6 @@
 {
     "name": "openemr/oe-module-agentforge",
-    "description": "AgentForge Clinical Co-Pilot custom module for OpenEMR",
+    "description": "AgentForge Clinical Copilot custom module for OpenEMR",
     "type": "openemr-module",
     "license": "GPL-3.0-or-later",
     "require": {

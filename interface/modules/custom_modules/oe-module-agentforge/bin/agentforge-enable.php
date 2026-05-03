@@ -65,10 +65,11 @@ try {
 }
 
 $messages = [
-    RegisterOutcome::Inserted->value => 'INSERTED — AgentForge module is now Active in modules table.',
-    RegisterOutcome::Unchanged->value => 'OK — AgentForge module already registered + Active (no change).',
-    RegisterOutcome::OperatorDisabled->value => 'NOTE — AgentForge module exists but mod_active=0 (operator disabled).'
-        . ' Re-enable via Modules → Manage Modules → AgentForge → Enable.',
+    RegisterOutcome::Inserted->value => 'INSERTED — Clinical Copilot module is now Active in modules table.',
+    RegisterOutcome::Refreshed->value => 'REFRESHED — Clinical Copilot module display fields updated to canonical values.',
+    RegisterOutcome::Unchanged->value => 'OK — Clinical Copilot module already registered + Active (no change).',
+    RegisterOutcome::OperatorDisabled->value => 'NOTE — Clinical Copilot module exists but mod_active=0 (operator disabled).'
+        . ' Re-enable via Modules → Manage Modules → Clinical Copilot → Enable.',
 ];
 
 echo "agentforge-enable: " . ($messages[$outcome->value] ?? $outcome->value) . PHP_EOL;

@@ -2,13 +2,15 @@
 course-start: 2026-04-27
 ---
 
-# AgentForge (Gauntlet AI)
+> **Project README:** [`/README.md`](../../README.md). Clinical Copilot is the product; this folder is the program-context build documentation from the Gauntlet AI AgentForge cohort that produced it.
 
-This folder holds **course and process documentation** for the Clinical Co-Pilot / AgentForge work on this OpenEMR fork. It is separate from upstream OpenEMR’s `Documentation/` tree.
+# AgentForge (Gauntlet AI) — Clinical Copilot Process Trail
 
-## Clinical Co-Pilot access control (instructor grading)
+This folder holds **course and process documentation** for the Clinical Copilot work developed on this OpenEMR fork during the Gauntlet AI AgentForge program. It is separate from upstream OpenEMR’s `Documentation/` tree.
 
-**Who gets the Clinical Co-Pilot rail, Context Service, and confirmed writes—and who does not—is defined in OpenEMR GACL**, not environmental toggles alone. Canonical summary for examiners:
+## Clinical Copilot access control (instructor grading)
+
+**Who gets the Clinical Copilot rail, Context Service, and confirmed writes—and who does not—is defined in OpenEMR GACL**, not environmental toggles alone. Canonical summary for examiners:
 
 - **[process/16-clinical-copilot-acl-role-gate.md](process/16-clinical-copilot-acl-role-gate.md)** — policy table (**`patients/demo`** floor + **`agentforge/use`** + **`agentforge/propose_write`**), **default-seeded groups** (`admin`, `doc`, `clin`, `breakglass`) vs **explicitly excluded** preset roles (`front`, `back`, parent `users` without assignment), **`admin/super`** caveat, implementation links.
 - **[Journal 0501-T2135](process/journal/week-1/0501-T2135-clinical-copilot-acl-role-gate.md)** — session decisions (GACL-only model, Emergency Login inclusion, Front Office / Accounting exclusion).
@@ -28,13 +30,13 @@ This folder holds **course and process documentation** for the Clinical Co-Pilot
 | 7   | [process/07-stage4-users.md](process/07-stage4-users.md)                     | Stage 4: users process pointer → [`USERS.md`](../../USERS.md) |
 | 8   | [process/08-stage5-architecture.md](process/08-stage5-architecture.md)       | Stage 5: architecture process pointer → [`ARCHITECTURE.md`](../../ARCHITECTURE.md) |
 | 9   | [process/09-vps-live-deployment.md](process/09-vps-live-deployment.md)       | MVP: live OpenEMR on a Linux VPS (Vultr) + Compose; GitLab clone; nip.io / HTTPS path |
-| 10  | [process/10-prd.md](process/10-prd.md)                                       | PRD + gate-ordered implementation task list; pointer to [`PRD.md`](../../PRD.md) and [`implementation/clinical-copilot-task-list.md`](implementation/clinical-copilot-task-list.md) |
+| 10  | [process/10-prd.md](process/10-prd.md)                                       | PRD + gate-ordered implementation task list; pointer to [`PRD.md`](../../PRD.md) and [`../../TASKS.md`](../../TASKS.md) |
 | 11  | [process/11-gate0-complete.md](process/11-gate0-complete.md)                 | Gate 0 scaffold + contract spine closed; verification journal; handoff to Gate 1 |
 | 12  | [process/12-gate1-gate2-complete.md](process/12-gate1-gate2-complete.md)       | Gate 1 security primitives + Gate 2 UC-A read spine closed; journal evidence; handoff to Gate 3 |
 | 13  | [process/13-gate3-complete.md](process/13-gate3-complete.md)                 | Gate 3 UC-A read completeness closed; case presentation + verification; handoff to Gate 4 |
 | 14  | [process/14-gate4-complete.md](process/14-gate4-complete.md)                 | Gate 4 UC-B confirmed writes closed; G4-10 chief-complaint E2E + `log_from='agent'` audit; handoff to Gate 5 |
 | 15  | [process/15-gate6-complete.md](process/15-gate6-complete.md)                 | Gate 6 eval + observability + deploy closed (G6-01..G6-18 + G6-20); LLM provider swap + eval-runner refactor + Context HTTP-matrix backfill; handoff to Gate 7 |
-| 16  | [process/16-clinical-copilot-acl-role-gate.md](process/16-clinical-copilot-acl-role-gate.md) | **Access control:** who may use Clinical Co-Pilot (`agentforge/use`, `propose_write`) vs excluded preset roles; GACL layering; examiner links |
+| 16  | [process/16-clinical-copilot-acl-role-gate.md](process/16-clinical-copilot-acl-role-gate.md) | **Access control:** who may use Clinical Copilot (`agentforge/use`, `propose_write`) vs excluded preset roles; GACL layering; examiner links |
 | 17  | [process/17-encounter-scoped-chart-bind-and-brief.md](process/17-encounter-scoped-chart-bind-and-brief.md) | **Open encounter scope:** appointment click context → session + AgentForge binder; brief vitals + Context `encounter_id` (not calendar “today”) |
 | 18  | [process/18-langfuse-observability-cost-analysis.md](process/18-langfuse-observability-cost-analysis.md) | **Observability live + AI cost appendix:** real Langfuse client (cloud) replacing the G6-07 stub — tool spans, LLM generations with model + tokens + cost, PHI-redacted; G7-07 [`ai-cost-analysis.md`](implementation/ai-cost-analysis.md) shipped; deployed to prod |
 

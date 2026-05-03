@@ -2,7 +2,7 @@
 date: 2026-05-01
 topic: Render Markdown in assistant prose surfaces of the CUI rail (text + claim segments + warning + auto-brief), Cursor/Claude-style
 related_prior_journal: ./0501-T1838-cui-panel-polish-header-empty-textarea-buttons.md
-related_task_list: ../../../implementation/clinical-copilot-task-list.md
+related_task_list: ../../../../../TASKS.md
 ---
 
 # CUI Markdown rendering — readable assistant prose for a busy clinician

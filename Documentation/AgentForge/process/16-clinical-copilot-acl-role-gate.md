@@ -1,14 +1,14 @@
 ---
 date: 2026-05-01
-topic: Clinical Co-Pilot GACL layer — instructor-facing access control summary
+topic: Clinical Copilot GACL layer — instructor-facing access control summary
 related_milestone: "process/16-clinical-copilot-acl-role-gate.md"
 ---
 
-# Clinical Co-Pilot access control — process milestone
+# Clinical Copilot access control — process milestone
 
 ## Purpose
 
-Provide a single **examiner-facing** checkpoint for **who may use AgentForge Clinical Co-Pilot** and **who may not**, aligned with OpenEMR GACL (no parallel privilege plane). Implementation lives in **`oe-module-agentforge`**; this file is the process-trail anchor for grading narratives and demos.
+Provide a single **examiner-facing** checkpoint for **who may use AgentForge Clinical Copilot** and **who may not**, aligned with OpenEMR GACL (no parallel privilege plane). Implementation lives in **`oe-module-agentforge`**; this file is the process-trail anchor for grading narratives and demos.
 
 See also session journal [0501-T2135-clinical-copilot-acl-role-gate.md](../journal/week-1/0501-T2135-clinical-copilot-acl-role-gate.md) for pivot history.
 
@@ -16,7 +16,7 @@ See also session journal [0501-T2135-clinical-copilot-acl-role-gate.md](../journ
 
 ## Decision (product policy)
 
-Clinical Co-Pilot access is **not** “everyone who can open demographics (`patients/demo`).” It adds a module-owned entitlement:
+Clinical Copilot access is **not** “everyone who can open demographics (`patients/demo`).” It adds a module-owned entitlement:
 
 | Layer | GACL section / value | Role |
 | ----- | --------------------- | ---- |

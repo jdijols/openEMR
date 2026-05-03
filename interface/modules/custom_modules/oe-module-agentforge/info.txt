@@ -1,1 +1,1 @@
-AgentForge Clinical Co-Pilot v0.1.0-gate0
+Clinical Copilot by Jason Dijols v0.1.0-gate0

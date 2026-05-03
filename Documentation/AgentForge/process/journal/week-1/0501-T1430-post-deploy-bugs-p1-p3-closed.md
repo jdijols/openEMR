@@ -91,7 +91,7 @@ VPS access is not available from this session, so the loop is **investigate + fi
   - [`tests/Tests/Isolated/Modules/AgentForge/SessionTokenIssuerFixture.php`](../../../../../tests/Tests/Isolated/Modules/AgentForge/SessionTokenIssuerFixture.php), [`tests/Tests/Isolated/Modules/AgentForge/SessionTokenInteropTest.php`](../../../../../tests/Tests/Isolated/Modules/AgentForge/SessionTokenInteropTest.php).
 - **This session (docs)** — landed in the docs commit alongside this journal.
   - [`Documentation/AgentForge/implementation/post-deploy-bug-log.md`](../../../implementation/post-deploy-bug-log.md) — status flipped to `fixes-shipped`, Resolution sections per bug with commit SHAs and verification steps, M1 strikethroughs reflecting what's now done.
-  - [`Documentation/AgentForge/implementation/clinical-copilot-task-list.md`](../../../implementation/clinical-copilot-task-list.md) — G5-08 status note: P2 blocker shipped, awaiting prod re-smoke.
+  - [`TASKS.md`](../../../../../TASKS.md) — G5-08 status note: P2 blocker shipped, awaiting prod re-smoke.
   - [`Documentation/AgentForge/process/journal/week-1/0501-T0014-prod-deploy-gates3-5-vps.md`](./0501-T0014-prod-deploy-gates3-5-vps.md) — prior session journal landed (was uncommitted).
   - This file.
 
@@ -116,7 +116,7 @@ VPS access is not available from this session, so the loop is **investigate + fi
 - Plan file (this session): `.claude/plans/post-deploy_bugs_p1-p3_fix_ba8d7be5.plan.md` (local, not committed).
 - Bug log: [`Documentation/AgentForge/implementation/post-deploy-bug-log.md`](../../../implementation/post-deploy-bug-log.md).
 - Prior session journal: [`./0501-T0014-prod-deploy-gates3-5-vps.md`](./0501-T0014-prod-deploy-gates3-5-vps.md).
-- Task list: [`Documentation/AgentForge/implementation/clinical-copilot-task-list.md`](../../../implementation/clinical-copilot-task-list.md) (G5-08 status note).
+- Task list: [`TASKS.md`](../../../../../TASKS.md) (G5-08 status note).
 - Branch tip on `gitlab/master`: `5d2902203`.
 - Five-commit range: `git log d2b8f3621..5d2902203 --oneline` →
   - `5d2902203` test: split malformed-token interop test off typed mint()
