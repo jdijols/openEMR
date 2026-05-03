@@ -31,7 +31,14 @@ const clinicalNoteEditSchema = z
     encounter_id: z.number().int().positive(),
     note_uuid: z.string().min(1),
     action: clinicalNoteEditActionSchema,
-    text: z.string().min(1).max(8000).optional(),
+    text: z
+      .string()
+      .min(1)
+      .max(8000)
+      .optional()
+      .describe(
+        'Required when action="update" — the new note body that replaces the existing row\'s text. OMIT this field entirely when action="delete" — the soft-delete does not need a text payload. Sending text alongside action="delete" will be rejected by validation.',
+      ),
   })
   .strict()
   .superRefine((val, ctx) => {
@@ -326,7 +333,7 @@ export function createProposeWriteTools(
 
     propose_clinical_note_edit: tool({
       description:
-        'Propose editing a specific existing clinical note row by UUID — either updating its body text (action="update", with replacement text) or soft-deleting it (action="delete", which sets activity=0 in OpenEMR; the row is hidden but preserved for audit). Use this for physician-driven corrections like "remove the note about asthma improving" or "rewrite the dizziness note to say it resolved after rest". Get the note_uuid from a prior get_clinical_notes call (it is the row\'s "uuid" field). The note must belong to the active encounter — cross-encounter edits are rejected.',
+        'Propose editing a specific existing clinical note row by UUID — either updating its body text (action="update", with replacement text) or soft-deleting it (action="delete", which sets activity=0 in OpenEMR; the row is hidden but preserved for audit). Use this for physician-driven corrections like "remove the note about asthma improving" or "rewrite the dizziness note to say it resolved after rest". Get the note_uuid from a prior get_clinical_notes call (it is the row\'s "uuid" field). The note must belong to the active encounter — cross-encounter edits are rejected. **Field-shape rules:** for action="update" you MUST include text (the replacement body). For action="delete" you MUST OMIT the text field entirely — the soft-delete payload is { patient_uuid, encounter_id, note_uuid, action: "delete" } with no text key. Sending text alongside action="delete" is rejected.',
       inputSchema: clinicalNoteEditSchema,
       execute: async (input) => {
         const bound = assertBoundPatient(env, sessionToken, input.patient_uuid);

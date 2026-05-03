@@ -33,8 +33,15 @@ final class OpenEmrEncounterVitalsDeleteAdapter implements EncounterVitalsDelete
             return ConfirmedWriteOutcome::openemrRejected('vitals not found');
         }
 
+        // form_vitals has no encounter column of its own; encounter binding lives in
+        // the forms table (forms.form_id == form_vitals.id, forms.formdir = 'vitals').
+        // JOIN through forms to fetch the encounter id alongside the row, then verify
+        // the binding before flipping activity.
         $rows = QueryUtils::fetchRecords(
-            "SELECT id, eid FROM form_vitals WHERE uuid = ? AND pid = ? LIMIT 1",
+            "SELECT fv.id AS id, f.encounter AS encounter "
+            . "FROM form_vitals fv "
+            . "JOIN forms f ON f.form_id = fv.id AND f.formdir = 'vitals' AND f.pid = fv.pid "
+            . "WHERE fv.uuid = ? AND fv.pid = ? LIMIT 1",
             [$hexUuid, $pid],
         );
 
@@ -44,13 +51,13 @@ final class OpenEmrEncounterVitalsDeleteAdapter implements EncounterVitalsDelete
 
         $row = $rows[0];
         $formVitalsId = isset($row['id']) && \is_numeric($row['id']) ? (int) $row['id'] : 0;
-        $rowEid = isset($row['eid']) && \is_numeric($row['eid']) ? (int) $row['eid'] : 0;
+        $rowEncounter = isset($row['encounter']) && \is_numeric($row['encounter']) ? (int) $row['encounter'] : 0;
 
         if ($formVitalsId <= 0) {
             return ConfirmedWriteOutcome::openemrRejected('vitals not found');
         }
 
-        if ($rowEid !== $encounterNumericId) {
+        if ($rowEncounter !== $encounterNumericId) {
             return ConfirmedWriteOutcome::openemrRejected('encounter mismatch');
         }
 
@@ -59,9 +66,11 @@ final class OpenEmrEncounterVitalsDeleteAdapter implements EncounterVitalsDelete
                 "UPDATE forms SET activity = 0 WHERE form_id = ? AND formdir = 'vitals' AND pid = ? AND encounter = ? LIMIT 1",
                 [$formVitalsId, $pid, $encounterNumericId],
             );
+            // The JOIN above already verified the encounter binding; the form_vitals
+            // row is keyed by (id, pid) — no `eid` column exists on this table.
             QueryUtils::sqlStatementThrowException(
-                "UPDATE form_vitals SET activity = 0 WHERE id = ? AND pid = ? AND eid = ? LIMIT 1",
-                [$formVitalsId, $pid, $encounterNumericId],
+                "UPDATE form_vitals SET activity = 0 WHERE id = ? AND pid = ? LIMIT 1",
+                [$formVitalsId, $pid],
             );
         } catch (\Throwable) {
             return ConfirmedWriteOutcome::openemrRejected('write failed');
