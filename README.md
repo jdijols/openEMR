@@ -11,11 +11,11 @@
 
 At least not today. What they need is their time back.
 
-Physicians in adult primary care spend nearly two hours on EHR documentation and clerical work for every one hour of direct patient face time.\* That ratio — not patient complexity, not clinical decision-making — is the largest single driver of physician burnout in modern outpatient practice. The chart, not the patient, is the problem.
+Physicians in adult primary care spend nearly two hours on EHR documentation and clerical work for every one hour of direct patient face time. That ratio — not patient complexity, not clinical decision-making — is the largest single driver of physician burnout in modern outpatient practice. The chart, not the patient, is the problem.
 
 Clinical Copilot is built around that observation. It does not interpret labs, suggest diagnoses, or recommend treatments. It pulls data from the patient's chart on request, proposes structured writes from physician dictation (only after explicit confirmation), and otherwise stays out of the way. The conversational interface is the surface; the work underneath is **automation, not advice**.
 
-<sub>\* Sinsky C, Colligan L, Li L, et al. *"Allocation of Physician Time in Ambulatory Practice: A Time and Motion Study in 4 Specialties."* Annals of Internal Medicine. 2016;165(11):753-760.</sub>
+\* Sinsky C, Colligan L, Li L, et al. *"Allocation of Physician Time in Ambulatory Practice: A Time and Motion Study in 4 Specialties."* Annals of Internal Medicine. 2016;165(11):753-760.
 
 ---
 
@@ -67,9 +67,13 @@ These are not aspirational gaps. Several of them — medical advice, external kn
 
 ## What's planned for V2
 
-The verification architecture was designed with extension in mind. The most concrete V2 candidate is an **external evidence grounding** layer: a `lookup_clinical_evidence` tool over PubMed, NEJM, or OpenEvidence that would let the system answer general clinical-knowledge questions with peer-reviewed citations rather than deferring.
+V2 deepens what V1 already proved: the propose → confirm → write contract works, and the four-layer verification gate handles UUID citations from any tool source. V2 extends that pattern across the **full patient chart**, so the agent can read, create, update, and delete every data type a clinician touches in a chart workflow — not just the five confirmed-write targets V1 ships with. The work is sequenced into three sub-versions:
 
-The existing citation-enforcement gate already does the right thing on UUIDs from any source pack; adding the new tool would not require redesigning verification, only registering the new source family and extending citation rendering to handle external URLs alongside in-chart navigation. V1 defers it because verifying source currency and accuracy is its own engineering project — not because the architecture cannot accommodate it. See [VERIFICATION.md §7](VERIFICATION.md) for the design sketch and [Documentation/AgentForge/implementation/v2-roadmap.md](Documentation/AgentForge/implementation/v2-roadmap.md) for the broader candidate set.
+- **V2.1 — Clinical core:** allergies (closing the CRUD V1 left at add/update), medical problems, medications, prescription records, immunizations.
+- **V2.2 — Care coordination:** care team, treatment intervention preferences, care experience preferences.
+- **V2.3 — Operational chart:** demographics, billing/insurance, patient messages, patient reminders.
+
+Architecturally this is a clean extension, not a redesign. Every V2 surface uses the same propose → confirm → write pipeline, the same UUID-citation gate, and the same active-chart binding model V1 ships with. **External evidence grounding** — the `lookup_clinical_evidence` tool over PubMed, NEJM, or OpenEvidence that earlier drafts proposed for V2 — moves to V3, where it can get a dedicated design pass for source currency, hallucinated-citation risk, and external-URL citation rendering rather than being bolted onto a chart-CRUD release. See [VERIFICATION.md §7](VERIFICATION.md) for the V1 limitation that motivates V3 external evidence, and [Documentation/AgentForge/implementation/v2-roadmap.md](Documentation/AgentForge/implementation/v2-roadmap.md) for the full V2 sequencing and V3 candidate set.
 
 ---
 
@@ -93,7 +97,7 @@ The CUI never holds LLM API keys; only the Agent API talks to the model and STT 
 
 ## Try it
 
-- **Live demo:** [https://108-61-145-220.nip.io](https://108-61-145-220.nip.io) — `admin` / `pass`, synthetic patients only
+- **Live demo:** [https://108-61-145-220.nip.io](https://108-61-145-220.nip.io) — `physician` / `password123`, synthetic patients only
 - **Local development (Docker):** see [docker/development-easy/](docker/development-easy/) and [Documentation/AgentForge/process/04-stage1-local-dev-runbook.md](Documentation/AgentForge/process/04-stage1-local-dev-runbook.md)
 - **VPS deployment runbook:** see [Documentation/AgentForge/process/09-vps-live-deployment.md](Documentation/AgentForge/process/09-vps-live-deployment.md)
 
@@ -104,17 +108,17 @@ The CUI never holds LLM API keys; only the Agent API talks to the model and STT 
 The submission package and project context, in the order a reader should approach them:
 
 
-| Document                             | What it covers                                                                                                                                           |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Document                             | What it covers                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | [USERS.md](USERS.md)                 | Target user (Dr. Maya Reynolds, adult PCP, new or returning patients), the ten V1 use cases (UC-A through UC-J: pre-room case presentation, single- and cross-domain Q&A, four confirmed-write surfaces, refusal posture, documentary med reconciliation, documentary abnormal lab surfacing), CRUD matrix, explicit non-goals, refusals, degraded behavior. |
-| [ARCHITECTURE.md](ARCHITECTURE.md)   | Technical integration plan: framework choices, system diagram, trust boundaries, deployment model, known tradeoffs.                                      |
-| [AUDIT.md](AUDIT.md)                 | Stage 3 OpenEMR audit findings — the security, performance, architecture, data-quality, and compliance constraints that shaped the build.                |
-| [VERIFICATION.md](VERIFICATION.md)   | Chart-fidelity gate: citation enforcement, negative-claim backing, range guard, med-status warnings — and what verification *does not* catch.            |
-| [EVALUATION.md](EVALUATION.md)       | Eval suite: ten deterministic check rules (stop-the-line invariants + instructor-named failure modes + the constraint-boundary "automation, not advice" gate), 39 curated cases, defense of scope. |
-| [OBSERVABILITY.md](OBSERVABILITY.md) | Langfuse tracing: per-turn forensic reconstruction, the four required questions answered from logs, PHI redaction.                                       |
-| [PRD.md](PRD.md)                     | Engineer-facing implementation spec, mapped 1:1 to gates and acceptance criteria.                                                                        |
-| [JOURNEY.md](JOURNEY.md)             | Physician's-eye narrative of one full visit through the shipped CUI.                                                                                     |
-| [TASKS.md](TASKS.md)                 | Gate-by-gate implementation tracking, dependency-ordered.                                                                                                |
+| [ARCHITECTURE.md](ARCHITECTURE.md)   | Technical integration plan: framework choices, system diagram, trust boundaries, deployment model, known tradeoffs.                                                                                                                                                                                                                                          |
+| [AUDIT.md](AUDIT.md)                 | Stage 3 OpenEMR audit findings — the security, performance, architecture, data-quality, and compliance constraints that shaped the build.                                                                                                                                                                                                                    |
+| [VERIFICATION.md](VERIFICATION.md)   | Chart-fidelity gate: citation enforcement, negative-claim backing, range guard, med-status warnings — and what verification *does not* catch.                                                                                                                                                                                                                |
+| [EVALUATION.md](EVALUATION.md)       | Eval suite: ten deterministic check rules (stop-the-line invariants + instructor-named failure modes + the constraint-boundary "automation, not advice" gate), 39 curated cases, defense of scope.                                                                                                                                                           |
+| [OBSERVABILITY.md](OBSERVABILITY.md) | Langfuse tracing: per-turn forensic reconstruction, the four required questions answered from logs, PHI redaction.                                                                                                                                                                                                                                           |
+| [PRD.md](PRD.md)                     | Engineer-facing implementation spec, mapped 1:1 to gates and acceptance criteria.                                                                                                                                                                                                                                                                            |
+| [JOURNEY.md](JOURNEY.md)             | Physician's-eye narrative of one full visit through the shipped CUI.                                                                                                                                                                                                                                                                                         |
+| [TASKS.md](TASKS.md)                 | Gate-by-gate implementation tracking, dependency-ordered.                                                                                                                                                                                                                                                                                                    |
 
 
 The program-context build documentation — process journals, milestone closeouts, dated session entries — lives under [Documentation/AgentForge/](Documentation/AgentForge/).
