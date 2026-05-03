@@ -3,7 +3,7 @@
 > An OpenEMR-embedded conversational copilot for adult primary care visits.
 > Built on OpenEMR. Developed during the Gauntlet AI AgentForge program.
 
-**Live demo:** [https://108-61-145-220.nip.io](https://108-61-145-220.nip.io) · **Login:** `physician` / `password123` (synthetic data only)
+**Live demo:** [https://108-61-145-220.nip.io](https://108-61-145-220.nip.io) · **Login:** `admin` / `pass` (synthetic data only)
 
 ---
 
@@ -106,11 +106,11 @@ The submission package and project context, in the order a reader should approac
 
 | Document                             | What it covers                                                                                                                                           |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [USERS.md](USERS.md)                 | Target user (Dr. Maya Reynolds, adult PCP), V1 use cases (UC-A pre-room, UC-B in-room, UC-C post-room), explicit non-goals, refusals, degraded behavior. |
+| [USERS.md](USERS.md)                 | Target user (Dr. Maya Reynolds, adult PCP, new or returning patients), the ten V1 use cases (UC-A through UC-J: pre-room case presentation, single- and cross-domain Q&A, four confirmed-write surfaces, refusal posture, documentary med reconciliation, documentary abnormal lab surfacing), CRUD matrix, explicit non-goals, refusals, degraded behavior. |
 | [ARCHITECTURE.md](ARCHITECTURE.md)   | Technical integration plan: framework choices, system diagram, trust boundaries, deployment model, known tradeoffs.                                      |
 | [AUDIT.md](AUDIT.md)                 | Stage 3 OpenEMR audit findings — the security, performance, architecture, data-quality, and compliance constraints that shaped the build.                |
 | [VERIFICATION.md](VERIFICATION.md)   | Chart-fidelity gate: citation enforcement, negative-claim backing, range guard, med-status warnings — and what verification *does not* catch.            |
-| [EVALUATION.md](EVALUATION.md)       | Eval suite: six stop-the-line invariants, 13 deterministic cases, defense of scope.                                                                      |
+| [EVALUATION.md](EVALUATION.md)       | Eval suite: ten deterministic check rules (stop-the-line invariants + instructor-named failure modes + the constraint-boundary "automation, not advice" gate), 39 curated cases, defense of scope. |
 | [OBSERVABILITY.md](OBSERVABILITY.md) | Langfuse tracing: per-turn forensic reconstruction, the four required questions answered from logs, PHI redaction.                                       |
 | [PRD.md](PRD.md)                     | Engineer-facing implementation spec, mapped 1:1 to gates and acceptance criteria.                                                                        |
 | [JOURNEY.md](JOURNEY.md)             | Physician's-eye narrative of one full visit through the shipped CUI.                                                                                     |

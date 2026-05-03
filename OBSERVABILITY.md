@@ -37,7 +37,7 @@ Production currently sends to Langfuse Cloud (`https://us.cloud.langfuse.com`). 
 A single Langfuse trace, keyed by `correlation_id`, contains every step in chronological order. The trace itself is opened at [agentforge/api/src/observability/index.ts:86-99](agentforge/api/src/observability/index.ts:86) (`traceTurn`), and three step types are nested inside:
 
 - **Spans** for tool calls, opened with a start time and ended with output + an end time. See [agentforge/api/src/observability/index.ts:101-141](agentforge/api/src/observability/index.ts:101) and the call sites in every tool — for example [agentforge/api/src/tools/get_allergies.ts:23](agentforge/api/src/tools/get_allergies.ts:23) and the four spans across [agentforge/api/src/tools/propose_writes.ts:105, 150, 201, 243](agentforge/api/src/tools/propose_writes.ts:105) (one per V1 write target).
-- **Events** for instantaneous markers: verification categories (`verification.uncited_claim_removed`, `verification.med_status_conflict_warning`, etc. — see [agentforge/api/src/agent/verification.ts:8-10](agentforge/api/src/agent/verification.ts:8)), security guards, and cache hits. See [agentforge/api/src/observability/index.ts:143-156](agentforge/api/src/observability/index.ts:143).
+- **Events** for instantaneous markers: verification categories (`verification.uncited_claim_removed`, `verification.med_status_conflict_warning`, etc. — see [agentforge/api/src/agent/verification.ts:30-32](agentforge/api/src/agent/verification.ts:30)), security guards, and cache hits. See [agentforge/api/src/observability/index.ts:143-156](agentforge/api/src/observability/index.ts:143).
 - **Generations** for the LLM call, with model name, token usage, cost, and start/end times. See [agentforge/api/src/observability/index.ts:158-217](agentforge/api/src/observability/index.ts:158).
 
 The chronological reconstruction is automatic — Langfuse orders by start time within the trace. To answer "what did the agent do on request `abc-123`", you load that trace ID in the UI and read top-to-bottom.
@@ -223,7 +223,7 @@ The observability layer satisfies the brief's four questions (what / when / fail
 
 ## Cross-references
 
-- Verification events emitted into Langfuse: each prefix `verification.*` corresponds to a layer in [VERIFICATION.md](VERIFICATION.md). The full list is in [agentforge/api/src/agent/verification.ts:8-10, 80, 96, 102, 112, 117, 138, 144](agentforge/api/src/agent/verification.ts:8).
+- Verification events emitted into Langfuse: each prefix `verification.*` corresponds to a layer in [VERIFICATION.md](VERIFICATION.md). The full list of emit sites is in [agentforge/api/src/agent/verification.ts:30-32, 109, 125, 131, 141, 146, 167, 173](agentforge/api/src/agent/verification.ts:30).
 - Eval-suite correlation IDs: every curated case can carry an optional `correlation_id` so adversarial fixtures point back at the trace they were derived from. See [EVALUATION.md](EVALUATION.md) and the case files under [agentforge/api/eval/cases/curated/](agentforge/api/eval/cases/curated/).
 - AI cost analysis appendix: [Documentation/AgentForge/implementation/ai-cost-analysis.md](Documentation/AgentForge/implementation/ai-cost-analysis.md) — methodology, unit economics measured from real Langfuse traces, projections at 100/1k/10k/100k MAU clinicians.
 - Process milestone covering the Langfuse-live transition: [Documentation/AgentForge/process/18-langfuse-observability-cost-analysis.md](Documentation/AgentForge/process/18-langfuse-observability-cost-analysis.md).

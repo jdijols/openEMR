@@ -46,7 +46,7 @@ client request
   → response written to the conversation log + returned to client
 ```
 
-The verification call site is a single line at [agentforge/api/src/agent/orchestrator.ts:660](agentforge/api/src/agent/orchestrator.ts:660):
+The verification call site is a single line at [agentforge/api/src/agent/orchestrator.ts:663](agentforge/api/src/agent/orchestrator.ts:663):
 
 ```ts
 blocks = await verifyClinicalBlocks(observability, correlationId, blocks, evidence);
@@ -55,7 +55,7 @@ blocks = await verifyClinicalBlocks(observability, correlationId, blocks, eviden
 By the time we reach that line, three things are true:
 
 1. `blocks` is the parsed structured response from the LLM — a typed array of `claim`, `text`, `tool_call`, `tool_result`, `warning`, and `refusal` blocks.
-2. `evidence` is a `ClinicalToolEvidence` aggregate built from the tool-result merge in [agentforge/api/src/agent/orchestrator.ts:653-658](agentforge/api/src/agent/orchestrator.ts:653) — citation UUIDs the model is allowed to reference, an "empty-backed" map that records which tools actually returned an empty list, and the medication rows we observed (with their statuses).
+2. `evidence` is a `ClinicalToolEvidence` aggregate built from the tool-result merge at [agentforge/api/src/agent/orchestrator.ts:658](agentforge/api/src/agent/orchestrator.ts:658) — citation UUIDs the model is allowed to reference, an "empty-backed" map that records which tools actually returned an empty list, and the medication rows we observed (with their statuses).
 3. `observability` is the live Langfuse handle for this `correlationId`. Every verification decision emits a categorized event so the trace tells you not just "we removed a claim" but "we removed it for reason X."
 
 After verification returns, the post-conditions are: every surviving claim block cites at least one UUID in the evidence set; no negative claim is present without backing; no impossible BP value remains; warnings are attached where med-status conflicts were detected. If those post-conditions cannot be reached, the function short-circuits to a refusal.
@@ -66,7 +66,7 @@ After verification returns, the post-conditions are: every surviving claim block
 
 ### 1. Citation enforcement
 
-The core invariant. Implementation in [agentforge/api/src/agent/verification.ts:54-60, 108-114](agentforge/api/src/agent/verification.ts:54).
+The core invariant. Implementation in [agentforge/api/src/agent/verification.ts:76-82, 137-143](agentforge/api/src/agent/verification.ts:76).
 
 Every clinical claim block carries one or more citation IDs. Those IDs must intersect with the set of UUIDs the tool layer actually emitted during this turn (`evidence.citationUuids`). The check itself is a one-line set membership test:
 
@@ -77,7 +77,7 @@ function citesAny(claimIds: readonly string[], cited: ReadonlySet<string>): bool
 }
 ```
 
-If the test fails, the block is stripped from the output and a `verification.uncited_claim_removed` event is emitted to Langfuse. We do not silently drop the claim — every removal is observable.
+If the test fails, the block is stripped from the output and a `verification.uncited_claim_removed` event is emitted to Langfuse (see [agentforge/api/src/agent/verification.ts:30-32](agentforge/api/src/agent/verification.ts:30) for the event-emission helper). We do not silently drop the claim — every removal is observable.
 
 This catches three concrete failure modes:
 
@@ -89,7 +89,7 @@ The reason it works is the citation namespace. UUIDs are minted server-side per 
 
 ### 2. Negative-claim backing
 
-Implementation in [agentforge/api/src/agent/verification.ts:5-6, 95-105](agentforge/api/src/agent/verification.ts:5).
+Implementation in [agentforge/api/src/agent/verification.ts:27-28, 124-134](agentforge/api/src/agent/verification.ts:27).
 
 The most insidious clinical hallucination is *"the patient has no allergies"* when the allergy tool was never called. Citation enforcement alone doesn't catch this — there's no citation to check, because the claim is about the *absence* of records.
 
@@ -106,7 +106,7 @@ This is a narrow defense. It only covers two clinical surfaces (allergies and la
 
 ### 3. Numeric blood-pressure range guard
 
-Implementation in [agentforge/api/src/agent/verification.ts:15-36](agentforge/api/src/agent/verification.ts:15).
+Implementation in [agentforge/api/src/agent/verification.ts:37-58](agentforge/api/src/agent/verification.ts:37).
 
 A small but important defense-in-depth parser. When a claim mentions a BP value, the parser extracts systolic / diastolic numbers and checks them against PRD §9.2.3 ranges: systolic `[40, 300]`, diastolic `[20, 200]`. Anything outside is flagged as `impossible_vital`.
 
@@ -114,7 +114,7 @@ This is paranoia in the right place. The vitals write path has its own parser; t
 
 ### 4. Medication-inactive warning
 
-Implementation in [agentforge/api/src/agent/verification.ts:150-176](agentforge/api/src/agent/verification.ts:150).
+Implementation in [agentforge/api/src/agent/verification.ts:179-205](agentforge/api/src/agent/verification.ts:179).
 
 When a claim says *"currently taking X"*, *"active medication"*, or *"still on Y"*, the verification layer cross-references the cited medication rows. If any cited row has a status containing `inactive` or `discontinu` and the drug name appears in the claim text, the layer attaches a warning block:
 
@@ -128,7 +128,7 @@ This is the only verification layer that produces a soft outcome. The other thre
 
 ## What happens when verification fails
 
-The stripping behavior cascades. Implementation in [agentforge/api/src/agent/verification.ts:128-141](agentforge/api/src/agent/verification.ts:128).
+The stripping behavior cascades. Implementation in [agentforge/api/src/agent/verification.ts:157-170](agentforge/api/src/agent/verification.ts:157).
 
 After all blocks have been processed, the layer checks whether any clinically meaningful block survived (`claim`, `text`, `tool_call`, `tool_result`, or `warning`). If none did — every claim was uncited, every negative was unbacked — the layer returns a single refusal block:
 
@@ -138,7 +138,7 @@ return [{ type: 'refusal', reason: 'insufficient_evidence_after_verification' }]
 
 This is the most important property of the design. The clinician never sees a partial answer with the bad parts quietly removed. If the model wrote five claims and four were unbacked, the surviving fifth still ships (with attribution). If all five were unbacked, the user gets a refusal that names the reason. The refusal renders in the UI as a clear "I couldn't substantiate a response" message, which is a valid clinical outcome — one that the brief's adversarial eval cases specifically test for.
 
-The cross-patient case is handled at the very top of the function, before any block is examined: if `evidence.crossPatientLeak` is true (a tool was called against a UUID that doesn't match the bound chart), the entire response is replaced with `blocked_cross_patient_tool_args`. See [agentforge/api/src/agent/verification.ts:79-82](agentforge/api/src/agent/verification.ts:79).
+The cross-patient case is handled at the very top of the function, before any block is examined: if `evidence.crossPatientLeak` is true (a tool was called against a UUID that doesn't match the bound chart), the entire response is replaced with `blocked_cross_patient_tool_args`. See [agentforge/api/src/agent/verification.ts:108-111](agentforge/api/src/agent/verification.ts:108).
 
 ---
 

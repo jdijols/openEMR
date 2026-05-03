@@ -4,11 +4,11 @@
 
 ## Summary
 
-The Clinical Copilot is graded by a deterministic eval suite of 13 curated cases that exercise 6 stop-the-line invariants — the rules whose violation would make the agent unsafe to ship regardless of how good its happy-path answers look. The suite runs as `npm run eval` from [agentforge/api](agentforge/api) and reports pass/fail per case plus an aggregate by check type. Every case is a JSON fixture under [agentforge/api/eval/cases/curated/](agentforge/api/eval/cases/curated/); there is no LLM in the loop. The runner takes synthetic context payloads representing what the agent's trace would look like in each scenario, applies a deterministic rule, and asserts the rule holds (or, for intentional-violation fixtures, that it correctly fails).
+The Clinical Copilot is graded by a deterministic eval suite of 39 curated cases that exercise 10 deterministic check rules — the original 6 stop-the-line invariants whose violation would make the agent unsafe to ship, plus 4 additional rules covering instructor-named failure modes and the constraint-boundary "automation, not advice" gate. The suite runs as `npm run eval` from [agentforge/api](agentforge/api) and reports pass/fail per case plus an aggregate by check type. Every case is a JSON fixture under [agentforge/api/eval/cases/curated/](agentforge/api/eval/cases/curated/); there is no LLM in the loop. The runner takes synthetic context payloads representing what the agent's trace would look like in each scenario, applies a deterministic rule, and asserts the rule holds (or, for intentional-violation fixtures, that it correctly fails).
 
-The six invariants come straight from the PRD's anti-success criteria (§1.5) and the security spec (§4.7.1, §5.5, §5.11, §8.1, §8.5, §9.3, §9.4): no write without a prior clinician confirm, no writes outside the V1 target set, no cross-patient data leakage, no prompt-injection extraction of internal state, no guessing on ambiguous vitals, no unbacked negative clinical claims. Each invariant is a hard property that must hold across every demo lane and every adversarial test. The eval suite is what proves they do.
+The six original invariants come straight from the PRD's anti-success criteria (§1.5) and the security spec (§4.7.1, §5.5, §5.11, §8.1, §8.5, §9.3, §9.4): no write without a prior clinician confirm, no writes outside the V1 target set, no cross-patient data leakage, no prompt-injection extraction of internal state, no guessing on ambiguous vitals, no unbacked negative clinical claims. The four additional rules — `all_domains_unavailable_refused`, `provider_timeout_typed_error`, `conflicting_medication_records_warned`, `constraint_boundary_describes_vs_recommends` — extend coverage to resilience failures and the documentary-vs-advisory boundary. Each rule is a hard property that must hold across every demo lane and every adversarial test. The eval suite is what proves they do.
 
-This document explains the runner, walks through each check with its code anchor and the cases that exercise it, and — most importantly — defends the choice of 13 cases over a longer list. The brief asks for *intentional and defensible* decisions on what to test and why; this is where that defense lives.
+This document explains the runner, walks through each check with its code anchor and the cases that exercise it, and defends the choice of 39 cases over a longer list. The brief asks for *intentional and defensible* decisions on what to test and why; this is where that defense lives.
 
 ---
 
@@ -34,12 +34,12 @@ The tradeoff: this suite does not catch model regressions where the LLM produces
 
 Implementation in [agentforge/api/eval/runner.ts](agentforge/api/eval/runner.ts).
 
-The runner is ~340 lines of TypeScript with no runtime dependencies on the rest of the API — by design, so it can run in CI before the API builds. It does four things:
+The runner is ~700 lines of TypeScript with no runtime dependencies on the rest of the API — by design, so it can run in CI before the API builds. It does four things:
 
-1. **Loads cases** from `eval/cases/curated/*.json` ([agentforge/api/eval/runner.ts:72-108](agentforge/api/eval/runner.ts:72)) and validates structural shape: every case must carry a `case_id`; cases with a `check` field other than `no_write_without_confirm` must carry a `context` object; legacy `no_write_without_confirm` cases (UC-B fixtures) must carry a `steps[]` array.
-2. **Dispatches to the rule** for each case's `check` name ([agentforge/api/eval/runner.ts:249-265](agentforge/api/eval/runner.ts:249)). The dispatcher is an exhaustive `switch` over the six check names — no `default` branch, so adding a check without wiring its rule is a TypeScript build error, not a silent skip.
-3. **Computes pass/fail** for each case, with the negative-case inversion described below ([agentforge/api/eval/runner.ts:294-295](agentforge/api/eval/runner.ts:294)).
-4. **Writes a JSON report** with the run ID, per-case results, correlation IDs (so traces can be cross-referenced in Langfuse), and an aggregate by check type ([agentforge/api/eval/runner.ts:316-331](agentforge/api/eval/runner.ts:316)).
+1. **Loads cases** from `eval/cases/curated/*.json` and validates structural shape: every case must carry a `case_id`; cases with a `check` field other than `no_write_without_confirm` must carry a `context` object; legacy `no_write_without_confirm` cases (UC-B fixtures) must carry a `steps[]` array.
+2. **Dispatches to the rule** for each case's `check` name ([agentforge/api/eval/runner.ts:602-625](agentforge/api/eval/runner.ts:602)). The dispatcher is an exhaustive `switch` over the ten check names — no `default` branch, so adding a check without wiring its rule is a TypeScript build error, not a silent skip.
+3. **Computes pass/fail** for each case, with the negative-case inversion described below ([agentforge/api/eval/runner.ts:656-657](agentforge/api/eval/runner.ts:656)).
+4. **Writes a JSON report** with the run ID, per-case results, correlation IDs (so traces can be cross-referenced in Langfuse), and an aggregate by check type.
 
 Invocation:
 
@@ -52,17 +52,21 @@ Output (truncated example):
 
 ```json
 {
-  "run_id": "20260501T155811_a3f9c021",
-  "cases": 13,
+  "run_id": "20260503T064556949Z_25f6528b",
+  "cases": 39,
   "failures": 0,
-  "report": "eval/reports/eval-20260501T155811_a3f9c021.json",
+  "duration_ms": 6,
   "aggregate": {
-    "no_write_without_confirm":           { "passed": 2, "failed": 0 },
-    "unsupported_write_target_rejected":  { "passed": 5, "failed": 0 },
-    "cross_patient_blocked":              { "passed": 1, "failed": 0 },
-    "internal_disclosure_blocked":        { "passed": 2, "failed": 0 },
-    "vitals_parser_uncertain_not_guess":  { "passed": 1, "failed": 0 },
-    "negative_claim_requires_empty_query":{ "passed": 2, "failed": 0 }
+    "no_write_without_confirm":                    { "evaluations_passed": 8,  "evaluations_failed": 0 },
+    "unsupported_write_target_rejected":           { "evaluations_passed": 10, "evaluations_failed": 0 },
+    "cross_patient_blocked":                       { "evaluations_passed": 1,  "evaluations_failed": 0 },
+    "internal_disclosure_blocked":                 { "evaluations_passed": 2,  "evaluations_failed": 0 },
+    "vitals_parser_uncertain_not_guess":           { "evaluations_passed": 1,  "evaluations_failed": 0 },
+    "negative_claim_requires_empty_query":         { "evaluations_passed": 2,  "evaluations_failed": 0 },
+    "all_domains_unavailable_refused":             { "evaluations_passed": 1,  "evaluations_failed": 0 },
+    "provider_timeout_typed_error":                { "evaluations_passed": 1,  "evaluations_failed": 0 },
+    "conflicting_medication_records_warned":       { "evaluations_passed": 1,  "evaluations_failed": 0 },
+    "constraint_boundary_describes_vs_recommends": { "evaluations_passed": 12, "evaluations_failed": 0 }
   }
 }
 ```
@@ -71,7 +75,9 @@ A non-zero exit on any failure makes this safe to wire into a `prek` hook or a C
 
 ---
 
-## The six checks
+## The ten checks
+
+> **NEW GAP (added by update-submission-files skill, 2026-05-03):** This section documents the original six checks. Four additional checks shipped after the original draft and are not yet expanded below: `all_domains_unavailable_refused`, `provider_timeout_typed_error`, `conflicting_medication_records_warned`, `constraint_boundary_describes_vs_recommends`. Their rule definitions live in [agentforge/api/eval/runner.ts](agentforge/api/eval/runner.ts); the constraint-boundary check enforces the README's "automation, not advice" promise and is the most heavily covered (12 of the 39 cases). A full per-check section for each of the four needs to be written below in the same shape as the original six.
 
 ### 1. `no_write_without_confirm`
 
@@ -138,7 +144,9 @@ This is the eval-side counterpart to the verification.ts negative-claim layer (s
 
 ---
 
-## The 13 cases at a glance
+## The cases at a glance
+
+> **NEW GAP (added by update-submission-files skill, 2026-05-03):** The table below enumerates the original 13 fixtures. The suite has since grown to 39 fixtures (16 added Track-B failure-mode + CRUD-cell coverage; 10 added for UC-I/UC-J documentary workflows + advisory-drift refusals). The table needs to be regenerated against the current contents of [agentforge/api/eval/cases/curated/](agentforge/api/eval/cases/curated/).
 
 | File | Check | Expect rule holds | Use case anchor |
 |------|-------|-------------------|-----------------|
@@ -177,9 +185,11 @@ In other words: the negative cases are the proof that the rules aren't tautologi
 
 ---
 
-## Why 13 cases, not 50
+## Why this case count
 
-A natural reaction to "13 eval cases" is to ask why not more. The defensible answer has three parts.
+> **NEW GAP (added by update-submission-files skill, 2026-05-03):** This section was originally written as a defense of the 13-case scope. The suite is now 39 cases — the defense framing should be reworked to articulate why "39 cases, not 100" rather than "13 cases, not 50". The structural argument (deterministic rules + surface-area coverage + complementary layers) still holds; only the numbers and the §"Part 2: surface-area coverage" breakdown need refreshing.
+
+A natural reaction to a small eval count is to ask why not more. The defensible answer has three parts.
 
 **Part 1: deterministic rules have no false-positive risk.** The six rules are pure functions of their input traces. There is no probability distribution to sample from, no model temperature, no prompt variation. Once a rule is correct, ten cases and a hundred cases give the same signal: the rule is correct. The reason to run more cases is to widen *coverage* of input shapes the rule needs to handle — not to drive down a confidence interval on its mean accuracy. So the question becomes: what's the surface area of input shapes for each rule, and have we exercised it?
 
@@ -236,8 +246,8 @@ The eval enforces the invariants we encoded — write authority, citation requir
 
 The five initial gaps from the audit pass that produced this document are now closed:
 
-- **Per-check schema validation in the runner** — added [`validateCaseShape`](agentforge/api/eval/runner.ts) in `loadCuratedCases`. Each of the six checks now has its own field-level shape gate (e.g., `cross_patient_blocked` requires `bound_patient_uuid` and `request_patient_uuid` as strings; `vitals_parser_uncertain_not_guess` requires `parser_output: string`). Malformed fixtures fail at load time with a specific error, not at evaluation time with a confusing rule failure.
-- **Coverage matrix README** — [agentforge/api/eval/README.md](agentforge/api/eval/README.md) shipped. Maps each of the 13 cases to its check, fixture file, and PRD anchor; documents the per-check shape requirements; explains the negative-case inversion mechanic; lists what the suite does *not* test (with cross-references to the layers that do).
+- **Per-check schema validation in the runner** — added [`validateCaseShape`](agentforge/api/eval/runner.ts) in `loadCuratedCases`. Each of the ten checks now has its own field-level shape gate (e.g., `cross_patient_blocked` requires `bound_patient_uuid` and `request_patient_uuid` as strings; `vitals_parser_uncertain_not_guess` requires `parser_output: string`; `constraint_boundary_describes_vs_recommends` requires `response_text: string` and `blocks: array`). Malformed fixtures fail at load time with a specific error, not at evaluation time with a confusing rule failure.
+- **Coverage matrix README** — [agentforge/api/eval/README.md](agentforge/api/eval/README.md) shipped (originally for the 13-case shape; the README's case inventory predates the Track-B / UC-I / UC-J expansion to 39 cases and would benefit from a refresh).
 - **CI workflow** — [.github/workflows/agentforge-eval.yml](.github/workflows/agentforge-eval.yml) added. Triggers on master pushes and PRs that touch `agentforge/api/eval/**` or the package files. Runs `npm run eval` from `agentforge/api`, uploads the per-run report as an artifact on failure for retroactive inspection. Path-filtered so it doesn't run on every upstream OpenEMR PR.
 - **Performance budget warning** — added a 5-second budget guard at the end of `main()` in [agentforge/api/eval/runner.ts](agentforge/api/eval/runner.ts). Wall-clock duration is captured at run start, compared against `PERF_BUDGET_MS`, and reported in both the JSON output and the stdout summary. Exceeding the budget emits `eval_perf_warning` to stderr without failing the run — the runner is meant to be sub-second; over-budget is a strong signal that an external call or heavy I/O has been introduced. Typical run is now ~3ms.
 - **Negative-claim paraphrase coverage** — addressed at the vitest layer rather than the eval-runner layer, because that's the architecturally correct location. The eval runner's `negative_claim_requires_empty_query` check operates on synthesized context fields (`negative_claim: boolean`, `backed_by_empty_query: boolean`); it does not process natural-language prose, so adding paraphrase JSON fixtures would not exercise the regex. The actual paraphrase regression matrix lives at [agentforge/api/test/agent/verification-negative-coverage.test.ts](agentforge/api/test/agent/verification-negative-coverage.test.ts) — 24 cases covering paraphrases the regex catches, paraphrases it misses by design, and clinical surfaces V1 doesn't cover at all. See [VERIFICATION.md](VERIFICATION.md) §"Open gaps" for the full description of that test.

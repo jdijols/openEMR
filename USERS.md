@@ -75,7 +75,7 @@ Those users may become future personas, but including them in V1 would weaken th
 
 ## 3. Workflow Narrative
 
-The diagram below traces a single adult-PCP visit across the three journey phases (pre-room / in-room / post-room), showing where the physician, the agent, and OpenEMR each act, and which architecture surfaces back the interaction. The eight V1 use cases (UC-A through UC-H) defined in §4 are organized by intent and CRUD operation rather than by phase alone — UC-A is the pre-room case presentation; UC-B / UC-C are read-shaped Q&A available across all phases; UC-D / UC-E / UC-F / UC-G are the in-room confirmed-write surfaces; UC-H is the refusal posture that holds across the others.
+The diagram below traces a single adult-PCP visit across the three journey phases (pre-room / in-room / post-room), showing where the physician, the agent, and OpenEMR each act, and which architecture surfaces back the interaction. The ten V1 use cases (UC-A through UC-J) defined in §4 are organized by intent and CRUD operation rather than by phase alone — UC-A is the pre-room case presentation; UC-B / UC-C are read-shaped Q&A available across all phases; UC-D / UC-E / UC-F / UC-G are the in-room confirmed-write surfaces; UC-H is the refusal posture that holds across the others; UC-I / UC-J are the documentary cross-domain workflows (medication reconciliation and abnormal lab surfacing).
 
 ```mermaid
 flowchart LR
@@ -153,7 +153,7 @@ This phase is not V1 note drafting. It is a lightweight continuation of the visi
 
 ## 4. V1 Use Cases
 
-The following eight use cases define the Stage 5 capabilities for V1. They are organized by the actual CRUD surface the agent exposes (read tools + propose-write tools, mapped to physician intents) rather than by journey phase alone — but each use case still anchors to a phase. UC-A is the auto-fired case presentation. UC-B / UC-C are read-shaped Q&A. UC-D through UC-G are the four write surfaces (chief complaint, vitals, tobacco/allergy, clinical notes) with their CRUD operations. UC-H is the refusal posture that holds across the others.
+The following ten use cases define the Stage 5 capabilities for V1. They are organized by the actual CRUD surface the agent exposes (read tools + propose-write tools, mapped to physician intents) rather than by journey phase alone — but each use case still anchors to a phase. UC-A is the auto-fired case presentation. UC-B / UC-C are read-shaped Q&A. UC-D through UC-G are the four write surfaces (chief complaint, vitals, tobacco/allergy, clinical notes) with their CRUD operations. UC-H is the refusal posture that holds across the others. UC-I and UC-J are documentary cross-domain workflows (medication reconciliation and abnormal lab surfacing) that exercise the same read tools through clinically-named intents while strictly avoiding clinical recommendations.
 
 ### UC-A — Pre-room case presentation
 
@@ -651,7 +651,7 @@ If a proposed Stage 5 capability does not map to this table, it is out of scope 
 
 - Defines exactly one V1 user persona (Dr. Maya Reynolds, adult primary care, new or returning patients).
 - Defines the journey phases where the agent enters the physician's day (pre-room / in-room / post-room).
-- Defines eight V1 use cases (UC-A through UC-H) covering the actual CRUD surface across reason for visit, vitals, tobacco, allergies, and clinical notes — plus refusal posture.
+- Defines ten V1 use cases (UC-A through UC-J) covering the actual CRUD surface across reason for visit, vitals, tobacco, allergies, and clinical notes — plus refusal posture and two documentary cross-domain workflows (medication reconciliation, abnormal lab surfacing).
 - Explains why a conversational agent is the right solution for each use case.
 - Defines the V1 write scope: chief complaint (C/U/clear), vitals (C/U/void), tobacco status (C/U), allergy add/update reaction/update severity, clinical notes (C/U/soft-delete) — each only after explicit physician confirmation; immunizations, orders, prescriptions, billing, allergy delete, and external knowledge lookup all explicitly excluded.
 - Excludes patient audio capture and audio retention from V1.

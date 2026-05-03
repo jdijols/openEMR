@@ -39,6 +39,7 @@ This folder holds **course and process documentation** for the Clinical Copilot 
 | 16  | [process/16-clinical-copilot-acl-role-gate.md](process/16-clinical-copilot-acl-role-gate.md) | **Access control:** who may use Clinical Copilot (`agentforge/use`, `propose_write`) vs excluded preset roles; GACL layering; examiner links |
 | 17  | [process/17-encounter-scoped-chart-bind-and-brief.md](process/17-encounter-scoped-chart-bind-and-brief.md) | **Open encounter scope:** appointment click context → session + AgentForge binder; brief vitals + Context `encounter_id` (not calendar “today”) |
 | 18  | [process/18-langfuse-observability-cost-analysis.md](process/18-langfuse-observability-cost-analysis.md) | **Observability live + AI cost appendix:** real Langfuse client (cloud) replacing the G6-07 stub — tool spans, LLM generations with model + tokens + cost, PHI-redacted; G7-07 [`ai-cost-analysis.md`](implementation/ai-cost-analysis.md) shipped; deployed to prod |
+| 19  | [process/19-final-submission-prep.md](process/19-final-submission-prep.md) | **Final submission prep:** UC count 3→10 (UC-A..UC-J incl. documentary med-rec + abnormal-lab surfacing), eval count 13→39 (4 instructor-named failure-mode rules + constraint-boundary describes-vs-recommends gate), CRUD soft-delete tools (vitals_delete, chief_complaint_delete), rebrand to "Clinical Copilot" with strategic product/program split, full submission-doc sync via `update-submission-files` skill |
 
 Dated entries under `process/journal/week-N/` are session journals between milestones; they are not listed in the table.
 
@@ -62,7 +63,7 @@ docker compose exec openemr php /var/www/localhost/htdocs/openemr/contrib/util/a
 
 ## How to extend this folder
 
-1. Add the next milestone as `process/18-<short-slug>.md` (next index **after `17`** in the table above).
+1. Add the next milestone as `process/20-<short-slug>.md` (next index **after `19`** in the table above).
 2. Update the table above so the index stays the single map of the trail.
 3. For working notes between milestones, add dated entries as `process/journal/week-N/MMDD-THHMM-topic.md`. The skill computes `N` from `course-start` in this README's frontmatter; create `week-N/` lazily if missing. Link decisions worth surfacing back into the relevant numbered process file.
 4. If `02-tooling-and-skills.md` grows too long, split changelogs into `02b-skills-changelog.md`.
