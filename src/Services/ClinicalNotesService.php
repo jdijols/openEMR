@@ -325,6 +325,224 @@ class ClinicalNotesService extends BaseService
         return $this->populateResultsWithLinkedData(QueryUtils::fetchRecords($sql, [$formid, $pid, $encounter]));
     }
 
+    /**
+     * Active clinical note rows for a patient across all encounters, ordered newest first.
+     * Joins encounter date and author so the AgentForge context endpoint can build citation packs.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getActiveClinicalNotesForPatient(int $pid, int $limit = 25): array
+    {
+        if ($pid <= 0) {
+            return [];
+        }
+
+        $limit = max(1, min(100, $limit));
+
+        $sql = "SELECT fcn.id, fcn.uuid, fcn.form_id, fcn.pid, fcn.encounter,
+                       fcn.activity, fcn.date, fcn.last_updated, fcn.user, fcn.code, fcn.codetext,
+                       fcn.description, fcn.clinical_notes_type, fcn.clinical_notes_category, fcn.note_related_to,
+                       fe.date AS encounter_date,
+                       lo_type.title AS type_title,
+                       lo_category.title AS category_title
+                FROM `form_clinical_notes` fcn
+                JOIN `forms` f ON f.form_id = fcn.form_id AND f.pid = fcn.pid AND f.formdir = 'clinical_notes'
+                LEFT JOIN `form_encounter` fe ON fe.encounter = fcn.encounter AND fe.pid = fcn.pid
+                LEFT JOIN `list_options` lo_type ON lo_type.list_id = 'Clinical_Note_Type' AND lo_type.option_id = fcn.clinical_notes_type
+                LEFT JOIN `list_options` lo_category ON lo_category.list_id = 'Clinical_Note_Category' AND lo_category.option_id = fcn.clinical_notes_category
+                WHERE fcn.pid = ? AND fcn.activity = 1 AND (f.deleted IS NULL OR f.deleted = 0)
+                ORDER BY COALESCE(fcn.last_updated, fcn.date) DESC, fcn.id DESC
+                LIMIT " . $limit;
+
+        $rows = QueryUtils::fetchRecords($sql, [$pid]);
+        return is_array($rows) ? $rows : [];
+    }
+
+    /**
+     * Find an active clinical note by UUID for a given patient. Returns null when not found or
+     * already inactive — callers should treat both as "nothing to act on" so soft-deletes are
+     * idempotent.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findActiveNoteByUuid(int $pid, string $noteUuid): ?array
+    {
+        if ($pid <= 0 || $noteUuid === '') {
+            return null;
+        }
+
+        $binary = null;
+        try {
+            $binary = UuidRegistry::uuidToBytes($noteUuid);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        if (!is_string($binary) || $binary === '') {
+            return null;
+        }
+
+        $row = QueryUtils::fetchRecords(
+            "SELECT id, encounter, description, clinical_notes_type
+             FROM `form_clinical_notes`
+             WHERE uuid = ? AND pid = ? AND activity = 1
+             LIMIT 1",
+            [$binary, $pid]
+        );
+
+        return $row !== [] ? $row[0] : null;
+    }
+
+    /**
+     * Soft-delete a clinical note by UUID. Sets activity = 0 so the row is hidden from the active
+     * Clinical Notes Form view but preserved for audit. Returns true when a row was changed; false
+     * when no matching active row exists (already deleted or wrong patient).
+     */
+    public function softDeleteNoteByUuid(int $pid, string $noteUuid): bool
+    {
+        $note = $this->findActiveNoteByUuid($pid, $noteUuid);
+        if ($note === null) {
+            return false;
+        }
+
+        $now = date('Y-m-d H:i:s');
+        QueryUtils::sqlStatementThrowException(
+            "UPDATE `form_clinical_notes` SET activity = 0, last_updated = ? WHERE id = ? AND pid = ?",
+            [$now, (int) $note['id'], $pid]
+        );
+
+        return true;
+    }
+
+    /**
+     * Replace a clinical note's description by UUID, recording the editing user. Returns true when
+     * a row was updated; false when no matching active row exists.
+     */
+    public function replaceNoteDescriptionByUuid(
+        int $pid,
+        string $noteUuid,
+        string $newDescription,
+        string $username,
+        string $groupname
+    ): bool {
+        $note = $this->findActiveNoteByUuid($pid, $noteUuid);
+        if ($note === null) {
+            return false;
+        }
+
+        $newDescription = trim($newDescription);
+        if ($newDescription === '') {
+            return false;
+        }
+
+        $now = date('Y-m-d H:i:s');
+        QueryUtils::sqlStatementThrowException(
+            "UPDATE `form_clinical_notes`
+             SET description = ?, last_updated = ?, user = ?, groupname = ?
+             WHERE id = ? AND pid = ?",
+            [$newDescription, $now, $username, $groupname !== '' ? $groupname : 'Default', (int) $note['id'], $pid]
+        );
+
+        return true;
+    }
+
+    /**
+     * Append physician-dictated text to the canonical "progress_note" row for this encounter, creating
+     * the parent Clinical Notes Form and the row itself when missing. Existing nursing/intake rows are
+     * untouched so author attribution is preserved.
+     *
+     * @return array{created_row: bool, created_form: bool, note_id: int, form_id: int}
+     */
+    public function appendPhysicianNoteForEncounter(
+        int $pid,
+        int $encounter,
+        string $username,
+        string $groupname,
+        string $text,
+        int $userauthorized = 1
+    ): array {
+        if ($pid <= 0 || $encounter <= 0) {
+            throw new \InvalidArgumentException('pid and encounter must be positive');
+        }
+
+        $text = trim($text);
+        if ($text === '') {
+            throw new \InvalidArgumentException('text must not be empty');
+        }
+
+        $existingFormId = QueryUtils::fetchSingleValue(
+            "SELECT form_id FROM `forms` WHERE formdir = 'clinical_notes' AND pid = ? AND encounter = ? AND (deleted IS NULL OR deleted = 0) ORDER BY form_id DESC LIMIT 1",
+            'form_id',
+            [$pid, $encounter]
+        );
+
+        $createdForm = false;
+        if (empty($existingFormId)) {
+            $formId = (int) $this->createClinicalNotesParentForm($pid, $encounter, $userauthorized);
+            $createdForm = true;
+        } else {
+            $formId = (int) $existingFormId;
+        }
+
+        $existingNoteId = QueryUtils::fetchSingleValue(
+            "SELECT id FROM `form_clinical_notes`
+             WHERE form_id = ? AND pid = ? AND encounter = ? AND clinical_notes_type = 'progress_note' AND activity = 1
+             ORDER BY id DESC LIMIT 1",
+            'id',
+            [$formId, $pid, $encounter]
+        );
+
+        $now = date('Y-m-d H:i:s');
+
+        if (!empty($existingNoteId)) {
+            $existingNoteId = (int) $existingNoteId;
+            $existingDescription = (string) QueryUtils::fetchSingleValue(
+                "SELECT description FROM `form_clinical_notes` WHERE id = ?",
+                'description',
+                [$existingNoteId]
+            );
+
+            $newDescription = $existingDescription === '' ? $text : ($existingDescription . "\n\n" . $text);
+
+            QueryUtils::sqlStatementThrowException(
+                "UPDATE `form_clinical_notes` SET description = ?, last_updated = ?, user = ?, groupname = ? WHERE id = ?",
+                [$newDescription, $now, $username, $groupname, $existingNoteId]
+            );
+
+            return [
+                'created_row' => false,
+                'created_form' => $createdForm,
+                'note_id' => $existingNoteId,
+                'form_id' => $formId,
+            ];
+        }
+
+        $saved = $this->saveArray([
+            'form_id' => $formId,
+            'date' => $now,
+            'pid' => $pid,
+            'encounter' => $encounter,
+            'user' => $username,
+            'groupname' => $groupname,
+            'authorized' => $userauthorized,
+            'activity' => 1,
+            'code' => 'LOINC:11506-3',
+            'codetext' => 'Progress note',
+            'description' => $text,
+            'clinical_notes_type' => 'progress_note',
+            'clinical_notes_category' => null,
+        ]);
+
+        $newId = isset($saved['id']) && is_numeric($saved['id']) ? (int) $saved['id'] : 0;
+
+        return [
+            'created_row' => true,
+            'created_form' => $createdForm,
+            'note_id' => $newId,
+            'form_id' => $formId,
+        ];
+    }
+
     public function deleteClinicalNoteRecordForPatient($recordId, $pid, $encounter)
     {
         $sql = "DELETE FROM `form_clinical_notes` WHERE id = ? AND pid= ? AND encounter = ?";

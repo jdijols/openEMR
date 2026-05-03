@@ -54,6 +54,27 @@ function requestCitationNavigation(
   );
 }
 
+/**
+ * After a proposal confirm succeeds, ask the host (rail container) to refresh OpenEMR's open
+ * encounter view so the new/edited/deleted note appears in the Clinical Notes Form panel without
+ * a manual click. Best-effort — same-origin postMessage with origin guard. The host listener
+ * handles the bridge into OpenEMR's `refreshVisitDisplay()`.
+ */
+function notifyParentOfWriteConfirmed(writeTarget: string, expectedPatientUuid: string): void {
+  if (typeof window.parent === 'undefined' || window.parent === null) {
+    return;
+  }
+
+  window.parent.postMessage(
+    {
+      type: 'WRITE_CONFIRMED',
+      write_target: writeTarget,
+      expected_patient_uuid: expectedPatientUuid,
+    },
+    window.location.origin,
+  );
+}
+
 /** Strip legacy case-presentation header the model was asked to emit; UI does not show this label. */
 function displayAssistantText(text: string): string {
   return text.replace(/^\s*One-liner:\s*/i, '');
@@ -319,32 +340,9 @@ function IconInfo(): ReactElement {
   );
 }
 
-/**
- * Tiny "↗" used after a navigable citation to signal that clicking the
- * link changes the chart view (i.e. has a side effect on the operator's
- * workspace, unlike a normal hyperlink). Drawn as an inline SVG so it
- * sits on the type baseline and inherits the link color.
- */
-function IconArrowOut(): ReactElement {
-  return (
-    <svg
-      className="agentforge-msg__cite-marker"
-      width="10"
-      height="10"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path d="M7 17 17 7" />
-      <path d="M9 7h8v8" />
-    </svg>
-  );
-}
+// IconArrowOut (a "↗" marker after navigable citations) was removed in PR-N: the marker
+// implied "external link" to clinicians, and the dotted underline + link color already
+// signal "click to navigate" sufficiently for inline chart citations.
 
 /*
  * The "CP" rounded-square avatar that briefly lived here in PR3 was
@@ -362,11 +360,20 @@ function IconArrowOut(): ReactElement {
 
 /**
  * Friendlier write-target chip label. Backend ships snake_case enum-ish
- * strings (`vitals`, `medication`, `chief_complaint`); the chip in the
- * card header should read like clinician prose. Pure presentation —
- * the underlying `write_target` value is unchanged on the wire.
+ * strings (`vitals`, `medication`, `chief_complaint`, `clinical_note`);
+ * the chip in the card header should read like clinician prose. Pure
+ * presentation — the underlying `write_target` value is unchanged on the wire.
+ *
+ * `chief_complaint` is relabeled "Reason for visit" because the underlying
+ * write target is `form_encounter.reason` (the front-desk-entered field), not
+ * a free-form chief complaint narrative. Calling it "Chief complaint" in the
+ * UI confuses physicians into accepting writes that overwrite intake data.
  */
 function formatWriteTarget(target: string): string {
+  if (target === 'chief_complaint') return 'Reason for visit';
+  if (target === 'clinical_note') return 'Clinical note';
+  if (target === 'clinical_note_update') return 'Update note';
+  if (target === 'clinical_note_delete') return 'Delete note';
   return target
     .split('_')
     .map((p) => (p.length > 0 ? p[0]!.toUpperCase() + p.slice(1) : p))
@@ -462,6 +469,7 @@ function ProposalBlock(
       const outcome = await postProposalConfirm(env.apiBase, env.sessionToken, env.patientUuid, env.conversationId, proposalId);
       if (outcome.accepted) {
         setUiAndPersist({ phase: 'accepted' });
+        notifyParentOfWriteConfirmed(props.block.write_target, env.patientUuid);
       } else {
         setUiAndPersist({ phase: 'openemr_denied', openemrReason: outcome.reason });
       }
@@ -629,7 +637,6 @@ function renderBlock(
                     onClick={() => requestCitationNavigation(seg.citation_id, hint, bound)}
                   >
                     {seg.text}
-                    <IconArrowOut />
                   </button>
                 );
               }
@@ -667,7 +674,6 @@ function renderBlock(
                 onClick={() => requestCitationNavigation(citeId, hint, bound)}
               >
                 {renderedText}
-                <IconArrowOut />
               </button>
             ) : (
               renderedText
@@ -728,6 +734,29 @@ function renderBlock(
         </p>
       );
   }
+}
+
+/**
+ * Whenever an assistant message contains a proposal block, the proposal card itself is the
+ * complete affordance — preview text + Confirm/Reject buttons. Any prose the model emits
+ * alongside it (narration like "I'll add this to the note", restatements of the preview,
+ * Y/N confirmations) is noise that undermines trust ("the assistant is talking past the
+ * card I'm about to click"). Suppress all text and claim blocks in any message that has a
+ * proposal — deterministic, no model-side prompt rules to drift away.
+ *
+ * Warnings, refusals, tool_call, and tool_result blocks are preserved because they carry
+ * safety/audit signal that doesn't restate the proposal. Proposal blocks themselves are
+ * always preserved (suppressing them would hide the actionable card).
+ *
+ * No-op when there are no proposal blocks in the message.
+ */
+function suppressDuplicateProposalNarration(blocks: readonly ChatBlock[]): ChatBlock[] {
+  const hasProposal = blocks.some((b) => b.type === 'proposal');
+  if (!hasProposal) {
+    return [...blocks];
+  }
+
+  return blocks.filter((b) => b.type !== 'text' && b.type !== 'claim');
 }
 
 export type { ChatMessage } from '../types/chat.js';
@@ -816,7 +845,7 @@ export function MessageList(props: {
                 Dictation
               </span>
             ) : null}
-            {m.blocks.map((b, j) =>
+            {(m.role === 'assistant' ? suppressDuplicateProposalNarration(m.blocks) : m.blocks).map((b, j) =>
               renderBlock(b, `${i}-${j}`, {
                 assistantMessage: m.role === 'assistant',
                 boundPatientUuid: props.boundPatientUuid,

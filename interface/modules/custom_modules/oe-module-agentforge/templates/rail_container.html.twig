@@ -317,6 +317,33 @@
         var prevPid = readPidProbe();
         var prevEncounter = readEncounterProbe();
 
+        // Walks the iframe tree from window.top down, calling refreshVisitDisplay() on the first
+        // frame that defines it (encounter_top.php). Mirrors how OpenEMR's own tabs_view_model.js
+        // (line ~343) discovers the encounter frame by feature-detecting twAddFrameTab. Best
+        // effort: cross-origin frames throw on access and are silently skipped.
+        function triggerOpenEmrEncounterRefresh() {
+            var done = false;
+            function walk(win) {
+                if (!win || done) return;
+                try {
+                    if (typeof win.refreshVisitDisplay === 'function') {
+                        win.refreshVisitDisplay();
+                        done = true;
+                        return;
+                    }
+                    var nested = win.frames;
+                    if (!nested) return;
+                    for (var i = 0; i < nested.length; i++) {
+                        walk(nested[i]);
+                        if (done) return;
+                    }
+                } catch (ignored) {
+                    // cross-origin / detached frame; skip
+                }
+            }
+            walk(window.top);
+        }
+
         function syncBoundEncounterInChrome(encId, encounterDate, encounterCategory) {
             var topWin = window.top;
             try {
@@ -429,7 +456,44 @@
                 return;
             }
             var data = ev.data;
-            if (!data || typeof data !== 'object' || data.type !== 'NAV_REQUEST') {
+            if (!data || typeof data !== 'object') {
+                return;
+            }
+
+            // After a confirmed write (clinical note / vitals / chief complaint / etc.) the CUI
+            // posts WRITE_CONFIRMED so the open encounter view can re-render without the operator
+            // hitting the encounter Refresh button. We bridge into OpenEMR's existing
+            // refreshVisitDisplay() defined on encounter_top.php (its loop calls each tab frame's
+            // own refreshVisitDisplay, which in turn hard-reloads forms.php).
+            //
+            // Frame hierarchy: this script runs in main.php (rail container is body-injected, not
+            // iframed), and encounter_top.php is loaded as a child frame of main.php. So we walk
+            // window.top.frames to find the frame that has refreshVisitDisplay defined — same
+            // pattern OpenEMR's tabs_view_model.js uses to find encounter_top by looking for
+            // twAddFrameTab. Calling top.refreshVisitDisplay() directly would no-op because
+            // main.php doesn't define that function.
+            //
+            // Patient-binding guard: ignore stale messages from a previous chart by comparing the
+            // expected_patient_uuid (sent by CUI) against the iframe's data-patient-uuid attribute
+            // (set on iframe-root by the CUI when bound). Mismatch = silently drop.
+            if (data.type === 'WRITE_CONFIRMED') {
+                var docW = null;
+                try {
+                    docW = frame.contentDocument;
+                } catch (ignored) {
+                    return;
+                }
+                var iframeRootW = docW ? docW.documentElement : null;
+                var boundUuidW = iframeRootW ? (iframeRootW.getAttribute('data-patient-uuid') || '') : '';
+                var expectedW = typeof data.expected_patient_uuid === 'string' ? data.expected_patient_uuid : '';
+                if (expectedW !== '' && boundUuidW !== '' && expectedW !== boundUuidW) {
+                    return;
+                }
+                triggerOpenEmrEncounterRefresh();
+                return;
+            }
+
+            if (data.type !== 'NAV_REQUEST') {
                 return;
             }
             var doc = null;

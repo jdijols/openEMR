@@ -118,29 +118,67 @@ function matchesOpenEncounterVitalsRow(row: ContextRow, openEncounterId: number 
   return rowDate === openEncounterDate;
 }
 
+/**
+ * Per-vital display formatters. The OpenEMR vitals table stores most numerics as DECIMAL with
+ * trailing zeros (e.g. "58.000000"); raw rendering produced "HR 58.000000" in the rail. Each
+ * formatter returns the display string for the value — `null` to omit the part entirely.
+ *
+ * Units are fixed to US/imperial because OpenEMR's default vitals form captures °F, lb, in.
+ * The `oxygen_saturation` column already represents a percentage (0–100), not a fraction.
+ */
+function formatIntegerVital(label: string, value: string, unit: string): string | null {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return `${label} ${Math.round(n)}${unit}`;
+}
+
+function formatDecimalVital(label: string, value: string, unit: string, decimals: number): string | null {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return `${label} ${n.toFixed(decimals)}${unit}`;
+}
+
+/** "70" inches → "5'10\"". Whole feet only when remainder is 0. */
+function formatHeightInches(value: string): string | null {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const totalInches = Math.round(n);
+  const feet = Math.floor(totalInches / 12);
+  const inches = totalInches % 12;
+  if (feet <= 0) return `Ht ${inches}"`;
+  if (inches === 0) return `Ht ${feet}'`;
+  return `Ht ${feet}'${inches}"`;
+}
+
 function vitalParts(row: ContextRow): string[] {
   const bps = readString(row, 'bps').trim();
   const bpd = readString(row, 'bpd').trim();
   const parts: string[] = [];
   if (bps !== '' && bpd !== '') {
-    parts.push(`BP ${bps}/${bpd}`);
+    const bpsN = Number(bps);
+    const bpdN = Number(bpd);
+    if (Number.isFinite(bpsN) && Number.isFinite(bpdN) && bpsN > 0 && bpdN > 0) {
+      parts.push(`BP ${Math.round(bpsN)}/${Math.round(bpdN)}`);
+    }
   }
 
-  const vitalMap: ReadonlyArray<readonly [string, string]> = [
-    ['pulse', 'HR'],
-    ['respiration', 'RR'],
-    ['temperature', 'Temp'],
-    ['oxygen_saturation', 'SpO2'],
-    ['pain', 'Pain'],
-    ['weight', 'Wt'],
-    ['height', 'Ht'],
-    ['BMI', 'BMI'],
+  const formatters: ReadonlyArray<readonly [string, (value: string) => string | null]> = [
+    ['pulse', (v) => formatIntegerVital('HR', v, '')],
+    ['respiration', (v) => formatIntegerVital('RR', v, '')],
+    ['temperature', (v) => formatDecimalVital('Temp', v, '°F', 1)],
+    ['oxygen_saturation', (v) => formatIntegerVital('SpO2', v, '%')],
+    ['pain', (v) => formatIntegerVital('Pain', v, '')],
+    ['weight', (v) => formatIntegerVital('Wt', v, ' lb')],
+    ['height', (v) => formatHeightInches(v)],
+    ['BMI', (v) => formatDecimalVital('BMI', v, '', 1)],
   ];
 
-  for (const [key, label] of vitalMap) {
+  for (const [key, fmt] of formatters) {
     const value = readString(row, key).trim();
-    if (value !== '') {
-      parts.push(`${label} ${value}`);
+    if (value === '') continue;
+    const formatted = fmt(value);
+    if (formatted !== null) {
+      parts.push(formatted);
     }
   }
 

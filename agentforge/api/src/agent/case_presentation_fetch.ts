@@ -106,6 +106,7 @@ export type CasePresentationFetched = {
   readonly vitals: readonly ContextRow[];
   readonly labs: readonly ContextRow[];
   readonly notes_metadata: readonly ContextRow[];
+  readonly clinical_notes: readonly ContextRow[];
   readonly social_history: readonly ContextRow[];
   readonly toolResults: readonly AiToolResultLike[];
   readonly bundleForLlm: Record<string, unknown>;
@@ -137,6 +138,7 @@ export async function fetchCasePresentationData(
     vitals,
     labs,
     notes_metadata,
+    clinical_notes,
     social_history,
   ] = await Promise.all([
     safeAllergies(env, ctx, patientUuid),
@@ -146,6 +148,7 @@ export async function fetchCasePresentationData(
     safeChartRows(env, ctx, patientUuid, 'context/vitals.php'),
     safeChartRows(env, ctx, patientUuid, 'context/labs.php'),
     safeChartRows(env, ctx, patientUuid, 'context/notes_metadata.php'),
+    safeChartRows(env, ctx, patientUuid, 'context/clinical_notes.php'),
     safeChartRows(env, ctx, patientUuid, 'context/social_history.php'),
   ]);
 
@@ -190,6 +193,11 @@ export async function fetchCasePresentationData(
       data: notes_metadata,
       source_packs: notes_metadata.map((r) => r.source_pack),
     }),
+    tr('get_clinical_notes', patientUuid, {
+      ok: true as const,
+      data: clinical_notes,
+      source_packs: clinical_notes.map((r) => r.source_pack),
+    }),
     tr('get_social_history', patientUuid, {
       ok: true as const,
       data: social_history,
@@ -222,6 +230,7 @@ export async function fetchCasePresentationData(
     vitals: clamp(vitals, 5),
     labs: clamp(labs, 10),
     notes_metadata: clamp(notes_metadata, 8),
+    clinical_notes: clamp(clinical_notes, 8),
     social_history: clamp(social_history, 8),
   };
 
@@ -234,6 +243,7 @@ export async function fetchCasePresentationData(
     vitals,
     labs,
     notes_metadata,
+    clinical_notes,
     social_history,
     toolResults,
     bundleForLlm,

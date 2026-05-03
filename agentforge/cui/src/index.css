@@ -562,6 +562,15 @@ body {
   font-size: inherit;
   font-weight: inherit;
   line-height: inherit;
+  /* Buttons default to text-align: center, which causes wrapped citation text
+     to drift to the middle of its line — visible when a long cited phrase
+     spans two lines or when a single-cite claim wraps the whole sentence in
+     a button. Inheriting the parent paragraph's alignment keeps the link
+     reading as inline prose. */
+  text-align: inherit;
+  /* Same reason as text-align: prevent the button's intrinsic block-level
+     box from breaking word wrapping across lines. */
+  white-space: normal;
   display: inline;
   margin: 0;
   padding: 0;

@@ -3,7 +3,15 @@ import type { Env } from '../env.js';
 import { OpenEmrCallError, postModuleJson, type OpenEmrClientContext } from '../openemr/client.js';
 import { fetchPendingProposal, markProposalFinal } from './store.js';
 
-const WRITE_TARGETS = ['chief_complaint', 'vitals', 'tobacco', 'allergy'] as const;
+const WRITE_TARGETS = [
+  'chief_complaint',
+  'vitals',
+  'tobacco',
+  'allergy',
+  'clinical_note',
+  'clinical_note_update',
+  'clinical_note_delete',
+] as const;
 export type WriteTarget = (typeof WRITE_TARGETS)[number];
 
 function isWriteTarget(v: string): v is WriteTarget {
@@ -15,7 +23,18 @@ const RELATIVE_PATH: Record<WriteTarget, string> = {
   vitals: 'write/vitals.php',
   tobacco: 'write/tobacco.php',
   allergy: 'write/allergy.php',
+  clinical_note: 'write/clinical_note.php',
+  clinical_note_update: 'write/clinical_note_edit.php',
+  clinical_note_delete: 'write/clinical_note_edit.php',
 };
+
+const ENCOUNTER_REQUIRED_TARGETS: ReadonlySet<WriteTarget> = new Set([
+  'chief_complaint',
+  'vitals',
+  'clinical_note',
+  'clinical_note_update',
+  'clinical_note_delete',
+]);
 
 /** Build `{ session_token, patient_uuid, proposal_id, encounter_id?, payload }` for oe-module-agentforge writes. */
 export function buildOpenEmrWriteBody(
@@ -28,7 +47,7 @@ export function buildOpenEmrWriteBody(
   },
   session_token: string,
 ): Record<string, unknown> {
-  if (row.writeTarget === 'chief_complaint' || row.writeTarget === 'vitals') {
+  if (ENCOUNTER_REQUIRED_TARGETS.has(row.writeTarget)) {
     const eid = row.encounterId;
     if (eid === null || eid <= 0) {
       throw Object.assign(new Error('missing_encounter_id'), { code: 'missing_encounter_id' });

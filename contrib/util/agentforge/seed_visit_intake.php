@@ -212,11 +212,15 @@ final class AgentForgeVisitIntakeSeeder
      */
     private function purgeAgentForgeIntakeEncounters(array $demoPids): void
     {
+        // Match by pid + demo weekday dates instead of the legacy "[AgentForge Intake] " reason
+        // prefix; the prefix was leaking into physician-facing rail copy so the seeder no longer
+        // adds it. Date-based identification is sufficient because demo encounters are scheduled
+        // exclusively on DEMO_WEEKDAY_DATES.
         $rows = QueryUtils::fetchRecords(
             "SELECT encounter, pid FROM form_encounter
              WHERE pid IN (" . $this->placeholders($demoPids) . ")
-             AND reason LIKE ?",
-            array_merge($demoPids, [self::INTAKE_REASON_PREFIX . '%'])
+             AND DATE(`date`) IN (" . $this->placeholders(self::DEMO_WEEKDAY_DATES) . ")",
+            array_merge($demoPids, self::DEMO_WEEKDAY_DATES)
         );
 
         foreach ($rows as $row) {
@@ -336,7 +340,10 @@ final class AgentForgeVisitIntakeSeeder
 
         $dateTime = $eventDate . ' ' . $startTime;
         $chief = trim((string)$appt['pc_title']);
-        $reason = self::INTAKE_REASON_PREFIX . $chief;
+        // Reason for visit is physician-facing copy in the rail and OpenEMR encounter view; do not
+        // prefix it with internal demo-data tags. Re-seed identification now uses pid + demo dates
+        // (see purgeAgentForgeIntakeEncounters) instead of a marker substring in the reason field.
+        $reason = $chief;
 
         $encounterResult = $this->encounterService->insertEncounter($puuid, [
             'date' => $dateTime,
@@ -372,8 +379,29 @@ final class AgentForgeVisitIntakeSeeder
         $vitalsPayload['activity'] = 1;
         $this->vitalsService->save($vitalsPayload);
 
-        $this->createMaIntakeNote($pid, $eid, $username, $eventDate, $chief);
+        $intakeUsername = $this->loadIntakeStaffUsername();
+        $this->createMaIntakeNote($pid, $eid, $intakeUsername, $eventDate, $chief);
         $this->ensureSocialHistoryDemoSlice($pid);
+    }
+
+    /**
+     * Username to attribute the MA intake note to. Falls back through a small priority list so the
+     * author column visibly differs from the physician on the same encounter — the demo loses its
+     * staff-vs-clinician contrast if both rows show the same author.
+     */
+    private function loadIntakeStaffUsername(): string
+    {
+        foreach (['clinician', 'nurse', 'medical_assistant', 'ma', 'receptionist'] as $candidate) {
+            $row = QueryUtils::fetchRecords(
+                'SELECT username FROM users WHERE username = ? AND active = 1 LIMIT 1',
+                [$candidate]
+            );
+            if ($row !== [] && !empty($row[0]['username'])) {
+                return (string) $row[0]['username'];
+            }
+        }
+
+        return 'oe-system';
     }
 
     /**
@@ -394,10 +422,9 @@ final class AgentForgeVisitIntakeSeeder
             "SELECT pid, DATE(`date`) AS encounter_date, COUNT(*) AS total
              FROM form_encounter
              WHERE pid IN (" . $this->placeholders($pids) . ")
-             AND reason LIKE ?
              AND DATE(`date`) IN (" . $this->placeholders(self::DEMO_WEEKDAY_DATES) . ")
              GROUP BY pid, DATE(`date`)",
-            array_merge($pids, [self::INTAKE_REASON_PREFIX . '%'], self::DEMO_WEEKDAY_DATES)
+            array_merge($pids, self::DEMO_WEEKDAY_DATES)
         );
 
         $actual = [];
@@ -497,10 +524,12 @@ final class AgentForgeVisitIntakeSeeder
 
     private function createMaIntakeNote(int $pid, int $encounterId, string $username, string $eventDate, string $chief): void
     {
-        $noteBody = "MA intake (demo seed): Vitals obtained pre-provider. "
+        // Note body is physician-facing copy in the rail and the Clinical Notes Form table — no
+        // internal demo-data tags or redundant "Reason for visit" line (the encounter's own reason
+        // field already carries that, and surfacing it twice in the chart confused reviewers).
+        $noteBody = "Vitals obtained pre-provider. "
             . "Medication list reviewed with patient; agrees with active med list in chart. "
-            . "Tobacco/alcohol screen updated. PHQ-2 screen negative today; patient denies suicidal ideation.\n"
-            . "Reason for visit (schedule): " . $chief;
+            . "Tobacco/alcohol screen updated. PHQ-2 screen negative today; patient denies suicidal ideation.";
 
         $formId = $this->clinicalNotesService->createClinicalNotesParentForm($pid, $encounterId, 1);
         $this->clinicalNotesService->saveArray([

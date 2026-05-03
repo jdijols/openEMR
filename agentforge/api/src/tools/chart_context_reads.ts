@@ -55,6 +55,7 @@ export function createChartContextReadTools(env: Env, sessionToken: string, obs:
     get_vitals: readTool(env, sessionToken, obs, correlationId, 'get_vitals', 'context/vitals.php', 'Recent vitals with packs'),
     get_labs: readTool(env, sessionToken, obs, correlationId, 'get_labs', 'context/labs.php', 'Recent labs with packs'),
     get_notes_metadata: readTool(env, sessionToken, obs, correlationId, 'get_notes_metadata', 'context/notes_metadata.php', 'Note/document metadata rows only'),
+    get_clinical_notes: readTool(env, sessionToken, obs, correlationId, 'get_clinical_notes', 'context/clinical_notes.php', 'Clinical Notes Form bodies (intake, progress, nursing) with narrative description text and citation packs'),
     get_social_history: readTool(env, sessionToken, obs, correlationId, 'get_social_history', 'context/social_history.php', 'Social history snapshots'),
   };
 }

@@ -241,6 +241,33 @@ final class SourcePackFactory
      *   navigation_hint: array{kind: string, params: array<string, mixed>}
      * }
      */
+    public static function clinicalNote(int $noteRowId, string $noteUuid, int $encounterId, \DateTimeImmutable $asOf): array
+    {
+        return [
+            'resource_family' => 'clinical_note',
+            'table' => 'form_clinical_notes',
+            'row_id' => $noteRowId,
+            'uuid' => $noteUuid,
+            'as_of' => $asOf->format(\DateTimeInterface::ATOM),
+            'retrieval_path' => 'ClinicalNotesService::getActiveClinicalNotesForPatient',
+            'navigation_hint' => [
+                'kind' => 'encounter',
+                'params' => ['encounter_id' => $encounterId],
+            ],
+        ];
+    }
+
+    /**
+     * @return array{
+     *   resource_family: string,
+     *   table: string,
+     *   row_id: int,
+     *   uuid: string,
+     *   as_of: string,
+     *   retrieval_path: string,
+     *   navigation_hint: array{kind: string, params: array<string, mixed>}
+     * }
+     */
     public static function socialHistory(int $historyDataId, string $historyUuid, \DateTimeImmutable $asOf): array
     {
         return [
