@@ -92,7 +92,7 @@ flowchart LR
         direction TB
         InStart["Physician<br/>Starts visit transcript<br/>(tap start/stop or hold-to-talk)"]
         InDict["Physician dictation only<br/>(no patient audio,<br/>no audio retained)"]
-        InSTT["agentforge-api STT relay<br/>AssemblyAI / Deepgram<br/>(BAA-class egress)"]
+        InSTT["agentforge-api STT relay<br/>AssemblyAI<br/>(BAA-class egress)"]
         InProp["Agent proposal in CUI<br/>chief complaint (C/U/clear) ·<br/>vitals (C/U/void) ·<br/>tobacco · allergy add/update ·<br/>clinical note (C/U/soft-delete)"]
         InConf["Physician<br/>Explicit confirm<br/>('save' / 'confirm')"]
         InWrite["Write module<br/>Physician session + GACL;<br/>active-chart binding;<br/>audit row log_from='agent'"]

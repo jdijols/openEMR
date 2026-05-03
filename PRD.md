@@ -9,7 +9,7 @@
 > - **Acceptance criteria** are hybrid. Most sections use **"Done means:"** bullet checklists (convertible to a task list). Security-critical and write-path sub-sections also include **Given / When / Then** scenarios.
 > - **Cross-references** to [`AUDIT.md`](AUDIT.md) findings, [`USERS.md`](USERS.md) sections, and [`ARCHITECTURE.md`](ARCHITECTURE.md) decisions appear inline. No silent decisions.
 > - **No emojis. No marketing prose.** Mermaid diagrams are used where component or sequence flow is otherwise ambiguous.
-> - **Provider lock:** Vercel AI SDK keeps the agent provider-agnostic. **Default for MVP demo:** Anthropic Claude (LLM) + Deepgram (STT). Swap = single environment variable. Implementation must keep both surfaces config-driven.
+> - **Provider lock:** Vercel AI SDK keeps the agent provider-agnostic. **Default for MVP demo:** Anthropic Claude (LLM) + AssemblyAI (STT). Swap = single environment variable. Implementation must keep both surfaces config-driven.
 
 ---
 
@@ -838,8 +838,8 @@ Security-critical (no audio retention). Includes Given/When/Then.
 #### 5.8.1 Implementation surface
 
 - `WS /stt/stream` (or HTTP/2 streaming POST) accepts a streaming audio frame source from the CUI, opens a corresponding stream to the configured STT provider, and pipes the partial + final transcript text back to the CUI as Server-Sent Events or WebSocket text frames.
-- `STT_PROVIDER` env switches between `deepgram` (default) and `assemblyai`. Both are BAA-eligible.
-- **No audio bytes are written to disk or to any persistent store.** The relay is in-memory only. Provider client config sets retention to `0` where the API supports it (Deepgram: `retention=0` parameter; AssemblyAI: equivalent).
+- `STT_PROVIDER` env points to `assemblyai` for the MVP demo. AssemblyAI is BAA-eligible.
+- **No audio bytes are written to disk or to any persistent store.** The relay is in-memory only. Provider client config sets retention to `0` where the API supports it (AssemblyAI configured to retain no audio).
 - Transcript text is persisted to Postgres per UC-B/UC-C requirements:
   - Table `transcripts` (`id`, `conversation_id`, `started_at`, `ended_at`, `physician_user_id`, `patient_uuid`, `encounter_id`).
   - Table `transcript_segments` (`id`, `transcript_id`, `seq`, `speaker_role`, `text`, `is_final`, `created_at`). `speaker_role` is always `physician` for V1; the field exists for future patient-audio scope but writes are rejected for any other role.
@@ -1304,7 +1304,7 @@ Security-critical. Includes Given/When/Then.
 - Only the `agentforge-api` container is permitted to reach the public internet. All other containers (especially `openemr`, `db`, `postgres`, `langfuse`) have egress denied at the firewall + Docker network policy layer.
 - Allowed destinations from the agent container:
   - LLM provider host (Anthropic API or Azure OpenAI region endpoint).
-  - STT provider host (Deepgram or AssemblyAI region endpoint).
+  - STT provider host (AssemblyAI region endpoint).
   - Let's Encrypt ACME endpoints (only Caddy needs this; agent doesn't but doesn't harm).
 - Implementation for MVP: UFW + iptables on the host, plus a Compose network with `internal: true` for non-egress services and a separate network with no egress restriction for the agent. If UFW rules prove flaky on Docker, fall back to a small forward-proxy container (squid or tinyproxy) that enforces the allowlist; the agent's `HTTPS_PROXY` env points at it.
 
@@ -1602,7 +1602,7 @@ Scenario: Filesystem audit
 Scenario: Provider retention
   Given the STT call succeeded
    When the provider's API is queried for stored audio
-   Then no audio is retained on the provider side (Deepgram retention=0; AssemblyAI equivalent)
+   Then no audio is retained on the provider side (AssemblyAI retention configured to zero)
 ```
 
 Cross-references: [`USERS.md` §3.2, §7.4](USERS.md).
@@ -2118,7 +2118,7 @@ Apply tiers in order; never cut tier N+1 before tier N.
 
 ### 15.2 Specific risks
 
-- **STT BAA setup time.** Deepgram and AssemblyAI both onboard quickly, but key issuance and BAA acknowledgment can take hours. Mitigation: secure the keys on **Wed evening** before they're needed Fri.
+- **STT BAA setup time.** AssemblyAI onboards quickly, but key issuance and BAA acknowledgment can take hours. Mitigation: secure the keys on **Wed evening** before they're needed Fri.
 - **Write-path discovery for 4 targets.** The vitals + tobacco + allergy services in OpenEMR are real but their exact insert/update signatures may differ from what `[USERS.md`](USERS.md)/`[AUDIT.md`](AUDIT.md) imply. Mitigation: spike each write in isolation Thu morning; if one is unexpectedly hard, drop per §15.1 tier 2/3.
 - **Citation navigation surface coverage.** Wiring the postMessage → host nav → OpenEMR existing screens may surface unexpected URL/route quirks. Mitigation: ship `kind=encounter` first (the most likely to "just work"), accept fallback for everything else.
 - **Let's Encrypt rate limits / DNS propagation.** A botched cert request can lock you out of issuing for an hour. Mitigation: set up DNS Sat morning at the latest; use staging endpoint first; keep nip.io fallback ready.

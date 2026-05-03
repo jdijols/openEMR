@@ -3,7 +3,7 @@
 > An OpenEMR-embedded conversational copilot for adult primary care visits.
 > Built on OpenEMR. Developed during the Gauntlet AI AgentForge program.
 
-**Live demo:** [https://108-61-145-220.nip.io](https://108-61-145-220.nip.io) · **Login:** `admin` / `pass` (synthetic data only)
+**Live demo:** [http://108-61-145-220.nip.io:8300/](http://108-61-145-220.nip.io:8300/) · **Login:** `physician` / `password123` (synthetic data only)
 
 ---
 
@@ -27,7 +27,7 @@ Clinical Copilot embeds a conversational panel inside an OpenEMR chart, scoped t
 - **In the room** — physician-only dictation that turns into structured proposals across the full V1 CRUD surface: chief complaint (create / update / clear), vitals incl. pain, height, weight (create / update / void), tobacco status (create / update), allergy add or reaction/severity update, and clinical notes (create / update / soft-delete). Nothing writes without explicit confirmation. Soft-deletes preserve the row in the database for audit.
 - **After the room** — the same conversation thread persists for follow-up Q&A against the chart and the visit transcript, plus a recap of confirmed, rejected, and pending proposals.
 
-That is the entire surface area. It is intentionally narrow. The eight V1 use cases (UC-A through UC-H), the target persona, the refusal posture, and the full traceability mapping from each capability to its tool path are documented in detail in [USERS.md](USERS.md).
+That is the entire surface area. It is intentionally narrow. The ten V1 use cases (UC-A through UC-J), the target persona, the refusal posture, and the full traceability mapping from each capability to its tool path are documented in detail in [USERS.md](USERS.md).
 
 ---
 
@@ -97,7 +97,7 @@ The CUI never holds LLM API keys; only the Agent API talks to the model and STT 
 
 ## Try it
 
-- **Live demo:** [https://108-61-145-220.nip.io](https://108-61-145-220.nip.io) — `physician` / `password123`, synthetic patients only
+- **Live demo:** [http://108-61-145-220.nip.io:8300/](http://108-61-145-220.nip.io:8300/) — `physician` / `password123`, synthetic patients only
 - **Local development (Docker):** see [docker/development-easy/](docker/development-easy/) and [Documentation/AgentForge/process/04-stage1-local-dev-runbook.md](Documentation/AgentForge/process/04-stage1-local-dev-runbook.md)
 - **VPS deployment runbook:** see [Documentation/AgentForge/process/09-vps-live-deployment.md](Documentation/AgentForge/process/09-vps-live-deployment.md)
 
@@ -116,6 +116,7 @@ The submission package and project context, in the order a reader should approac
 | [VERIFICATION.md](VERIFICATION.md)   | Chart-fidelity gate: citation enforcement, negative-claim backing, range guard, med-status warnings — and what verification *does not* catch.                                                                                                                                                                                                                |
 | [EVALUATION.md](EVALUATION.md)       | Eval suite: ten deterministic check rules (stop-the-line invariants + instructor-named failure modes + the constraint-boundary "automation, not advice" gate), 39 curated cases, defense of scope.                                                                                                                                                           |
 | [OBSERVABILITY.md](OBSERVABILITY.md) | Langfuse tracing: per-turn forensic reconstruction, the four required questions answered from logs, PHI redaction.                                                                                                                                                                                                                                           |
+| [COSTS.md](COSTS.md)                 | Actual dev spend (~$258 build total of which $3.34 is variable LLM), per-encounter unit economics, projections at 100 / 1K / 10K / 100K clinicians, architectural inflection points per tier, shipped cost mitigations.                                                                                                                                       |
 | [PRD.md](PRD.md)                     | Engineer-facing implementation spec, mapped 1:1 to gates and acceptance criteria.                                                                                                                                                                                                                                                                            |
 | [JOURNEY.md](JOURNEY.md)             | Physician's-eye narrative of one full visit through the shipped CUI.                                                                                                                                                                                                                                                                                         |
 | [TASKS.md](TASKS.md)                 | Gate-by-gate implementation tracking, dependency-ordered.                                                                                                                                                                                                                                                                                                    |

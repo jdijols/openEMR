@@ -18,7 +18,7 @@
 | **Hosting** | **Linux VPS** + Docker Compose (MVP deployed on **Vultr**) | Matches our **single-VM + Compose** plan ([Stage 2 decision](Documentation/AgentForge/process/05-stage2-deployment-decision.md)). OpenEMR is a long-lived PHP + MariaDB stack; a single VM with Compose is what upstream expects. A cohort peer shipped a working demo this way — low surprise, workable ops. *Course/synthetic data:* a standard VPS footprint is appropriate. *Future production under strict infrastructure BAA:* evaluate managed/regulated hosting separately — not a Gauntlet MVP blocker. |
 | **CUI (Conversational UI)** | **React** (e.g. Vite + TypeScript) | Team comfort and speed; isolates the copilot in an **iframe SPA** so we are not rewriting OpenEMR’s legacy Angular. The iframe mounts in a toggleable **right rail** launched from a header icon; if the host shell would scroll horizontally, the rail overlays instead of forcing a broken layout. Same language family as the **Agent API** (TypeScript) for shared types and simpler reasoning. |
 | **Agent backend** | **Node 20 + TypeScript + Vercel AI SDK** | Bounded **read → propose → confirm → write** flow — not multi-agent “planning.” Typed tools (Zod), provider swap without rewrites. |
-| **Visit capture (STT + transcript)** | **`agentforge-api` streaming relay** → default **Deepgram** (AssemblyAI acceptable); transcript in **Postgres**; **tap start/stop** or **hold-to-talk** | UC-B threads **chart context + physician dictation**; proposals appear as visible messages → confirm → module writes. **No ambient scope**, **no audio retention** ([`USERS.md` §3.2](USERS.md)); BAA egress like LLMs ([`Compliance-5`](AUDIT.md#compliance-5-no-outbound-network-egress-controls-the-llm-call-would-be-the-first-phi-bearing-outbound)). |
+| **Visit capture (STT + transcript)** | **`agentforge-api` streaming relay** → **AssemblyAI** (BAA-class); transcript in **Postgres**; **tap start/stop** or **hold-to-talk** | UC-B threads **chart context + physician dictation**; proposals appear as visible messages → confirm → module writes. **No ambient scope**, **no audio retention** ([`USERS.md` §3.2](USERS.md)); BAA egress like LLMs ([`Compliance-5`](AUDIT.md#compliance-5-no-outbound-network-egress-controls-the-llm-call-would-be-the-first-phi-bearing-outbound)). |
 | **Chart reads / writes in OpenEMR** | **PHP custom module** (`oe-module-agentforge`) | OpenEMR’s **supported extension path** is PHP: `globals.php` session, GACL, existing services, audit hooks ([`Architecture-1`](AUDIT.md#architecture-1-openemr-is-a-hybrid-legacymodern-system-with-interfaceglobalsphp-as-the-shared-runtime-bridge), [`Architecture-4`](AUDIT.md#architecture-4-custom-modules-plus-event-hooks-are-the-most-plausible-in-repo-integration-path-for-a-v1-embedded-read-only-copilot)). We are **not** avoiding PHP for integration—we use it **where OpenEMR lives**. The **Agent Context Service** stays bounded (UUID in/out, explicit columns) so we do not inherit naive N+1 read patterns ([`Performance-7`](AUDIT.md#performance-7-n1-query-patterns-and-select--survive-in-services)). The **CUI has no standalone permissions** — bounded chart reads and writes run only through the module under that user’s established OpenEMR session/GACL (no parallel privilege plane for chat). |
 | **Safety** | **Verification before display** + **active-chart binding** | Case study + audit: claims must cite chart sources; staff API paths need **session/chart binding** ([`Security-3`](AUDIT.md#security-3-fhir-patient-context-reads-and-staff-acl-reads-follow-different-enforcement-paths)). Citations expose actionable links where the **source pack** supports navigation; MVP wires limited host navigation first, then expands surfaces. |
 | **Observability** | **Langfuse** — self-hosted compose service shipped in the stack; current production demo deploy points at Langfuse Cloud (`https://us.cloud.langfuse.com`) for synthetic-data velocity, with the self-hosted v2 service available for the real-PHI swap | Agent traces often include prompts, tool payloads, and model output—**PHI-adjacent** once real charts are in play. **Self-hosted Langfuse** on **the same VPS** keeps that telemetry **inside our boundary** for real-PHI deployments instead of shipping it to another vendor that would need its own BAA and retention story ([`Compliance-2`](AUDIT.md#compliance-2-external-llm-use-requires-a-phi-boundary-decision-before-any-real-chart-data-leaves-openemr)). It still gives turn-level tracing, latency, tool failures, and token/cost visibility—the case study asks for real observability, not “installed and ignored.” See [`OBSERVABILITY.md`](OBSERVABILITY.md) for the cloud-vs-self-hosted swap plan. |
@@ -91,7 +91,7 @@ flowchart TB
     CUI -->|"chat / STT / transcript HTTPS"| Caddy
     Caddy --> OE
     Caddy --> API
-    EP --> Cloud["Anthropic / Azure OpenAI / Deepgram or AssemblyAI — BAA path"]
+    EP --> Cloud["Anthropic / Azure OpenAI / AssemblyAI — BAA path"]
 ```
 
 **Rule:** The browser never holds LLM API keys. Only **agentforge-api** calls the models.
@@ -174,10 +174,22 @@ Negative statements (“no allergies on file”) only count if the **empty aller
 
 ---
 
+## Speed vs. completeness
+
+A physician opens the chart and reads the rail in the 60-90 seconds before entering the room. That budget shapes three explicit tradeoffs.
+
+**What we prioritize for speed.** UC-A's case presentation auto-fires on chart open — the multi-tool synthesis happens while the physician is reading, not while they are waiting. The Context Service collapses the V1 chart bundle into a few bounded MariaDB reads rather than per-resource FHIR walks ([`Performance-3`](AUDIT.md#performance-3-restfhir-is-cleaner-as-a-boundary-but-adds-per-resource-overhead-and-uneven-pagination-behavior)). Vitals and lab numbers come from deterministic parsers, not LLM prose, which limits numeric hallucination and skips a model round-trip on the highest-value structured surface.
+
+**What we defer.** We do not stream tokens — the full response is built, verified by the four-layer gate, and shipped in one shot ([`VERIFICATION.md` "What verification does NOT catch" #6](VERIFICATION.md)). The user waits for the whole turn; we never retract a token already shown to a clinician. External evidence grounding (PubMed / NEJM / OpenEvidence) is V3 rather than V2 — it would expand the answer surface but adds a slow network hop and a new hallucination class. Cross-domain reasoning is bounded by the orchestrator's `stepCountIs(12)` budget; beyond that the agent answers with what it has rather than chasing completeness.
+
+**How we communicate uncertainty.** The vitals parser reports `uncertain` rather than guessing on ambiguous dictation ([`USERS.md` UC-E](USERS.md)). Med-status conflicts surface as inline warnings rather than stripped facts. Negative claims ("no allergies on file") are only allowed if the empty-query actually returned zero rows. Source-pack citations let the physician verify any specific value in one click. When verification cannot substantiate any claim, the turn is replaced with a visible refusal block — not a silently-trimmed answer that looks complete but isn't.
+
+---
+
 ## Speech, eval, observability (brief)
 
-- **STT:** Streaming provider under BAA (default **Deepgram**, **AssemblyAI** acceptable under the same pattern); **no audio file** retained; physician dictation only; capture supports **tap start/stop** or **hold-to-talk** ([`USERS.md` §3.2](USERS.md)).
-- **Eval:** **Synthea-imported** longitudinal charts + **hand-curated** golden cases ([`DataQuality-5`](AUDIT.md#dataquality-5-eval-ground-truth-requires-hybrid-synthetic-plus-curated-augmentation)). Deterministic checks: required citations, forbidden outputs, refusal paths, prompt-injection in notes.
+- **STT:** **AssemblyAI** under BAA; **no audio file** retained; physician dictation only; capture supports **tap start/stop** or **hold-to-talk** ([`USERS.md` §3.2](USERS.md)).
+- **Eval:** **Synthea-imported** longitudinal charts + **hand-curated** golden cases ([`DataQuality-5`](AUDIT.md#dataquality-5-eval-ground-truth-requires-hybrid-synthetic-plus-curated-augmentation)). Deterministic checks: required citations, forbidden outputs, refusal paths, prompt-injection in notes. Full rule-by-rule breakdown, the 39-case fixture inventory, and the brief-to-rule traceability map are in [`EVALUATION.md`](EVALUATION.md).
 - **Observability — Langfuse (self-hosted):** Vercel AI SDK can emit traces compatible with Langfuse; running Langfuse **on the same VPS** as the agent keeps eval/tracing aligned with the audit’s emphasis on **not turning observability into a second PHI leak** (contrast with sending full traces to a SaaS that is not in our BAA footprint). We use **redacted-by-default** trace bodies where needed; we still record **what ran, in what order, durations, tool failures, tokens, and cost** so the case-study observability questions are answerable from our own stack.
 
 ---
@@ -196,13 +208,16 @@ Rollback: disable OpenEMR module **or** `docker compose` to previous image tags;
 
 ## Cost snapshot (order of magnitude)
 
-| Scale (concurrent-ish physicians) | Rough LLM+STT / day | Note |
+| Scale (concurrent-ish physicians) | Total / year (LLM + STT + infra) | Note |
 | --- | --- | --- |
-| 100 | ~\$50–\$60 | Single VPS + backups |
-| 1K | ~\$500+ | Replicas, managed Postgres |
-| 10K / 100K | Much higher | Regional cells, caching policy `Performance-5`, smaller models for intent-only turns |
+| 100 | ~\$72K | Single VPS class scaled up; Postgres + Langfuse + API on one node |
+| 1K | ~\$650K | 3–5 API replicas, dedicated Postgres, self-hosted Langfuse cluster |
+| 10K | ~\$6.1M | Regional deployments, Postgres read replicas, dedicated STT egress |
+| 100K | ~\$60M | Per-tenant stacks, enterprise observability, BYO-LLM option |
 
-Refresh with **real** token traces during Early Submission. Per-physician-day envelope in the long doc was ~\$0.50 tool cost at list prices — treat as planning only until measured.
+Measured dev spend: **\$3.34** Anthropic API across the Apr 27 – May 3 build window (~550 LLM turns at \$0.006 blended/turn). AssemblyAI free-tier covered all dictation testing; Vultr VPS <\$15. Per-physician-day at production rates: \$2.20–\$3.00.
+
+**Full breakdown — methodology, projections, architectural inflection points per tier, and shipped mitigations — in [COSTS.md](COSTS.md).**
 
 ---
 
