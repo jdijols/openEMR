@@ -42,7 +42,7 @@ final class AgentForgeAppointmentSeeder
         '2026-05-04',
     ];
 
-    private const EXPECTED_DEMO_PATIENT_COUNT = 28;
+    private const EXPECTED_DEMO_PATIENT_COUNT = 32;
     private const APPOINTMENT_MARKER = '[AgentForge Appointment Seed]';
     private const SCHEDULED_PATIENT_MARKER_NAME = 'AgentForge Scheduled Patient ID';
     private const SCHEDULED_PATIENT_PREFIX = 'AF-SCHEDULED-';
@@ -89,8 +89,20 @@ final class AgentForgeAppointmentSeeder
         $scheduledPatients = $this->createScheduledPatients();
         $stockPatients = $this->loadStockPatients();
         $cohortPatients = $this->loadCohortPatients();
-        $establishedPatients = array_merge($stockPatients, $cohortPatients);
-        $demoPatients = array_merge($establishedPatients, $scheduledPatients);
+
+        // Split cohort by source. W1 cohort patients (AF-COHORT-001..010, source
+        // 'cohort') are established follow-ups that fill 'established' template
+        // slots. W2 cohort patients (AF-COHORT-011+, source 'new') are walk-in
+        // new-patient appointments per W2_ARCHITECTURE.md §10 — they join the
+        // new-patient pool alongside the appointment-only scheduled patients
+        // and the existing overflow logic places them as new-patient appointments
+        // on the last demo day.
+        $w1CohortPatients = array_values(array_filter($cohortPatients, static fn(array $p): bool => $p['source'] === 'cohort'));
+        $w2CohortPatients = array_values(array_filter($cohortPatients, static fn(array $p): bool => $p['source'] === 'new'));
+
+        $establishedPatients = array_merge($stockPatients, $w1CohortPatients);
+        $newPatients = array_merge($scheduledPatients, $w2CohortPatients);
+        $demoPatients = array_merge($establishedPatients, $newPatients);
         $this->assignDemoPatientsToAppointmentProvider($demoPatients);
 
         if ($establishedPatients === []) {
@@ -98,7 +110,7 @@ final class AgentForgeAppointmentSeeder
         }
 
         $this->assertDemoPatientRoster($demoPatients);
-        $appointments = $this->seedAppointments($establishedPatients, $scheduledPatients);
+        $appointments = $this->seedAppointments($establishedPatients, $newPatients);
         $this->assertAppointmentCoverage($appointments, $demoPatients);
         $this->writeManifest($appointments, $stockPatients, $cohortPatients, $scheduledPatients);
         $this->printSummary($appointments, $stockPatients, $cohortPatients, $scheduledPatients);
@@ -394,7 +406,8 @@ final class AgentForgeAppointmentSeeder
     private function loadCohortPatients(): array
     {
         $rows = QueryUtils::fetchRecords(
-            "SELECT p.pid, p.pubpid, p.fname, p.lname, u.fname AS provider_fname, u.lname AS provider_lname
+            "SELECT p.pid, p.pubpid, p.fname, p.lname, p.genericval1,
+                    u.fname AS provider_fname, u.lname AS provider_lname
              FROM patient_data p
              LEFT JOIN users u ON u.id = p.providerID
              WHERE p.genericname1 = ? AND p.genericval1 LIKE ?
@@ -402,12 +415,17 @@ final class AgentForgeAppointmentSeeder
             [self::COHORT_MARKER_NAME, self::COHORT_PREFIX . '%']
         );
 
-        return array_map(static function (array $row): array {
+        $prefixLen = strlen(self::COHORT_PREFIX);
+        return array_map(static function (array $row) use ($prefixLen): array {
+            // W2 cohort patients (AF-COHORT-011+) are walk-in new-patient
+            // appointments per W2_ARCHITECTURE.md §10. W1 cohort patients
+            // (AF-COHORT-001..010) remain established follow-ups.
+            $cohortNumber = (int)substr((string)$row['genericval1'], $prefixLen);
             return [
                 'pid' => (int)$row['pid'],
                 'pubpid' => (string)$row['pubpid'],
                 'name' => trim((string)$row['fname'] . ' ' . (string)$row['lname']),
-                'source' => 'cohort',
+                'source' => $cohortNumber >= 11 ? 'new' : 'cohort',
                 'primary_provider' => trim((string)($row['provider_fname'] ?? '') . ' ' . (string)($row['provider_lname'] ?? '')),
             ];
         }, $rows);
