@@ -477,7 +477,7 @@ export const SourceCitationSchema = z.object({
   source_id: z.string(),                           // DocumentReference UUID, chunk_id, or OpenEMR row uuid
   page_or_section: z.string(),                     // "page:2", "Chief Concern", "USPSTF §3.1"
   field_or_chunk_id: z.string(),                   // form field name, table cell coord, chunk id
-  quote_or_value: z.string(),                      // VERBATIM text or value from the source
+  quote_or_value: z.string().min(1),               // VERBATIM text or value from the source — must be non-empty (gates `citation_present` rubric)
   bbox: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional(),  // [x0,y0,x1,y1] normalized 0-1; PDFs only
   confidence: z.number().min(0).max(1).optional(), // VLM self-reported, surfaced in verification
 });
