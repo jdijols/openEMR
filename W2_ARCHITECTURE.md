@@ -1069,11 +1069,9 @@ The four sample documents in [Documentation/AgentForge/assets/W2-documents/](Doc
 | Patient            | Source documents (post-rename)                                                       | Cohort role                                                                            |
 | ------------------ | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | Chen, Margaret     | `Chen-Margaret-Intake-Form.pdf` + `Chen-Margaret-Lab-Lipid-Panel.pdf`                 | New-patient appointment; brought a recent outside lab. DOB / MRN / address from PDF.   |
-| Whitaker, Robert ⓟ | `Whitaker-Robert-Intake-Form.pdf` + `Whitaker-Robert-Lab-CBC.pdf`                     | New-patient appointment; first name **provisional** — verify against PDF during seeding.|
-| Reyes, Sofia       | `Reyes-Sofia-Intake-Form.png` + `Reyes-Sofia-Lab-HbA1c.png`                           | New-patient appointment; both docs are PNGs (phone-photo scenario).                    |
-| Kowalski, Anna ⓟ   | `Kowalski-Anna-Intake-Form.png` + `Kowalski-Anna-Lab-CMP.pdf`                         | New-patient appointment; first name **provisional** — verify against PDF during seeding.|
-
-ⓟ = provisional first name picked culturally appropriate to the surname; replace if the actual document carries a different first name.
+| Whitaker, James    | `Whitaker-James-Intake-Form.pdf` + `Whitaker-James-Lab-CBC.pdf`                       | New-patient appointment; brought a recent outside CBC. DOB 1958-11-03 / MRN-2026-04492 from PDF.        |
+| Reyes, Sofia       | `Reyes-Sofia-Intake-Form.png` + `Reyes-Sofia-Lab-HbA1c.png`                           | New-patient appointment; both docs are PNGs (phone-photo scenario).                                     |
+| Kowalski, Robert   | `Kowalski-Robert-Intake-Form.png` + `Kowalski-Robert-Lab-CMP.pdf`                     | New-patient appointment; intake is a phone-photo PNG; brought a recent outside CMP. DOB 1971-06-08.     |
 
 ### File naming convention
 
@@ -1464,7 +1462,7 @@ Spot-checked the W1 codebase before locking this architecture. The W2 deltas att
 UX, scope, persistence, and storage decisions are now locked. **No open questions remain.** Decisions made this pass:
 
 - **Cohort sample documents commit:** ✅ commit, with file rename to medical-office naming (`{LastName}-{FirstName}-{DocumentClass}-{SubType}.{ext}` — see §10) and a `README.md` next to them noting they are synthetic and not for any real workflow.
-- **First names for Whitaker and Kowalski:** provisional `Robert` and `Anna` respectively (verify against PDF text during seeding).
+- **First names for Whitaker and Kowalski:** confirmed against PDF text — `James` and `Robert` respectively (verified 2026-05-05; cohort table in §10 updated; sample-document filenames will follow on rename at G2-MVP-02).
 - **Vector retrieval mechanism:** ✅ pgvector on existing Postgres (single image swap, instructors' "vector retrieval" language satisfied directly).
 - **`attach_and_extract` tool surface:** ✅ implemented per brief signature; delegates to `intake_extractor` worker internally.
 - **Per-worker model selection capability:** ✅ built in from day one via `selectModel(workerName)` config map; all W2 workers use Haiku 4.5 today.
