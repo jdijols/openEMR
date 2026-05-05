@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Microsoft Edge / IE11 / Windows pinned-site tile config. Linked from the
+  HTML head via <meta name="msapplication-config" content="...">. The TileColor
+  matches the favicon plate (#0A2540) so the pinned tile blends visually
+  with the icon.
+-->
+<browserconfig>
+  <msapplication>
+    <tile>
+      <square150x150logo src="mstile-150.png"/>
+      <TileColor>#0A2540</TileColor>
+    </tile>
+  </msapplication>
+</browserconfig>

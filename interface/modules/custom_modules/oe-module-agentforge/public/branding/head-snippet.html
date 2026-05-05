@@ -1,0 +1,109 @@
+<!--
+  Clinical Copilot — canonical <head> snippet
+  ============================================
+
+  Drop this into the OpenEMR main HTML template head (e.g. interface/main/main.php
+  or whichever Twig layout wraps the chrome). The asset paths assume the
+  branding bundle lives at:
+    /interface/modules/custom_modules/oe-module-agentforge/public/branding/
+  ...which is its location in the AgentForge module's `public/` tree.
+
+  Absolute URLs (canonical, og:url, og:image, twitter:image, JSON-LD) are
+  hardcoded to the demo VPS hostname (108-61-145-220.nip.io). Find/replace
+  that hostname if you ever move to a custom domain. Everything else uses
+  root-relative paths and survives a domain change as-is.
+
+  Robots: <meta name="robots" content="noindex, nofollow"> is set because
+  the VPS hosts demo PHI. Remove or flip to "index, follow" for production.
+-->
+
+<!-- ─── Encoding & viewport ─────────────────────────────────────────── -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+<!-- ─── Title & description ────────────────────────────────────────── -->
+<title>Clinical Copilot — Less charting, more patient time</title>
+<meta name="description" content="The AI co-pilot for clinical documentation. Native to your EMR — drafts notes at the point of care so clinicians spend more time with patients.">
+<meta name="application-name" content="Clinical Copilot">
+<meta name="author" content="Clinical Copilot">
+
+<!-- ─── Canonical & robots ─────────────────────────────────────────── -->
+<link rel="canonical" href="https://108-61-145-220.nip.io/">
+<meta name="robots" content="noindex, nofollow">
+
+<!-- ─── Theme & colour scheme ──────────────────────────────────────── -->
+<meta name="theme-color" content="#0A2540">
+<meta name="color-scheme" content="light dark">
+<meta name="format-detection" content="telephone=no">
+
+<!-- ─── Favicon set ────────────────────────────────────────────────── -->
+<!-- Order matters: SVG first, then sized PNG, then ICO catch-all -->
+<link rel="icon" type="image/svg+xml" href="/interface/modules/custom_modules/oe-module-agentforge/public/branding/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/interface/modules/custom_modules/oe-module-agentforge/public/branding/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/interface/modules/custom_modules/oe-module-agentforge/public/branding/favicon-16.png">
+<link rel="shortcut icon" href="/interface/modules/custom_modules/oe-module-agentforge/public/branding/favicon.ico">
+
+<!-- ─── Apple touch icons (iOS home-screen) ────────────────────────── -->
+<link rel="apple-touch-icon" sizes="180x180" href="/interface/modules/custom_modules/oe-module-agentforge/public/branding/apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="167x167" href="/interface/modules/custom_modules/oe-module-agentforge/public/branding/apple-touch-icon-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="/interface/modules/custom_modules/oe-module-agentforge/public/branding/apple-touch-icon-152.png">
+<link rel="apple-touch-icon" sizes="120x120" href="/interface/modules/custom_modules/oe-module-agentforge/public/branding/apple-touch-icon-120.png">
+
+<!-- iOS PWA / standalone display hints -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Copilot">
+
+<!-- Safari pinned-tab silhouette -->
+<link rel="mask-icon" href="/interface/modules/custom_modules/oe-module-agentforge/public/branding/mask-icon.svg" color="#0A2540">
+
+<!-- ─── Microsoft tile (Edge / Windows pinned site) ───────────────── -->
+<meta name="msapplication-TileColor" content="#0A2540">
+<meta name="msapplication-TileImage" content="/interface/modules/custom_modules/oe-module-agentforge/public/branding/mstile-150.png">
+<meta name="msapplication-config" content="/interface/modules/custom_modules/oe-module-agentforge/public/branding/browserconfig.xml">
+
+<!-- ─── Web app manifest (Android, Chromium PWA) ──────────────────── -->
+<link rel="manifest" href="/interface/modules/custom_modules/oe-module-agentforge/public/branding/site.webmanifest">
+
+<!-- ─── Open Graph (Slack / Discord / iMessage / LinkedIn / Facebook) -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Clinical Copilot">
+<meta property="og:title" content="Clinical Copilot — Less charting, more patient time">
+<meta property="og:description" content="The AI co-pilot for clinical documentation. Native to your EMR — drafts notes at the point of care so clinicians spend more time with patients.">
+<meta property="og:url" content="https://108-61-145-220.nip.io/">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://108-61-145-220.nip.io/interface/modules/custom_modules/oe-module-agentforge/public/branding/og-image.png">
+<meta property="og:image:secure_url" content="https://108-61-145-220.nip.io/interface/modules/custom_modules/oe-module-agentforge/public/branding/og-image.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Clinical Copilot — two stacked C glyphs in blue and white on a deep navy plate, with the tagline 'Less time charting. More time with patients.'">
+
+<!-- ─── Twitter Card ──────────────────────────────────────────────── -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Clinical Copilot — Less charting, more patient time">
+<meta name="twitter:description" content="The AI co-pilot for clinical documentation. Native to your EMR — drafts notes at the point of care so clinicians spend more time with patients.">
+<meta name="twitter:image" content="https://108-61-145-220.nip.io/interface/modules/custom_modules/oe-module-agentforge/public/branding/og-image.png">
+<meta name="twitter:image:alt" content="Clinical Copilot — two stacked C glyphs in blue and white on a deep navy plate, with the tagline 'Less time charting. More time with patients.'">
+
+<!-- ─── Schema.org structured data (JSON-LD) ──────────────────────── -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Clinical Copilot",
+  "description": "The AI co-pilot for clinical documentation. Native to your EMR — drafts notes at the point of care so clinicians spend more time with patients.",
+  "applicationCategory": "MedicalApplication",
+  "applicationSubCategory": "Electronic Health Records",
+  "audience": {
+    "@type": "MedicalAudience",
+    "audienceType": "Clinician"
+  },
+  "operatingSystem": "Web Browser",
+  "url": "https://108-61-145-220.nip.io/",
+  "image": "https://108-61-145-220.nip.io/interface/modules/custom_modules/oe-module-agentforge/public/branding/og-image.png",
+  "logo": "https://108-61-145-220.nip.io/interface/modules/custom_modules/oe-module-agentforge/public/branding/favicon.svg",
+  "softwareVersion": "1.0"
+}
+</script>
