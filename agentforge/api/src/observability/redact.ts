@@ -176,6 +176,15 @@ export function redactPhi(input: unknown): unknown {
       return redactString(String(input));
     }
 
+    // §12 / G2-MVP-40 — W2 content-block summarization (S11 hard rule).
+    // Document / image content blocks carry raw PHI bytes in `source.data`;
+    // summarize before any other walk so we never even consider redacting
+    // a base64'd PDF/PNG body field-by-field.
+    const summarizedW2 = summarizeW2ContentBlockOrExtraction(input);
+    if (summarizedW2 !== null) {
+      return summarizedW2;
+    }
+
     const out: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
       if (PHI_KEY_HINTS.has(key) || PHI_KEY_HINTS.has(key.toLowerCase())) {
@@ -189,4 +198,69 @@ export function redactPhi(input: unknown): unknown {
 
   // bigint, symbol, function — refuse to serialize.
   return REDACTED;
+}
+
+/**
+ * §12 / G2-MVP-40 — W2 content-block + extraction-JSON summarizer.
+ *
+ * Returns a PHI-safe summary object when the input is one of:
+ *   - Anthropic `document` content block (PDF base64) →
+ *     { type, size_bytes, mime, _phi_safe_summary:true }
+ *   - Anthropic `image` content block (PNG/JPEG base64) →
+ *     { type, size_bytes, mime, _phi_safe_summary:true }
+ *   - LLM-extracted JSON envelope (carries §6 schema fields) →
+ *     { schema_valid, n_facts, n_uncertain, _phi_safe_summary:true }
+ *
+ * Returns `null` when the input is none of these — callers fall through
+ * to the regular deny-list walk.
+ */
+function summarizeW2ContentBlockOrExtraction(input: unknown): unknown | null {
+  if (input === null || typeof input !== 'object') {
+    return null;
+  }
+  const obj = input as Record<string, unknown>;
+
+  // Document / image content blocks — Anthropic SDK shape:
+  //   { type: 'document'|'image', source: { type: 'base64', media_type, data: '<b64>' } }
+  if ((obj['type'] === 'document' || obj['type'] === 'image') && typeof obj['source'] === 'object' && obj['source'] !== null) {
+    const source = obj['source'] as Record<string, unknown>;
+    if (source['type'] === 'base64' && typeof source['data'] === 'string') {
+      const sizeBytes = Math.ceil((source['data'].length * 3) / 4); // base64 → byte estimate
+      return {
+        type: obj['type'],
+        size_bytes: sizeBytes,
+        mime: typeof source['media_type'] === 'string' ? source['media_type'] : 'unknown',
+        _phi_safe_summary: true,
+      };
+    }
+  }
+
+  // LLM extraction JSON — recognized by §6 document_type literal + leaf
+  // citations. Replace the entire envelope with a metadata summary.
+  if (obj['document_type'] === 'lab_pdf' && Array.isArray(obj['results'])) {
+    const meta = obj['extraction_metadata'] as Record<string, unknown> | undefined;
+    return {
+      document_type: 'lab_pdf',
+      schema_valid: true,
+      n_facts: (obj['results'] as unknown[]).length,
+      n_uncertain: Array.isArray(meta?.['fields_uncertain']) ? meta['fields_uncertain'].length : 0,
+      _phi_safe_summary: true,
+    };
+  }
+  if (obj['document_type'] === 'intake_form' && typeof obj['demographics'] === 'object') {
+    const meta = obj['extraction_metadata'] as Record<string, unknown> | undefined;
+    const meds = Array.isArray(obj['current_medications']) ? obj['current_medications'].length : 0;
+    const allergies = Array.isArray(obj['allergies']) ? obj['allergies'].length : 0;
+    const family = Array.isArray(obj['family_history']) ? obj['family_history'].length : 0;
+    return {
+      document_type: 'intake_form',
+      schema_valid: true,
+      n_facts: meds + allergies + family + 2, // demographics + chief_concern always present
+      n_uncertain: Array.isArray(meta?.['fields_uncertain']) ? meta['fields_uncertain'].length : 0,
+      n_unsupported: Array.isArray(meta?.['fields_unsupported']) ? meta['fields_unsupported'].length : 0,
+      _phi_safe_summary: true,
+    };
+  }
+
+  return null;
 }
