@@ -11,6 +11,7 @@ import { createChartContextReadTools } from '../tools/chart_context_reads.js';
 import { createGetAllergiesTool } from '../tools/get_allergies.js';
 import { createGetIdentityTool } from '../tools/get_identity.js';
 import { createProposeWriteTools } from '../tools/propose_writes.js';
+import { buildW2DocumentNote, createW2Tools } from './w2_tools.js';
 import { estimateUsdForProviderTokens } from './cost_estimate.js';
 import { todayInFacilityTz } from './local_date.js';
 import { CLINICAL_SYSTEM_PROMPT } from './system_prompt.js';
@@ -550,6 +551,9 @@ export type ChatTurnInput = {
   userMessage: string;
   /** Client-owned stable id for Postgres thread partitioning (RFC-4122). */
   conversation_id?: string | undefined;
+  /** §5 / G2-MVP-36 — when present, the supervisor invokes attach_and_extract first. */
+  docrefUuid?: string | undefined;
+  docType?: 'lab_pdf' | 'intake_form' | undefined;
 };
 
 export async function runChatTurn(
@@ -611,11 +615,20 @@ export async function runChatTurn(
     { conversationInternalId: convRecord.internalId },
   );
 
+  const w2Tools = await createW2Tools({
+    env,
+    pool: deps.pool,
+    sessionToken: input.sessionToken,
+    correlationId,
+    observability,
+  });
+
   const tools = {
     ...createChartContextReadTools(env, input.sessionToken, observability, correlationId),
     get_identity: createGetIdentityTool(env, input.sessionToken, observability, correlationId),
     get_allergies: createGetAllergiesTool(env, input.sessionToken, observability, correlationId),
     ...proposeBundle,
+    ...w2Tools,
   };
 
   const model = getChatModel(env);
@@ -636,10 +649,12 @@ export async function runChatTurn(
   // (carried in the JWT `facility_tz` claim) so the model's "today" matches
   // the operator's wall clock, not UTC. Falls back to UTC when claim absent.
   const today = todayInFacilityTz(new Date(), sessionClaims?.facility_tz ?? null);
+  const w2DocumentNote = buildW2DocumentNote(input.docrefUuid, input.docType);
   const turnHeader =
-    boundEncounterId !== null ?
-      `patient_uuid for this turn: ${input.patientUuid}\nactive_encounter_id for this turn: ${boundEncounterId}\nserver_today: ${today}\n\nUser: ${input.userMessage}`
-    : `patient_uuid for this turn: ${input.patientUuid}\nactive_encounter_id for this turn: <none — the rail was launched without a bound encounter; either an encounter has not been saved yet, or this rail iframe is stale and needs to be reopened after the physician saved the encounter form>\nserver_today: ${today}\n\nUser: ${input.userMessage}`;
+    (boundEncounterId !== null
+      ? `patient_uuid for this turn: ${input.patientUuid}\nactive_encounter_id for this turn: ${boundEncounterId}\nserver_today: ${today}\n\nUser: ${input.userMessage}`
+      : `patient_uuid for this turn: ${input.patientUuid}\nactive_encounter_id for this turn: <none — the rail was launched without a bound encounter; either an encounter has not been saved yet, or this rail iframe is stale and needs to be reopened after the physician saved the encounter form>\nserver_today: ${today}\n\nUser: ${input.userMessage}`)
+    + w2DocumentNote;
 
   const llmStartedAtMs = Date.now();
   const result = await generateText({
