@@ -25,6 +25,11 @@ export const envSchema = z.object({
   CUI_ALLOWED_ORIGINS: z.string().min(1),
   SESSION_TOKEN_SECRET: z.string().min(32),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']),
+  // §8 / G2-MVP-53 — Cohere Rerank API key. The W2 hybrid retriever feeds
+  // Cohere Rerank with the union of sparse + dense candidates and returns
+  // the top 3-5 to the supervisor. Required at boot so misconfigured
+  // deployments fail loud rather than silently degrading retrieval.
+  COHERE_API_KEY: z.string().min(1),
 });
 
 export type Env = z.infer<typeof envSchema>;

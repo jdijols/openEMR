@@ -15,7 +15,10 @@ services:
 
   # Skeleton only (Gate 0) — images/health/volumes finalized in Gate 6.
   postgres:
-    image: postgres:16-alpine
+    # G2-MVP-50: pgvector swap for W2 RAG. Same Postgres 16, plus the
+    # vector extension. Existing W1 transcripts/Langfuse schemas come up
+    # unchanged on first restart.
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: agentforge
       POSTGRES_PASSWORD: agentforge

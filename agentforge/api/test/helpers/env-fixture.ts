@@ -15,6 +15,7 @@ export function testEnv(overrides: Partial<Record<string, string>> = {}): Env {
     LANGFUSE_SECRET_KEY: 'sk-test',
     CUI_ALLOWED_ORIGINS: 'http://localhost:5173',
     SESSION_TOKEN_SECRET: '0123456789abcdef0123456789abcdef01234567',
+    COHERE_API_KEY: 'test-cohere-key',
     LOG_LEVEL: 'info',
     ...overrides,
   };
