@@ -49,6 +49,7 @@ Milestones are organized by cohort week under `process/milestones/week-N/`, with
 | #   | File                                                                          | Purpose                                          |
 | --- | ----------------------------------------------------------------------------- | ------------------------------------------------ |
 | 1   | [process/milestones/week-2/01-local-dev-recovery-runbook.md](process/milestones/week-2/01-local-dev-recovery-runbook.md) | **Local-dev recovery runbook:** what to do when `localhost:8300` shows the OpenEMR Setup wizard (`sitesvolume` reset to baseline) — diagnostic check, sqlconf patch, why the VPS is unaffected; first observed 2026-05-04 |
+| 2   | [process/milestones/week-2/02-architecture-and-task-plan.md](process/milestones/week-2/02-architecture-and-task-plan.md) | **W2 architecture + task plan locked:** brief-compliant [`W2_ARCHITECTURE.md`](../../W2_ARCHITECTURE.md) (probe-validated Claude PDF/Vision extraction with `pdf-parse` cross-check, `pgvector` RAG, supervisor + 2 workers, citation contract + UI, 50-case eval gate) + gated [`TASKS.md`](../../TASKS.md) (3 gates, ~90 task IDs, S12 brief's hard gate); cohort sample patients planned as new-patient appointments; pre-implementation phase complete |
 
 
 ## Demo data seeding (local Docker)
