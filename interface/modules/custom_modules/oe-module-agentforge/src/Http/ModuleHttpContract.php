@@ -52,6 +52,8 @@ final class ModuleHttpContract
             WriteVitals::RELATIVE_SCRIPT_PATH,
             WriteTobacco::RELATIVE_SCRIPT_PATH,
             WriteAllergy::RELATIVE_SCRIPT_PATH,
+            UploadDocument::RELATIVE_SCRIPT_PATH,
+            ReadDocumentBytes::RELATIVE_SCRIPT_PATH,
         ];
         sort($paths);
 

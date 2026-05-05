@@ -12,6 +12,8 @@
     "write/chief_complaint.php",
     "write/vitals.php",
     "write/tobacco.php",
-    "write/allergy.php"
+    "write/allergy.php",
+    "upload/document.php",
+    "document/bytes.php"
   ]
 }

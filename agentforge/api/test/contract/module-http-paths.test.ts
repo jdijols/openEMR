@@ -7,6 +7,6 @@ describe('module HTTP contract drift', () => {
     const fromJson = [...moduleJson.paths].sort();
     const fromTs = [...MODULE_HTTP_PATHS].sort();
     expect(fromTs).toEqual(fromJson);
-    expect(fromTs).toHaveLength(13);
+    expect(fromTs).toHaveLength(15);
   });
 });
