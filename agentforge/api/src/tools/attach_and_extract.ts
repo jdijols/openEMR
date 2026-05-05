@@ -115,6 +115,15 @@ export async function runAttachAndExtract(
 
     return { ok: true, result };
   } catch (e) {
+    // Print the underlying exception so dev tail can debug without a Langfuse round-trip.
+    console.error('attach_and_extract_threw', {
+      correlation_id: deps.correlationId,
+      doc_type: input.doc_type,
+      docref_uuid_prefix: input.docref_uuid.slice(0, 8),
+      error_message: e instanceof Error ? e.message : String(e),
+      error_name: e instanceof Error ? e.name : 'unknown',
+      stack_head: e instanceof Error && typeof e.stack === 'string' ? e.stack.split('\n').slice(0, 5).join('\n') : null,
+    });
     await span.end({ error: e });
     return { ok: false, error: 'openemr_error' };
   }

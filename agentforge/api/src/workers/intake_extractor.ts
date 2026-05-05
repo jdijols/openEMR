@@ -123,9 +123,38 @@ export async function runIntakeExtractor(
   const outputTokens = (llmResponse as unknown as { usage?: { output_tokens?: number } }).usage?.output_tokens ?? 0;
 
   const llmJson = extractJsonFromResponse(llmResponse);
+
+  // The LLM does not know our internal UUIDs — `patient_uuid` (system
+  // canonical) and `source_document_id` (the DocRef we minted at upload)
+  // can only be supplied by the caller. Inject them before Zod, and
+  // overwrite every leaf citation's `source_id` + `source_type` so the
+  // schema's `quote_or_value` cross-check still has a coherent envelope.
+  if (llmJson !== null && typeof llmJson === 'object' && !Array.isArray(llmJson)) {
+    const obj = llmJson as Record<string, unknown>;
+    obj['document_type'] = input.docType;
+    obj['patient_uuid'] = input.patientUuidCanonical;
+    obj['source_document_id'] = input.docrefUuid;
+    injectDocRefIntoCitations(obj, input.docrefUuid, input.docType);
+  }
+
   const schema = input.docType === 'lab_pdf' ? LabPdfExtractionSchema : IntakeFormSchema;
   const parsed = schema.safeParse(llmJson);
   if (!parsed.success) {
+    // Diagnostic: keys present + first few Zod issues. PHI-safe (paths only,
+    // no values). Remove or downgrade to debug after the smoke is green.
+    const obj = (llmJson !== null && typeof llmJson === 'object' && !Array.isArray(llmJson))
+      ? (llmJson as Record<string, unknown>)
+      : {};
+    console.error('intake_extractor_schema_fail', {
+      docType: input.docType,
+      llm_returned_object: llmJson !== null && typeof llmJson === 'object',
+      top_level_keys: Object.keys(obj),
+      issues: parsed.error.issues.slice(0, 8).map((iss) => ({
+        path: iss.path.join('.'),
+        code: iss.code,
+        message: iss.message,
+      })),
+    });
     return {
       schemaValid: false,
       extraction: null,
@@ -189,38 +218,162 @@ function bytesToBase64(bytes: Uint8Array): string {
 function buildPromptForDocType(docType: 'lab_pdf' | 'intake_form'): string {
   if (docType === 'lab_pdf') {
     return [
-      'You are extracting a clinical lab report. Return ONLY a JSON object conforming to LabPdfExtractionSchema.',
-      'Required top-level keys: document_type="lab_pdf", patient_uuid (UUID), source_document_id, ordering_provider, performing_lab, results, extraction_metadata.',
-      'For each result populate test_name, value, unit, reference_range_low/high or reference_range_text, collection_date (ISO 8601), abnormal_flag (one of normal|low|high|critical_low|critical_high|abnormal|unknown), and a citation (source_type="lab_pdf", source_id=document UUID, page_or_section like "page:1", field_or_chunk_id, quote_or_value as VERBATIM source text).',
-      'Do NOT invent values. If a field is not visible, list its name in extraction_metadata.fields_uncertain and omit the result row entirely.',
-      'No prose; emit raw JSON.',
-    ].join('\n\n');
+      'You are extracting a clinical lab report. Return ONLY a JSON object — no prose, no markdown fences — matching this exact shape:',
+      '```',
+      '{',
+      '  "ordering_provider": "<name>" | null,',
+      '  "performing_lab": "<name>" | null,',
+      '  "results": [',
+      '    {',
+      '      "test_name": "<verbatim test name>",',
+      '      "loinc": "<code>" | null,',
+      '      "value": <number> | "<string for non-numeric>",',
+      '      "unit": "<unit>" | null,',
+      '      "reference_range_low": <number> | null,',
+      '      "reference_range_high": <number> | null,',
+      '      "reference_range_text": "<verbatim range text>" | null,',
+      '      "collection_date": "<ISO 8601 date>",',
+      '      "abnormal_flag": "normal" | "low" | "high" | "critical_low" | "critical_high" | "abnormal" | "unknown",',
+      '      "citation": {',
+      '        "source_type": "lab_pdf",',
+      '        "source_id": "<docref>",',
+      '        "page_or_section": "page:1",',
+      '        "field_or_chunk_id": "<short label>",',
+      '        "quote_or_value": "<EXACT verbatim text from PDF, must appear character-for-character>"',
+      '      }',
+      '    }',
+      '  ],',
+      '  "extraction_metadata": {',
+      '    "pages_processed": <int>,',
+      '    "overall_confidence": "high" | "medium" | "low",',
+      '    "fields_uncertain": ["<field name>", ...]',
+      '  }',
+      '}',
+      '```',
+      'Use EXACTLY these JSON keys — do not rename. Use `null` (not omission) for unknown values. Do NOT invent values: if a result row is unreadable, drop the row and add its name to `fields_uncertain`. quote_or_value MUST be a substring of the source PDF.',
+      'Do NOT include `document_type`, `patient_uuid`, or `source_document_id` — the caller injects those. Emit ONLY the raw JSON object, no markdown fences.',
+    ].join('\n');
   }
   return [
-    'You are extracting a patient intake form. Return ONLY a JSON object conforming to IntakeFormSchema.',
-    'Required keys: document_type="intake_form", patient_uuid, source_document_id, demographics, chief_concern, current_medications, allergies, family_history, extraction_metadata.',
-    'Every leaf observation (each medication, each allergy, each family-history entry, demographics, chief_concern) must include a citation with verbatim quote_or_value drawn from the source.',
-    'Do NOT invent values. If a field is requested but not visible, list its name in extraction_metadata.fields_unsupported.',
-    'No prose; emit raw JSON.',
-  ].join('\n\n');
+    'You are extracting a patient intake form. Return ONLY a JSON object — no prose, no markdown fences — matching this exact shape:',
+    '```',
+    '{',
+    '  "demographics": {',
+    '    "name": "<full name>" | null,',
+    '    "dob": "<YYYY-MM-DD>" | null,',
+    '    "sex": "male" | "female" | "other" | "unknown" | null,',
+    '    "contact_phone": "<phone>" | null,',
+    '    "citation": {',
+    '      "source_type": "intake_form",',
+    '      "source_id": "<docref>",',
+    '      "page_or_section": "Demographics",',
+    '      "field_or_chunk_id": "demographics",',
+    '      "quote_or_value": "<verbatim quote from form>"',
+    '    }',
+    '  },',
+    '  "chief_concern": {',
+    '    "text": "<verbatim chief concern>",',
+    '    "onset": "<duration>" | null,',
+    '    "citation": { ...same shape as above, page_or_section: "Chief Concern" }',
+    '  },',
+    '  "current_medications": [',
+    '    { "name": "<drug>", "dose": "<dose>" | null, "frequency": "<freq>" | null, "citation": { ... } },',
+    '    ...',
+    '  ],',
+    '  "allergies": [',
+    '    { "substance": "<drug/agent>", "reaction": "<reaction>" | null, "severity": "mild" | "moderate" | "severe" | "unknown" | null, "citation": { ... } },',
+    '    ...',
+    '  ],',
+    '  "family_history": [',
+    '    { "relation": "<father/mother/sibling/...>", "condition": "<condition>", "citation": { ... } },',
+    '    ...',
+    '  ],',
+    '  "extraction_metadata": {',
+    '    "pages_processed": <int>,',
+    '    "overall_confidence": "high" | "medium" | "low",',
+    '    "fields_uncertain": ["<field name>", ...],',
+    '    "fields_unsupported": ["<field requested but not visible>", ...]',
+    '  }',
+    '}',
+    '```',
+    'Use EXACTLY these JSON keys — do not rename, do not nest under additional wrappers like `personal_details`, `legal_name`, `date_of_birth`, `phone`. Use `null` (not omission) for unknown values. Every leaf observation MUST include `citation` with `quote_or_value` as a verbatim substring of the form. Empty arrays (`[]`) are fine when a section has no entries.',
+    'Do NOT include `document_type`, `patient_uuid`, or `source_document_id` — the caller injects those. Do NOT include extra top-level keys like `emergency_contact`, `health_insurance`, `treating_physicians`, `past_medical_surgical_history`, `social_history` — they are out of scope. Emit ONLY the raw JSON object, no markdown fences.',
+  ].join('\n');
+}
+
+/**
+ * Walk every nested object and overwrite each `citation` field's
+ * `source_id` + `source_type` to match the caller-provided DocRef. The
+ * LLM names citations correctly enough but cannot know our internal IDs.
+ */
+function injectDocRefIntoCitations(value: unknown, docrefUuid: string, docType: 'lab_pdf' | 'intake_form'): void {
+  if (value === null || typeof value !== 'object') {
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      injectDocRefIntoCitations(item, docrefUuid, docType);
+    }
+    return;
+  }
+  const o = value as Record<string, unknown>;
+  for (const [k, v] of Object.entries(o)) {
+    if (k === 'citation' && v !== null && typeof v === 'object' && !Array.isArray(v)) {
+      const c = v as Record<string, unknown>;
+      c['source_id'] = docrefUuid;
+      c['source_type'] = docType;
+    } else {
+      injectDocRefIntoCitations(v, docrefUuid, docType);
+    }
+  }
 }
 
 function extractJsonFromResponse(response: unknown): unknown {
   const content = (response as { content?: ReadonlyArray<{ type?: string; text?: string }> }).content ?? [];
   for (const block of content) {
-    if (block.type === 'text' && typeof block.text === 'string') {
-      const trimmed = block.text.trim();
-      const start = trimmed.indexOf('{');
-      const end = trimmed.lastIndexOf('}');
-      if (start >= 0 && end > start) {
-        try {
-          return JSON.parse(trimmed.slice(start, end + 1));
-        } catch {
-          return null;
-        }
+    if (block.type !== 'text' || typeof block.text !== 'string') {
+      continue;
+    }
+    let raw = block.text.trim();
+
+    // Strip markdown fences: ```json ... ``` or ``` ... ```.
+    const fence = raw.match(/^```(?:json)?\s*\n([\s\S]*?)\n?```$/);
+    if (fence) {
+      raw = fence[1]?.trim() ?? raw;
+    }
+
+    // Find the outermost `{...}` block. Try parsing; on failure, scan
+    // inward for a smaller balanced object (Claude sometimes appends prose
+    // after the JSON).
+    const start = raw.indexOf('{');
+    if (start < 0) {
+      continue;
+    }
+    for (let end = raw.lastIndexOf('}'); end > start; end = raw.lastIndexOf('}', end - 1)) {
+      try {
+        return JSON.parse(raw.slice(start, end + 1));
+      } catch {
+        // Try a tighter slice.
       }
     }
+
+    // This block had `{` but no parse worked — log the head so we can debug.
+    console.error('intake_extractor_unparseable_text_block', {
+      head: raw.slice(0, 400),
+      tail: raw.slice(-200),
+      length: raw.length,
+    });
   }
+
+  // No content block yielded JSON. Log the response shape so we can see
+  // what Claude actually returned.
+  const blocks = (response as { content?: ReadonlyArray<{ type?: string; text?: string }> }).content ?? [];
+  console.error('intake_extractor_no_json_in_response', {
+    block_count: blocks.length,
+    block_types: blocks.map((b) => b.type),
+    first_text_head: blocks.find((b) => b.type === 'text')?.text?.slice(0, 400),
+  });
+
   return null;
 }
 

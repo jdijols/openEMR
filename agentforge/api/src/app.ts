@@ -132,6 +132,10 @@ const chatRequestSchema = z.object({
   patient_uuid: z.string().min(1),
   message: z.string().min(1),
   conversation_id: z.string().uuid().optional(),
+  // §5 / G2-MVP-36 — when present, the supervisor invokes attach_and_extract
+  // before answering. Both keys must be supplied together to take effect.
+  docref_uuid: z.string().min(1).optional(),
+  doc_type: z.enum(['lab_pdf', 'intake_form']).optional(),
 });
 
 const presentPatientSchema = z.object({
@@ -282,6 +286,8 @@ export function buildApp(
           patientUuid: parsed.data.patient_uuid,
           userMessage: parsed.data.message,
           conversation_id: parsed.data.conversation_id,
+          docrefUuid: parsed.data.docref_uuid,
+          docType: parsed.data.doc_type,
         },
         correlationId,
         { pool },
@@ -295,6 +301,8 @@ export function buildApp(
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'error';
+      // Print the underlying exception so dev tail can debug without a Langfuse round-trip.
+      console.error('chat_internal_error', { correlation_id: correlationId, error: e });
       if (isLlmConfigError(msg)) {
         return c.json({ error: 'misconfigured', correlation_id: correlationId }, 501);
       }

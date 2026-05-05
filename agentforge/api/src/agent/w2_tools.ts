@@ -49,13 +49,24 @@ async function getClients(env: Env): Promise<CachedClients> {
     return fn(text);
   };
 
-  // Lazy pdf-parse import (heavy parser; only loaded when first PDF is processed).
+  // Lazy pdf-parse import (heavy parser; only loaded when first PDF is
+  // processed). Pinned at 1.1.1 because the 2.x rewrite ships a class-
+  // based API not worth integrating for a 1-line use case. We import the
+  // *inner* lib file directly because pdf-parse 1.1.1's `index.js` has a
+  // famous leftover debug branch that calls `readFileSync` on a missing
+  // test fixture under modern Node ESM dynamic import — see
+  // https://gitlab.com/autokent/pdf-parse/-/issues/24.
   let pdfParseModulePromise: Promise<(buf: Buffer) => Promise<{ text: string }>> | null = null;
   const pdfParseFn: IntakeExtractorDeps['pdfParseFn'] = async (bytes: Uint8Array) => {
     if (pdfParseModulePromise === null) {
       pdfParseModulePromise = (async () => {
-        const mod = await import('pdf-parse');
-        const fn = (mod as unknown as { default: (buf: Buffer) => Promise<{ text: string }> }).default;
+        const mod = (await import('pdf-parse/lib/pdf-parse.js')) as unknown as {
+          default?: (buf: Buffer) => Promise<{ text: string }>;
+        };
+        const fn = mod.default;
+        if (typeof fn !== 'function') {
+          throw new Error('pdf_parse_default_export_missing');
+        }
         return fn;
       })();
     }
@@ -69,7 +80,10 @@ async function getClients(env: Env): Promise<CachedClients> {
 
 /**
  * HTTP fetch for /document/bytes.php — same-session ACL is enforced server-side
- * by ChartContextGate; the agent forwards its session_token + patient_uuid.
+ * by ChartContextGate's trusted-agent path. The agent forwards
+ * `X-Internal-Auth` (= OPENEMR_MODULE_SHARED_SECRET) so the gate skips the
+ * browser-cookie check, plus the session_token + patient_uuid in the query
+ * string for the binding check that follows.
  */
 function makeBytesFetcher(env: Env, sessionToken: string): DocumentBytesFetcher {
   return async ({ docrefUuid, patientUuidCanonical }) => {
@@ -78,7 +92,13 @@ function makeBytesFetcher(env: Env, sessionToken: string): DocumentBytesFetcher 
     url.searchParams.set('session_token', sessionToken);
     url.searchParams.set('patient_uuid', patientUuidCanonical);
 
-    const resp = await fetch(url, { method: 'GET' });
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'X-Internal-Auth': env.OPENEMR_MODULE_SHARED_SECRET,
+        'X-Correlation-Id': `attach-and-extract-${docrefUuid.slice(0, 8)}`,
+      },
+    });
     if (resp.status === 404) {
       return null;
     }
