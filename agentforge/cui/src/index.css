@@ -26,13 +26,6 @@
     "Lato", "Helvetica Neue", Helvetica, Arial, sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 
-  /* Display — Cal Sans (single-weight SemiBold). Applied selectively to
-     the brand-touching surfaces (panel title, empty-state hero, section
-     subtitles) so the CUI echoes the favicon and OG-card typography.
-     Lato stays the body workhorse for chat / proposals / alerts. */
-  --af-font-display:
-    "Cal Sans", "Lato", "Helvetica Neue", Helvetica, Arial, sans-serif;
-
   /* Brand — OpenEMR Bootstrap 4.6 ($blue / $green / $yellow / $red / $cyan).
      `*-50` and `*-600` are tinted/shaded peers used for subtle backgrounds and
      hover states; they're derived from the primary swatch, not Tailwind. */
@@ -209,7 +202,6 @@ body {
 }
 
 .agentforge-cui__title {
-  font-family: var(--af-font-display);
   font-size: var(--af-text-title);
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -357,7 +349,6 @@ body {
 }
 
 .agentforge-cui__subtitle {
-  font-family: var(--af-font-display);
   font-size: var(--af-text-section);
   margin: 0 0 var(--af-s1);
   font-weight: 600;
@@ -1227,7 +1218,6 @@ body {
 }
 
 .agentforge-cui__empty-title {
-  font-family: var(--af-font-display);
   margin: 0;
   font-size: var(--af-text-section);
   font-weight: 600;
