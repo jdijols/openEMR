@@ -1,7 +1,7 @@
 ---
 date: 2026-04-28
 topic: Cluster 5 — Performance audit
-related_milestone: process/06-stage3-audit.md
+related_milestone: process/milestones/week-1/06-stage3-audit.md
 ---
 
 # Cluster 5 — Performance audit — session journal
@@ -20,31 +20,31 @@ Cluster 2 established OpenEMR as a hybrid legacy/modern app with `interface/glob
 
 - **Prompt:** "Likely bottlenecks for retrieving adult PCP chart context."
 - **Recommendation:** Record that OpenEMR has no single cheap chart-summary read; the v1 context requires a bounded multi-source bundle across demographics, encounters, lists, prescriptions, vitals, labs, notes/documents, and history. Unbounded reads are the primary latency risk.
-- **Outcome:** [`AUDIT.md` §Performance-1](../../../../AUDIT.md#performance-1-adult-pcp-chart-context-is-currently-a-multi-read-aggregation-not-a-single-low-latency-chart-summary) landed; presearch §2 now frames expected query volume and latency as source-bundle measurements.
+- **Outcome:** [`AUDIT.md` §Performance-1](../../../../../AUDIT.md#performance-1-adult-pcp-chart-context-is-currently-a-multi-read-aggregation-not-a-single-low-latency-chart-summary) landed; presearch §2 now frames expected query volume and latency as source-bundle measurements.
 
 ### Decision: Identify query amplification before API preference
 
 - **Prompt:** "Query shape and join complexity for encounters, problems, allergies, meds, vitals, labs, notes/documents, and history."
 - **Recommendation:** Capture the wide joins, medication union, vitals/detail fan-out, lab procedure/report/result lineage, and PHP hydration/dedup behavior before deciding REST/FHIR vs internal services. The final answer may be short, but retrieval work can still be large.
-- **Outcome:** [`AUDIT.md` §Performance-2](../../../../AUDIT.md#performance-2-chart-relevant-service-queries-use-wide-joins-unions-and-one-to-many-hydration-that-can-grow-faster-than-the-final-summary) landed; presearch §7 now requires explicit bounds and performance-envelope reporting on tool results.
+- **Outcome:** [`AUDIT.md` §Performance-2](../../../../../AUDIT.md#performance-2-chart-relevant-service-queries-use-wide-joins-unions-and-one-to-many-hydration-that-can-grow-faster-than-the-final-summary) landed; presearch §7 now requires explicit bounds and performance-envelope reporting on tool results.
 
 ### Decision: Keep REST/FHIR as a measured trade-off, not an assumption
 
 - **Prompt:** "REST/FHIR vs internal service/query performance trade-offs."
 - **Recommendation:** Preserve REST/FHIR as the cleaner security/extraction boundary, but document the per-call API bootstrap, FHIR serialization, per-resource filtering, and uneven pagination behavior that could hurt latency. Internal service calls may be faster but must prove authorization and audit parity.
-- **Outcome:** [`AUDIT.md` §Performance-3](../../../../AUDIT.md#performance-3-restfhir-is-cleaner-as-a-boundary-but-adds-per-resource-overhead-and-uneven-pagination-behavior) landed; presearch §2 and §6 now require measuring the same chart bundle through candidate read boundaries.
+- **Outcome:** [`AUDIT.md` §Performance-3](../../../../../AUDIT.md#performance-3-restfhir-is-cleaner-as-a-boundary-but-adds-per-resource-overhead-and-uneven-pagination-behavior) landed; presearch §2 and §6 now require measuring the same chart bundle through candidate read boundaries.
 
 ### Decision: Defer model choice until payload/context measurements exist
 
 - **Prompt:** "Fill presearch §6 LLM Selection only as far as performance/context-window evidence supports."
 - **Recommendation:** Do not pick GPT/Claude/open-source yet. The evidence only supports measuring bytes/tokens by source family, especially notes/documents, FHIR bundles, and broad Observation reads, then selecting a model that fits latency, structured-output, citation, and compliance constraints.
-- **Outcome:** [`AUDIT.md` §Performance-4](../../../../AUDIT.md#performance-4-payload-and-context-window-risk-comes-from-wide-clinical-rows-documents-fhir-wrappers-and-observation-expansion) landed; presearch §6 now contains performance/context-window constraints without selecting a model.
+- **Outcome:** [`AUDIT.md` §Performance-4](../../../../../AUDIT.md#performance-4-payload-and-context-window-risk-comes-from-wide-clinical-rows-documents-fhir-wrappers-and-observation-expansion) landed; presearch §6 now contains performance/context-window constraints without selecting a model.
 
 ### Decision: Make observability PHI-minimized from the start
 
 - **Prompt:** "Caching/precomputation opportunities and risks, especially PHI/cache invalidation. What must be measured before choosing final architecture."
 - **Recommendation:** Current OpenEMR logging/audit settings can store PHI-bearing API responses and SQL/request details, while the reviewed cache surfaces are not chart-summary caches. Measurement and caching must record timings, counts, ids, and errors without storing full chart text by default.
-- **Outcome:** [`AUDIT.md` §Performance-5](../../../../AUDIT.md#performance-5-caching-and-observability-can-improve-latency-but-are-phi-sensitive-and-invalidation-heavy) landed; presearch §8 now defines latency, payload, LLM, cache, and safety metrics.
+- **Outcome:** [`AUDIT.md` §Performance-5](../../../../../AUDIT.md#performance-5-caching-and-observability-can-improve-latency-but-are-phi-sensitive-and-invalidation-heavy) landed; presearch §8 now defines latency, payload, LLM, cache, and safety metrics.
 
 ## Trade-offs and alternatives
 
@@ -62,8 +62,8 @@ Reviewed representative paths: `src/Services/EncounterService.php`, `src/Service
 ## Files touched
 
 - **Modified:** `AUDIT.md` (added `Performance-1` through `Performance-5`; expanded Performance methodology).
-- **Modified:** `Documentation/AgentForge/process/03-presearch-checklist.md` (§2, §6, §7, §8).
-- **Modified:** `Documentation/AgentForge/process/06-stage3-audit.md` (Cluster 5 status → Done; status checklist ticked).
+- **Modified:** `Documentation/AgentForge/process/milestones/week-1/03-presearch-checklist.md` (§2, §6, §7, §8).
+- **Modified:** `Documentation/AgentForge/process/milestones/week-1/06-stage3-audit.md` (Cluster 5 status → Done; status checklist ticked).
 - **Created:** `Documentation/AgentForge/process/journal/week-1/0428-T0225-cluster-5-performance-audit.md` (this file).
 
 ## Outcomes
@@ -86,7 +86,7 @@ Cluster 5 is complete. AgentForge now has evidence-backed performance constraint
 
 ## Links
 
-- Hard-gate deliverable: [`AUDIT.md`](../../../../AUDIT.md)
-- Process pointer for Stage 3: [`process/06-stage3-audit.md`](../../06-stage3-audit.md)
-- Presearch checklist: [`process/03-presearch-checklist.md`](../../03-presearch-checklist.md)
+- Hard-gate deliverable: [`AUDIT.md`](../../../../../AUDIT.md)
+- Process pointer for Stage 3: [`process/milestones/week-1/06-stage3-audit.md`](../../milestones/week-1/06-stage3-audit.md)
+- Presearch checklist: [`process/milestones/week-1/03-presearch-checklist.md`](../../milestones/week-1/03-presearch-checklist.md)
 - Prior data-quality/eval audit: [`0428-T0210-cluster-4-data-quality-eval.md`](0428-T0210-cluster-4-data-quality-eval.md)

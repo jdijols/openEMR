@@ -1,7 +1,7 @@
 # Gate 0 close — scaffold + contract spine
 
 **Time:** 2026-04-29 (local)  
-**Refs:** [`TASKS.md`](../../implementation/TASKS.md) (Gate 0), [`PRD.md`](../../../../PRD.md) §3.2 §3.4 §5.1.1 §7.1.1 §11.1 §4.9.1
+**Refs:** [`TASKS.md`](../../../../../TASKS.md) (Gate 0), [`PRD.md`](../../../../../PRD.md) §3.2 §3.4 §5.1.1 §7.1.1 §11.1 §4.9.1
 
 ## Exit criteria (task list)
 

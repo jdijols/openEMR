@@ -1,7 +1,7 @@
 ---
 date: 2026-04-30
 topic: Dictation ↔ typed parity — route dictation through /chat so proposals fire
-related_milestone: process/14-gate4-complete.md
+related_milestone: process/milestones/week-1/14-gate4-complete.md
 ---
 
 # Dictation ↔ typed parity — session journal
@@ -88,5 +88,5 @@ Gate 4 (UC-B) + Gate 5 (STT) engineering closed earlier today. Manual smoke expo
 
 - Previous journal: [`0430-T2256-mic-enabled-on-load-and-assemblyai-stt.md`](./0430-T2256-mic-enabled-on-load-and-assemblyai-stt.md) — flagged this exact follow-up.
 - Gate 5 manual checklist: [`0430-T2145-gate5-stt-uc-c-manual-smoke.md`](./0430-T2145-gate5-stt-uc-c-manual-smoke.md).
-- Gate 4 milestone: [`process/14-gate4-complete.md`](../../14-gate4-complete.md).
+- Gate 4 milestone: [`process/milestones/week-1/14-gate4-complete.md`](../../milestones/week-1/14-gate4-complete.md).
 - Task list: [`TASKS.md`](../../../../../TASKS.md) (G5-08 row).

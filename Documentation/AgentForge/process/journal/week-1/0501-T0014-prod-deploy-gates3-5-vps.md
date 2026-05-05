@@ -1,7 +1,7 @@
 ---
 date: 2026-05-01
 topic: Prod VPS deploy of Gates 3–5 + STT (commit `d2b8f3621`); manual smoke surfaced 3 agent-side bugs
-related_milestone: process/14-gate4-complete.md
+related_milestone: process/milestones/week-1/14-gate4-complete.md
 ---
 
 # Prod VPS deploy of Gates 3–5 + AssemblyAI STT — session journal
@@ -25,7 +25,7 @@ Earlier in the day Gates 3, 4, and the Gate 5 STT polish all closed in dev (see 
 ### Decision: squash 150+ files into one commit instead of splitting per gate
 
 - **Prompt:** "Squash into one commit."
-- **Recommendation:** GitLab history value of per-gate commits is small here because the [process docs 12–14](../../14-gate4-complete.md) and the dated journals already give a richer audit trail than git commits would. Squash keeps focus on the deploy tonight; we can rewrite history later if it ever matters.
+- **Recommendation:** GitLab history value of per-gate commits is small here because the [process docs 12–14](../../milestones/week-1/14-gate4-complete.md) and the dated journals already give a richer audit trail than git commits would. Squash keeps focus on the deploy tonight; we can rewrite history later if it ever matters.
 - **Outcome:** `d2b8f3621 feat(agentforge): close Gates 3-5 — auto case presentation, write actions, dictation via AssemblyAI` (157 files, +14,795 / −296). `Assisted-by: Cursor` trailer per CLAUDE.md.
 
 ### Decision: symlink-band-aid the Caddyfile path again (option B) instead of fixing it upstream
@@ -112,4 +112,4 @@ Earlier in the day Gates 3, 4, and the Gate 5 STT polish all closed in dev (see 
   - Gate 4: [`0430-T2230-gate4-g410-uc-b-smoke.md`](./0430-T2230-gate4-g410-uc-b-smoke.md)
   - Gate 5: [`0430-T2256-mic-enabled-on-load-and-assemblyai-stt.md`](./0430-T2256-mic-enabled-on-load-and-assemblyai-stt.md), [`0430-T2314-dictation-agent-parity.md`](./0430-T2314-dictation-agent-parity.md)
 - Bug log this deploy spawned: [`implementation/post-deploy-bug-log.md`](../../../implementation/post-deploy-bug-log.md)
-- Milestones: [`process/14-gate4-complete.md`](../../14-gate4-complete.md).
+- Milestones: [`process/milestones/week-1/14-gate4-complete.md`](../../milestones/week-1/14-gate4-complete.md).

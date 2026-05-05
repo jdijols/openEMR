@@ -1,7 +1,7 @@
 # Stage 15 — Gate 6 complete (engineering)
 
 **Purpose:** Record closure of **Gate 6 — Eval + Observability + Deploy**
-from [`TASKS.md`](../../../TASKS.md):
+from [`TASKS.md`](../../../../../TASKS.md):
 two-vhost Caddyfile, preflight credential gate, PHI redactor (S7),
 LLM provider swap (Anthropic + Azure OpenAI), Synthea fixtures + 13
 curated/adversarial cases, §8 security baseline script, demo storyboard,
@@ -18,7 +18,7 @@ gate on that manual smoke.
 
 **Gate 6** — Task list **CLOSED (engineering)** (2026-05-01) for
 G6-01..G6-18 + G6-20. Session journal:
-[`journal/week-1/0501-T1558-gate6-closed-eval-llm-repair.md`](journal/week-1/0501-T1558-gate6-closed-eval-llm-repair.md).
+[`journal/week-1/0501-T1558-gate6-closed-eval-llm-repair.md`](../../journal/week-1/0501-T1558-gate6-closed-eval-llm-repair.md).
 Final regression sweep:
 
 - API Vitest: **140 passed / 1 skipped** (`agentforge/api && npm test`).
@@ -92,7 +92,7 @@ Final regression sweep:
 ## Next
 
 **Gate 7** — Submission Bundle. See
-[`TASKS.md` § Gate 7](../../../TASKS.md#gate-7--submission-bundle):
+[`TASKS.md` § Gate 7](../../../../../TASKS.md#gate-7--submission-bundle):
 Loom recording (UC-A + UC-B propose→confirm→write + UC-C + refusal),
 social post, `submission.md` URL bundle, final §13.4 checklist,
 `ai-cost-analysis.md` cost appendix (G7-07), and the 11:45 cellular

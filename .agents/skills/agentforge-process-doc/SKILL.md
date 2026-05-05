@@ -1,6 +1,6 @@
 ---
 name: agentforge-process-doc
-description: Capture AgentForge process documentation at the end of a chat or when adding a new numbered process file. Use when the user says "process documentation", "add process file to documentation", "compact and document", "document this session", or asks to update the AgentForge process trail. Summarizes user goals, trade-offs, tools/dependencies, files touched, and a Key Decisions log (user prompt + agent recommendation summary at each pivot). Adds the next `process/NN-<slug>.md` and keeps the README trail table coherent under `Documentation/AgentForge/`.
+description: Capture AgentForge process documentation at the end of a chat or when adding a new numbered process file. Use when the user says "process documentation", "add process file to documentation", "compact and document", "document this session", or asks to update the AgentForge process trail. Summarizes user goals, trade-offs, tools/dependencies, files touched, and a Key Decisions log (user prompt + agent recommendation summary at each pivot). Adds the next `process/milestones/week-N/NN-<slug>.md` (numbering restarts per week) and keeps the README trail table coherent under `Documentation/AgentForge/`.
 ---
 
 # AgentForge process documentation
@@ -8,7 +8,7 @@ description: Capture AgentForge process documentation at the end of a chat or wh
 This skill keeps the **AgentForge process trail** in [Documentation/AgentForge/](../../../Documentation/AgentForge/) honest and easy to extend. It runs in two situations (often together):
 
 - **Compact and document** — end of a chat session: distill what happened into a dated journal entry.
-- **Add process file** — promote work into the numbered trail (`process/NN-<slug>.md`) and update the README index.
+- **Add process file** — promote work into the numbered trail (`process/milestones/week-N/NN-<slug>.md`) and update the README index.
 
 > Canonical root for everything in this skill: `Documentation/AgentForge/`. Never write to `docs/agentforge/`. If you find that path in any file, fix it (see "Repo hygiene").
 
@@ -85,17 +85,17 @@ Format example (also in `SESSION-JOURNAL-TEMPLATE.md`):
 
 - **Prompt:** "option A (Documentation/AgentForge) since I made that change to the file structure and if it conflicts with the current readme text, then update the readme as necessary to make it coherent"
 - **Recommendation:** Treat `Documentation/AgentForge/` as the single source of truth and patch any stale `docs/agentforge/` references (root README, process frontmatter) to match.
-- **Outcome:** Root [README.md](../../../../README.md) and [process/02-tooling-and-skills.md](../../02-tooling-and-skills.md) updated.
+- **Outcome:** Root [README.md](../../../../../README.md) and [process/milestones/week-1/02-tooling-and-skills.md](../../milestones/week-1/02-tooling-and-skills.md) updated.
 ```
 
-> Relative links inside a journal entry are written from `Documentation/AgentForge/process/journal/week-N/`. From there: repo root is `../../../../`, the AgentForge folder is `../../../`, the `process/` folder is `../../`, and the parent `journal/` folder is `../`.
+> Relative links inside a journal entry are written from `Documentation/AgentForge/process/journal/week-N/`. From there: repo root is `../../../../../`, the `Documentation/` folder is `../../../../`, the AgentForge folder is `../../../`, the `process/` folder is `../../`, the parent `journal/` folder is `../`, and a sibling milestone is `../../milestones/week-N/NN-<slug>.md`.
 
 ## 4. New milestone (add process file)
 
-1. Read the **Process trail** table in [Documentation/AgentForge/README.md](../../../Documentation/AgentForge/README.md). The next index is `max(#) + 1`.
-2. Create `Documentation/AgentForge/process/NN-<slug>.md`. Slug rules in `MILESTONE-NAMING.md`.
+1. Read the **Process trail** table in [Documentation/AgentForge/README.md](../../../Documentation/AgentForge/README.md). The trail is split into per-week sub-tables (`### Week 1`, `### Week 2`, …); pick the sub-table matching the current cohort week `N` (computed the same way as the journal directory). The next index is `max(#) + 1` **within that week's sub-table** — numbering restarts at `01` for each week.
+2. Create `Documentation/AgentForge/process/milestones/week-N/NN-<slug>.md`. Slug rules in `MILESTONE-NAMING.md`. Create the `week-N/` directory lazily if missing (mirrors the journal layout); do not pre-create future weeks.
 3. Keep the first version small: title, one-paragraph purpose, the decisions/sections that exist *now*. Do not pad.
-4. Insert a new row in the README table (one line: `| NN | [process/NN-slug.md](process/NN-slug.md) | <one-line purpose> |`). The README table is the **single index** of the trail — never let a numbered file exist without a row, and never let a row point at a missing file.
+4. Insert a new row in the matching week's sub-table (one line: `| NN | [process/milestones/week-N/NN-slug.md](process/milestones/week-N/NN-slug.md) | <one-line purpose> |`). The README table is the **single index** of the trail — never let a numbered file exist without a row, and never let a row point at a missing file.
 
 ## 5. Cross-linking journal ↔ numbered trail
 
@@ -109,7 +109,7 @@ This implements README "How to extend this folder" item 3 without duplicating co
 
 ## 6. Tooling churn → 02 changelog
 
-If the session installed/removed/upgraded a skill, gstack tool, or other dev-side dependency, append a dated bullet to the **Changelog** at the bottom of [process/02-tooling-and-skills.md](../../../Documentation/AgentForge/process/02-tooling-and-skills.md). Use **`TZ=America/Chicago date +"%Y-%m-%d"`** for the bullet’s calendar date so it matches journal convention.
+If the session installed/removed/upgraded a skill, gstack tool, or other dev-side dependency, append a dated bullet to the **Changelog** at the bottom of [process/milestones/week-1/02-tooling-and-skills.md](../../../Documentation/AgentForge/process/milestones/week-1/02-tooling-and-skills.md). Use **`TZ=America/Chicago date +"%Y-%m-%d"`** for the bullet’s calendar date so it matches journal convention.
 
 ```markdown
 - **YYYY-MM-DD** — <one-line summary of what changed>.
@@ -122,8 +122,9 @@ This keeps tooling history reproducible without forcing a new milestone every ti
 While writing, if you encounter any of these, fix in the same change:
 
 - Stale `docs/agentforge/` paths anywhere in the repo (canonical is `Documentation/AgentForge/`).
-- README trail table out of sync with files in `process/`.
-- A numbered file with no purpose line in the README table.
+- Stale flat-trail paths like `process/NN-<slug>.md` (canonical is `process/milestones/week-N/NN-<slug>.md`).
+- README trail table out of sync with files in `process/milestones/week-N/`.
+- A numbered file with no purpose line in the matching week's README sub-table.
 
 ## Outputs and limits
 

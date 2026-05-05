@@ -7,7 +7,7 @@
 
 > **Working document:** This file may be revised up to **MVP submission** (Gauntlet deadline). Keep the instructor table + executive summary aligned with whatever ships.
 
-> **MVP submission bundle (checklist):** Repo deliverables [`AUDIT.md`](AUDIT.md), [`USERS.md`](USERS.md), this [`ARCHITECTURE.md`](ARCHITECTURE.md) **plus** (1) **live URL** — OpenEMR (and agent stack when ready) on a **Linux VPS** + Docker per [Stage 2](Documentation/AgentForge/process/05-stage2-deployment-decision.md) (Gauntlet MVP host: **Vultr**; any comparable VPS works), (2) **Loom** — you on camera walking the architecture decisions, (3) **social post** — e.g. X / LinkedIn per case study (tag **@GauntletAI** where required). **Priority for tonight:** working **HTTPS deployment** and a URL graders can open.
+> **MVP submission bundle (checklist):** Repo deliverables [`AUDIT.md`](AUDIT.md), [`USERS.md`](USERS.md), this [`ARCHITECTURE.md`](ARCHITECTURE.md) **plus** (1) **live URL** — OpenEMR (and agent stack when ready) on a **Linux VPS** + Docker per [Stage 2](Documentation/AgentForge/process/milestones/week-1/05-stage2-deployment-decision.md) (Gauntlet MVP host: **Vultr**; any comparable VPS works), (2) **Loom** — you on camera walking the architecture decisions, (3) **social post** — e.g. X / LinkedIn per case study (tag **@GauntletAI** where required). **Priority for tonight:** working **HTTPS deployment** and a URL graders can open.
 
 ---
 
@@ -15,7 +15,7 @@
 
 | Decision | Choice | Why it’s justified |
 | --- | --- | --- |
-| **Hosting** | **Linux VPS** + Docker Compose (MVP deployed on **Vultr**) | Matches our **single-VM + Compose** plan ([Stage 2 decision](Documentation/AgentForge/process/05-stage2-deployment-decision.md)). OpenEMR is a long-lived PHP + MariaDB stack; a single VM with Compose is what upstream expects. A cohort peer shipped a working demo this way — low surprise, workable ops. *Course/synthetic data:* a standard VPS footprint is appropriate. *Future production under strict infrastructure BAA:* evaluate managed/regulated hosting separately — not a Gauntlet MVP blocker. |
+| **Hosting** | **Linux VPS** + Docker Compose (MVP deployed on **Vultr**) | Matches our **single-VM + Compose** plan ([Stage 2 decision](Documentation/AgentForge/process/milestones/week-1/05-stage2-deployment-decision.md)). OpenEMR is a long-lived PHP + MariaDB stack; a single VM with Compose is what upstream expects. A cohort peer shipped a working demo this way — low surprise, workable ops. *Course/synthetic data:* a standard VPS footprint is appropriate. *Future production under strict infrastructure BAA:* evaluate managed/regulated hosting separately — not a Gauntlet MVP blocker. |
 | **CUI (Conversational UI)** | **React** (e.g. Vite + TypeScript) | Team comfort and speed; isolates the copilot in an **iframe SPA** so we are not rewriting OpenEMR’s legacy Angular. The iframe mounts in a toggleable **right rail** launched from a header icon; if the host shell would scroll horizontally, the rail overlays instead of forcing a broken layout. Same language family as the **Agent API** (TypeScript) for shared types and simpler reasoning. |
 | **Agent backend** | **Node 20 + TypeScript + Vercel AI SDK** | Bounded **read → propose → confirm → write** flow — not multi-agent “planning.” Typed tools (Zod), provider swap without rewrites. |
 | **Visit capture (STT + transcript)** | **`agentforge-api` streaming relay** → **AssemblyAI** (BAA-class); transcript in **Postgres**; **tap start/stop** or **hold-to-talk** | UC-B threads **chart context + physician dictation**; proposals appear as visible messages → confirm → module writes. **No ambient scope**, **no audio retention** ([`USERS.md` §3.2](USERS.md)); BAA egress like LLMs ([`Compliance-5`](AUDIT.md#compliance-5-no-outbound-network-egress-controls-the-llm-call-would-be-the-first-phi-bearing-outbound)). |
@@ -279,4 +279,4 @@ V1 has ten use cases (UC-A through UC-J) per [`USERS.md` §4](USERS.md). UC-A is
 
 ## References
 
-[`AUDIT.md`](AUDIT.md) · [`USERS.md`](USERS.md) · [Stage 2 deployment](Documentation/AgentForge/process/05-stage2-deployment-decision.md) · [VPS live deployment (Gauntlet)](Documentation/AgentForge/process/09-vps-live-deployment.md) · [Case study PDF](Documentation/AgentForge/references/Week%201%20-%20AgentForge.pdf)
+[`AUDIT.md`](AUDIT.md) · [`USERS.md`](USERS.md) · [Stage 2 deployment](Documentation/AgentForge/process/milestones/week-1/05-stage2-deployment-decision.md) · [VPS live deployment (Gauntlet)](Documentation/AgentForge/process/milestones/week-1/09-vps-live-deployment.md) · [Case study PDF](Documentation/AgentForge/references/Week%201%20-%20AgentForge.pdf)

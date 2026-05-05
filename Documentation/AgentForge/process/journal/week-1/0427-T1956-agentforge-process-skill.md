@@ -1,7 +1,7 @@
 ---
 date: 2026-04-27
 topic: agentforge-process-doc skill creation
-related_milestone: none (tooling change; logged in process/02-tooling-and-skills.md changelog)
+related_milestone: none (tooling change; logged in process/milestones/week-1/02-tooling-and-skills.md changelog)
 ---
 
 # AgentForge process-doc skill — session journal
@@ -20,7 +20,7 @@ The AgentForge folder ([Documentation/AgentForge/](../../../README.md)) had thre
 
 - **Prompt:** "option A (Documentation/AgentForge) since I made that change to the file structure and if it conflicts with the current readme text, then update the readme as necessary to make it coherent"
 - **Recommendation:** Treat `Documentation/AgentForge/` as the single source of truth, hardcode that into the new skill, and patch all stale `docs/agentforge/` references (root README, process file frontmatter, 02 doc) so the path is consistent across the repo.
-- **Outcome:** Done in three files — [README.md](../../../../../README.md) line 25, [process/02-tooling-and-skills.md](../../02-tooling-and-skills.md) line 25, and `fork_docs_path` frontmatter in [process/01-agentforge-impressions.md](../../01-agentforge-impressions.md) line 3. Skill instructions now warn against writing under `docs/agentforge/` ([SKILL.md](../../../../../.agents/skills/agentforge-process-doc/SKILL.md) "Repo hygiene").
+- **Outcome:** Done in three files — [README.md](../../../../../README.md) line 25, [process/milestones/week-1/02-tooling-and-skills.md](../../milestones/week-1/02-tooling-and-skills.md) line 25, and `fork_docs_path` frontmatter in [process/milestones/week-1/01-agentforge-impressions.md](../../milestones/week-1/01-agentforge-impressions.md) line 3. Skill instructions now warn against writing under `docs/agentforge/` ([SKILL.md](../../../../../.agents/skills/agentforge-process-doc/SKILL.md) "Repo hygiene").
 
 ### Decision: capture prompts + recommendations at every pivot
 
@@ -38,7 +38,7 @@ The AgentForge folder ([Documentation/AgentForge/](../../../README.md)) had thre
 
 - **Prompt:** Implicit — the user asked how the skill installation should work.
 - **Recommendation:** [skills-lock.json](../../../../../skills-lock.json) is a hash registry for **remote** skills vendored via `npx skills@latest add` (currently tracks `mattpocock/skills` entries). A local, repo-authored skill does not need an entry. Cursor reads `.agents/skills/` directly; for Claude Code / Kiro mirror the folder to `.claude/skills/` / `.kiro/skills/` (mirroring the pattern already in place for the Pocock skills).
-- **Outcome:** No `skills-lock.json` change. Documented in the [02-tooling-and-skills.md](../../02-tooling-and-skills.md) changelog bullet for this date.
+- **Outcome:** No `skills-lock.json` change. Documented in the [02-tooling-and-skills.md](../../milestones/week-1/02-tooling-and-skills.md) changelog bullet for this date.
 
 ## Trade-offs and alternatives
 
@@ -59,8 +59,8 @@ _None this session._ No installs, no upgrades, no external tooling. All edits we
   - `Documentation/AgentForge/process/journal/week-1/0427-T1956-agentforge-process-skill.md` (this file; originally `journal/2026-04-27-agentforge-process-skill.md`, moved/renamed in the next session)
 - **Modified:**
   - `README.md` (root) — fixed `docs/agentforge/` → `Documentation/AgentForge/`
-  - `Documentation/AgentForge/process/01-agentforge-impressions.md` — fixed `fork_docs_path` frontmatter
-  - `Documentation/AgentForge/process/02-tooling-and-skills.md` — fixed stale path on line 25, appended a 2026-04-27 changelog bullet for the new skill
+  - `Documentation/AgentForge/process/milestones/week-1/01-agentforge-impressions.md` — fixed `fork_docs_path` frontmatter
+  - `Documentation/AgentForge/process/milestones/week-1/02-tooling-and-skills.md` — fixed stale path on line 25, appended a 2026-04-27 changelog bullet for the new skill
 
 ## Outcomes
 
@@ -80,5 +80,5 @@ _None this session._ No installs, no upgrades, no external tooling. All edits we
 - Skill source: [.agents/skills/agentforge-process-doc/SKILL.md](../../../../../.agents/skills/agentforge-process-doc/SKILL.md)
 - Template: [.agents/skills/agentforge-process-doc/SESSION-JOURNAL-TEMPLATE.md](../../../../../.agents/skills/agentforge-process-doc/SESSION-JOURNAL-TEMPLATE.md)
 - Naming rules: [.agents/skills/agentforge-process-doc/MILESTONE-NAMING.md](../../../../../.agents/skills/agentforge-process-doc/MILESTONE-NAMING.md)
-- Tooling changelog entry: [process/02-tooling-and-skills.md](../../02-tooling-and-skills.md) (Changelog, 2026-04-27)
+- Tooling changelog entry: [process/milestones/week-1/02-tooling-and-skills.md](../../milestones/week-1/02-tooling-and-skills.md) (Changelog, 2026-04-27)
 - Agent Skills spec: <https://agentskills.io/specification>

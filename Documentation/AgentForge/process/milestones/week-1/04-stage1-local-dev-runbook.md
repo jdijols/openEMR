@@ -1,6 +1,6 @@
 # Stage 1 — Local OpenEMR (easy dev + demo data)
 
-Runbook for Gauntlet Stage 1: OpenEMR running locally with the curated development demo dataset. Upstream docs: [CONTRIBUTING.md](../../../CONTRIBUTING.md) (local development + devtools).
+Runbook for Gauntlet Stage 1: OpenEMR running locally with the curated development demo dataset. Upstream docs: [CONTRIBUTING.md](../../../../../CONTRIBUTING.md) (local development + devtools).
 
 ## Why Docker easy-dev (for now)
 
@@ -38,7 +38,7 @@ Wait until containers are healthy. Logs should eventually show Apache/cron start
 | phpMyAdmin | http://localhost:8310/ |
 | MariaDB    | `localhost:8320` (TLS — see compose volume mounts) |
 
-Override ports if needed with env vars `WT_HTTP_PORT`, `WT_HTTPS_PORT`, `WT_MYSQL_PORT` (see [docker/development-easy/docker-compose.yml](../../../docker/development-easy/docker-compose.yml)).
+Override ports if needed with env vars `WT_HTTP_PORT`, `WT_HTTPS_PORT`, `WT_MYSQL_PORT` (see [docker/development-easy/docker-compose.yml](../../../../../docker/development-easy/docker-compose.yml)).
 
 ### First login (before demo reset)
 
@@ -96,7 +96,7 @@ docker compose pull
 ## Not in scope for Stage 1
 
 - **Synthea** (`import-random-patients`) — deferred.
-- **Production compose** — see [docker/production/docker-compose.yml](../../../docker/production/docker-compose.yml) when you define deploy; it uses `openemr/openemr:latest`, not the `flex` dev image.
+- **Production compose** — see [docker/production/docker-compose.yml](../../../../../docker/production/docker-compose.yml) when you define deploy; it uses `openemr/openemr:latest`, not the `flex` dev image.
 
 ## Session log
 
@@ -106,4 +106,4 @@ docker compose pull
 | Docker | _(optional: `docker --version` on your machine)_ |
 | Compose | _(optional: `docker compose version`)_ |
 | Data path | `dev-reset-install-demodata` (curated demo) |
-| Status | Stage 1 deliverable met locally: stack up, demo loaded, patients visible via Finder. See [journal entry](../journal/week-1/0427-T2145-stage1-openemr-demo-verified.md). |
+| Status | Stage 1 deliverable met locally: stack up, demo loaded, patients visible via Finder. See [journal entry](../../journal/week-1/0427-T2145-stage1-openemr-demo-verified.md). |

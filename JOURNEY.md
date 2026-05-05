@@ -14,7 +14,7 @@ The PDF's first agent requirement is *"a multi-turn AI agent that can receive fo
 
 ## Encounter binding — implicit on the schedule path
 
-When the physician clicks a patient from the day's schedule (calendar or patient tracker), `af_appointment_id` and `af_appointment_date` thread through `demographics.php` and `AppointmentEncounterBinder` resolves the appointment-day encounter automatically. The session encounter, the AgentForge JWT, and the host "Open Encounter" all align on that visit's date — not the server's literal "today" — so confirmed writes land cleanly without manual setup. See [`Documentation/AgentForge/process/17-encounter-scoped-chart-bind-and-brief.md`](./Documentation/AgentForge/process/17-encounter-scoped-chart-bind-and-brief.md).
+When the physician clicks a patient from the day's schedule (calendar or patient tracker), `af_appointment_id` and `af_appointment_date` thread through `demographics.php` and `AppointmentEncounterBinder` resolves the appointment-day encounter automatically. The session encounter, the AgentForge JWT, and the host "Open Encounter" all align on that visit's date — not the server's literal "today" — so confirmed writes land cleanly without manual setup. See [`Documentation/AgentForge/process/milestones/week-1/17-encounter-scoped-chart-bind-and-brief.md`](./Documentation/AgentForge/process/milestones/week-1/17-encounter-scoped-chart-bind-and-brief.md).
 
 The direct-chart-search path (typing a patient name into the patient search field, no schedule click) still requires the physician to save an encounter before encounter-scoped writes will bind. This is the next gap to close, tracked in [`Documentation/AgentForge/implementation/open-questions.md`](./Documentation/AgentForge/implementation/open-questions.md).
 
@@ -169,7 +169,7 @@ Each journey moment has a corresponding eval case in [`agentforge/api/eval/cases
 - Architecture: [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 - User and use-case definitions: [`USERS.md`](./USERS.md).
 - Process trail and decisions: [`Documentation/AgentForge/README.md`](./Documentation/AgentForge/README.md).
-- Encounter binding for the appointment-day path: [`Documentation/AgentForge/process/17-encounter-scoped-chart-bind-and-brief.md`](./Documentation/AgentForge/process/17-encounter-scoped-chart-bind-and-brief.md).
+- Encounter binding for the appointment-day path: [`Documentation/AgentForge/process/milestones/week-1/17-encounter-scoped-chart-bind-and-brief.md`](./Documentation/AgentForge/process/milestones/week-1/17-encounter-scoped-chart-bind-and-brief.md).
 - Open product questions: [`Documentation/AgentForge/implementation/open-questions.md`](./Documentation/AgentForge/implementation/open-questions.md).
 
 *Working draft — kept in sync with the shipped CUI; revise as the journey and the product converge.*

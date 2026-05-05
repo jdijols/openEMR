@@ -140,7 +140,7 @@ yet include the deployed link or an explicit AgentForge setup section**.
 - [~] `master` is current with the deployed build — local `master` in sync with `gitlab/master`; user confirmed essentially up-to-date. Five working-tree files (Submission-Checklist.md, v2-roadmap.md, README.md, VERIFICATION.md, agentforge/api/src/agent/system_prompt.ts) will land in a staging commit + push **before** final submission.
 - [x] **README.md has a top-level Clinical Copilot section** — README was wholesale rewritten as a Clinical Copilot landing page (commit `a0d505905`); supersedes the original "add section" plan.
   - [x] **Deployed link** — README line 6 + line 100, prominently placed under the title
-  - [x] **Setup guide** — README lines 101–102 link [`docker/development-easy/`](../../../docker/development-easy/), [`process/04-stage1-local-dev-runbook.md`](../process/04-stage1-local-dev-runbook.md), and [`process/09-vps-live-deployment.md`](../process/09-vps-live-deployment.md)
+  - [x] **Setup guide** — README lines 101–102 link [`docker/development-easy/`](../../../docker/development-easy/), [`process/milestones/week-1/04-stage1-local-dev-runbook.md`](../process/milestones/week-1/04-stage1-local-dev-runbook.md), and [`process/milestones/week-1/09-vps-live-deployment.md`](../process/milestones/week-1/09-vps-live-deployment.md)
   - [x] **Architecture overview** — README line 94 + Documentation table line 114 link [`ARCHITECTURE.md`](../../../ARCHITECTURE.md)
   - [x] **Pointers to AUDIT / USERS / PRD / JOURNEY** — Documentation table at README lines 113–121 lists all four plus VERIFICATION, EVALUATION, OBSERVABILITY, and TASKS
 - [~] **(USER)** `Assisted-by: Claude Code` trailers — 23 commits already carry the trailer; the recent run (last ~10 commits) is clean. One older commit lacks it: `4a928113d UI updates, agent hardening, Gate 6 complete`. Decide whether to leave that as-is or note in submission that AI assistance applied across the build.
@@ -213,7 +213,7 @@ G7-01 row updated.
 **Status:** Eval lives in `agentforge/api` (Vitest) and PHPUnit isolated tests
 under `tests/Tests/Isolated/Modules/AgentForge/`. Gate 6 closed with the
 eval-runner refactor and Context HTTP-matrix coverage; see
-[`process/15-gate6-complete.md`](../process/15-gate6-complete.md).
+[`process/milestones/week-1/15-gate6-complete.md`](../process/milestones/week-1/15-gate6-complete.md).
 
 **To-do:**
 - [x] **Latest results captured in the doc** — [EVALUATION.md `## The runner`](../../../EVALUATION.md) at line 33 embeds a sample run from `run_id: 20260503T064556949Z_25f6528b` (today): **39 cases / 0 failures / 6 ms**, broken down by all 10 rules. Suite is offline / no-LLM, runs as `npm run eval` from `agentforge/api/`. Also has `npm test` Vitest + PHPUnit isolated AgentForge suite cross-references at [EVALUATION.md `## Cross-references`](../../../EVALUATION.md).
@@ -269,7 +269,7 @@ propose/confirm/write, UC-C, cross-patient refusal all confirmed working.
 
 **To-do:**
 - [ ] Verify TLS, headers, CORS allowlist, and Caddy front are still healthy on submission morning (no expired cert)
-- [ ] Verify a **non-admin clinical user** (per [`process/16-clinical-copilot-acl-role-gate.md`](../process/16-clinical-copilot-acl-role-gate.md)) can use the rail — ACL gate works against real users, not just admin
+- [ ] Verify a **non-admin clinical user** (per [`process/milestones/week-1/16-clinical-copilot-acl-role-gate.md`](../process/milestones/week-1/16-clinical-copilot-acl-role-gate.md)) can use the rail — ACL gate works against real users, not just admin
 - [ ] Add the live URL to [`submission.md`](../submission.md) (G7-03) and to the root `README.md` (deliverable 1)
 - [ ] Run the **11:30 CT cellular smoke** check (G7-05) on submission day from a phone or hotspot before clicking submit
 

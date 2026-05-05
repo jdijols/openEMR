@@ -1,7 +1,7 @@
 ---
 date: 2026-04-28
 topic: Cluster 1.5 — Demo data persona-viability spike
-related_milestone: process/06-stage3-audit.md
+related_milestone: process/milestones/week-1/06-stage3-audit.md
 ---
 
 # Cluster 1.5 — Demo data persona-viability spike — session journal
@@ -20,13 +20,13 @@ The prior session ([0428-T0046](0428-T0046-cluster-1-domain-users.md)) closed Cl
 
 - **Prompt:** "Cluster 1.5 — Demo data persona-viability spike. ... does the OpenEMR demo dataset actually support that persona, or does it need to revise?"
 - **Recommendation:** Lock the persona target as written (adult PCP, non-emergent, returning patients with rich charts). The persona itself is the right product target — it maps directly to the case study scenario. **The bundled demo dataset is what's broken**, not the persona. Add a **hard prerequisite gate** to presearch §1: data augmentation (leading candidate Synthea, already cued and deferred in the Stage 1 runbook) must precede Cluster 4 (Verification + Eval) and Cluster 6 (demo). Hand-curated vs Synthea vs hybrid decision deferred to Cluster 4 where it belongs.
-- **Outcome:** [`AUDIT.md` §DataQuality-1](../../../../AUDIT.md#dataquality-1-persona-viability--adult-pcp-returning-patient-demo-coverage) landed (severity High); [`03-presearch-checklist.md`](../../03-presearch-checklist.md) §1 rewritten — provisional callouts removed, persona locked, Cluster 1.5 outcome bullet inserted, data-source bullet updated to reflect what the bundled demo actually does and does not contain; [`06-stage3-audit.md`](../../06-stage3-audit.md) cluster map updated (Cluster 1 → Done, Cluster 1.5 → Done, status checkbox ticked).
+- **Outcome:** [`AUDIT.md` §DataQuality-1](../../../../../AUDIT.md#dataquality-1-persona-viability--adult-pcp-returning-patient-demo-coverage) landed (severity High); [`03-presearch-checklist.md`](../../milestones/week-1/03-presearch-checklist.md) §1 rewritten — provisional callouts removed, persona locked, Cluster 1.5 outcome bullet inserted, data-source bullet updated to reflect what the bundled demo actually does and does not contain; [`06-stage3-audit.md`](../../milestones/week-1/06-stage3-audit.md) cluster map updated (Cluster 1 → Done, Cluster 1.5 → Done, status checkbox ticked).
 
 ### Decision: Skip the UI Finder click-through — DB result already unsatisfiable
 
 - **Prompt:** Methodology step 3 — "pick 2–3 multi-visit candidate patients via the Finder, read their last two visits each, confirm a meaningful 'what changed since last visit' signal exists."
 - **Recommendation:** The DB-level result (3 patients, 1 encounter each, all 2014-02-01) makes "multi-visit candidate" the empty set. Doing the Finder click-through to confirm that the empty set is empty would be theatre, not evidence. Document the decision in Appendix A and move on. Stay tight per the spike's "one-question" framing — full §4 happens in Cluster 4.
-- **Outcome:** [`AUDIT.md` Appendix A](../../../../AUDIT.md) Data Quality bullet explicitly notes the UI step was skipped and why. The methodology footprint is honest about what was and was not done.
+- **Outcome:** [`AUDIT.md` Appendix A](../../../../../AUDIT.md) Data Quality bullet explicitly notes the UI step was skipped and why. The methodology footprint is honest about what was and was not done.
 
 ## Trade-offs and alternatives
 
@@ -55,8 +55,8 @@ Tables inspected: `patient_data`, `form_encounter`, `form_soap`, `form_vitals`, 
 ## Files touched
 
 - **Modified:** `AUDIT.md` (added `DataQuality-1` finding; replaced placeholder note in §4; expanded Appendix A § Data Quality to reflect spike methodology and the skipped UI step).
-- **Modified:** `Documentation/AgentForge/process/03-presearch-checklist.md` (§1 rewritten — provisional pass header replaced with locked-target header; persona bullets stripped of "(provisional)" and TBD callouts; Cluster 1.5 outcome bullet added; data-source bullet updated with concrete demo coverage).
-- **Modified:** `Documentation/AgentForge/process/06-stage3-audit.md` (cluster mapping: Cluster 1 status → Done, Cluster 1.5 status → Done; status checklist box for Cluster 1.5 ticked with one-line summary).
+- **Modified:** `Documentation/AgentForge/process/milestones/week-1/03-presearch-checklist.md` (§1 rewritten — provisional pass header replaced with locked-target header; persona bullets stripped of "(provisional)" and TBD callouts; Cluster 1.5 outcome bullet added; data-source bullet updated with concrete demo coverage).
+- **Modified:** `Documentation/AgentForge/process/milestones/week-1/06-stage3-audit.md` (cluster mapping: Cluster 1 status → Done, Cluster 1.5 status → Done; status checklist box for Cluster 1.5 ticked with one-line summary).
 - **Created:** `Documentation/AgentForge/process/journal/week-1/0428-T0118-cluster-1-5-demo-data-spike.md` (this file).
 
 ## Outcomes
@@ -87,8 +87,8 @@ Most of these depend on Cluster 2 architecture context or Cluster 4 data shape �
 
 ## Links
 
-- Hard-gate finding: [`AUDIT.md` §DataQuality-1](../../../../AUDIT.md#dataquality-1-persona-viability--adult-pcp-returning-patient-demo-coverage)
-- Process pointer for Stage 3: [`process/06-stage3-audit.md`](../../06-stage3-audit.md)
-- Presearch checklist (§1 updated this session): [`process/03-presearch-checklist.md`](../../03-presearch-checklist.md)
-- Stage 1 runbook (Synthea cue at "Not in scope for Stage 1"): [`process/04-stage1-local-dev-runbook.md`](../../04-stage1-local-dev-runbook.md)
+- Hard-gate finding: [`AUDIT.md` §DataQuality-1](../../../../../AUDIT.md#dataquality-1-persona-viability--adult-pcp-returning-patient-demo-coverage)
+- Process pointer for Stage 3: [`process/milestones/week-1/06-stage3-audit.md`](../../milestones/week-1/06-stage3-audit.md)
+- Presearch checklist (§1 updated this session): [`process/milestones/week-1/03-presearch-checklist.md`](../../milestones/week-1/03-presearch-checklist.md)
+- Stage 1 runbook (Synthea cue at "Not in scope for Stage 1"): [`process/milestones/week-1/04-stage1-local-dev-runbook.md`](../../milestones/week-1/04-stage1-local-dev-runbook.md)
 - Prior session that locked the provisional persona: [`0428-T0046-cluster-1-domain-users.md`](0428-T0046-cluster-1-domain-users.md)

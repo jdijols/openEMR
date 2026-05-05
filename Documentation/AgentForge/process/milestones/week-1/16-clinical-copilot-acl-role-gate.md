@@ -1,7 +1,7 @@
 ---
 date: 2026-05-01
 topic: Clinical Copilot GACL layer — instructor-facing access control summary
-related_milestone: "process/16-clinical-copilot-acl-role-gate.md"
+related_milestone: "process/milestones/week-1/16-clinical-copilot-acl-role-gate.md"
 ---
 
 # Clinical Copilot access control — process milestone
@@ -10,7 +10,7 @@ related_milestone: "process/16-clinical-copilot-acl-role-gate.md"
 
 Provide a single **examiner-facing** checkpoint for **who may use AgentForge Clinical Copilot** and **who may not**, aligned with OpenEMR GACL (no parallel privilege plane). Implementation lives in **`oe-module-agentforge`**; this file is the process-trail anchor for grading narratives and demos.
 
-See also session journal [0501-T2135-clinical-copilot-acl-role-gate.md](../journal/week-1/0501-T2135-clinical-copilot-acl-role-gate.md) for pivot history.
+See also session journal [0501-T2135-clinical-copilot-acl-role-gate.md](../../journal/week-1/0501-T2135-clinical-copilot-acl-role-gate.md) for pivot history.
 
 ---
 
@@ -34,13 +34,13 @@ Clinical Copilot access is **not** “everyone who can open demographics (`patie
 
 ## Code and spec pointers
 
-- Module README (implementation detail): [`interface/modules/custom_modules/oe-module-agentforge/README.md`](../../../interface/modules/custom_modules/oe-module-agentforge/README.md) — §4.9.
-- Product spec: [`PRD.md`](../../../PRD.md) §4.9.
-- Constants and composed checks: [`AclMap.php`](../../../interface/modules/custom_modules/oe-module-agentforge/src/Acl/AclMap.php).
-- Lazy ACO registration + default ACL rows: [`AgentForgeAclInstaller.php`](../../../interface/modules/custom_modules/oe-module-agentforge/src/Install/AgentForgeAclInstaller.php).
+- Module README (implementation detail): [`interface/modules/custom_modules/oe-module-agentforge/README.md`](../../../../../interface/modules/custom_modules/oe-module-agentforge/README.md) — §4.9.
+- Product spec: [`PRD.md`](../../../../../PRD.md) §4.9.
+- Constants and composed checks: [`AclMap.php`](../../../../../interface/modules/custom_modules/oe-module-agentforge/src/Acl/AclMap.php).
+- Lazy ACO registration + default ACL rows: [`AgentForgeAclInstaller.php`](../../../../../interface/modules/custom_modules/oe-module-agentforge/src/Install/AgentForgeAclInstaller.php).
 - Read gate: **`ChartContextGate`**, **`launch.php`**, **`panel.php`**, **`Bootstrap::shouldShowChrome()`** → **`AclMap::userPassesAgentForgeReadGate()`**.
 - Write gate: **`public/write/*.php`** → **`AclMap::userPassesAgentForgeProposeWriteGate()`** (implies read gate + **`propose_write`**).
-- Drift tests (isolated PHPUnit): **[`AgentForgeAclProductGateStructureTest.php`](../../../tests/Tests/Isolated/Modules/AgentForge/AgentForgeAclProductGateStructureTest.php)**, **`NoParallelPrivilegePlaneTest.php`**, **`AgentForgeAclCoreSpecGuardTest.php`** (same directory).
+- Drift tests (isolated PHPUnit): **[`AgentForgeAclProductGateStructureTest.php`](../../../../../tests/Tests/Isolated/Modules/AgentForge/AgentForgeAclProductGateStructureTest.php)**, **`NoParallelPrivilegePlaneTest.php`**, **`AgentForgeAclCoreSpecGuardTest.php`** (same directory).
 
 ---
 
@@ -52,4 +52,4 @@ To verify denial for non-clinical preset roles after upgrade: use a demo user ma
 
 ## Links
 
-- Session journal: [journal/week-1/0501-T2135-clinical-copilot-acl-role-gate.md](../journal/week-1/0501-T2135-clinical-copilot-acl-role-gate.md)
+- Session journal: [journal/week-1/0501-T2135-clinical-copilot-acl-role-gate.md](../../journal/week-1/0501-T2135-clinical-copilot-acl-role-gate.md)

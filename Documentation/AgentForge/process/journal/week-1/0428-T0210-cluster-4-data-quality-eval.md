@@ -1,7 +1,7 @@
 ---
 date: 2026-04-28
 topic: Cluster 4 — Data Quality + Verification + Eval audit
-related_milestone: process/06-stage3-audit.md
+related_milestone: process/milestones/week-1/06-stage3-audit.md
 ---
 
 # Cluster 4 — Data Quality + Verification + Eval audit — session journal
@@ -20,25 +20,25 @@ Cluster 1.5 showed the bundled OpenEMR demo dataset is insufficient as-is: 3 pat
 
 - **Prompt:** "Concrete chart sources for the adult PCP returning-patient persona."
 - **Recommendation:** Record that adult PCP facts come from multiple source families with different identifiers and status semantics: demographics/care team, encounters, `lists`, `prescriptions`, vitals/forms, procedure/lab tables, notes/documents, history, and immunizations.
-- **Outcome:** [`AUDIT.md` §DataQuality-2](../../../../AUDIT.md#dataquality-2-adult-pcp-chart-facts-come-from-multiple-source-families-with-different-identifiers-statuses-and-freshness-semantics) landed; presearch §7 now requires source packs that preserve table/resource, row id, field, status, freshness, retrieval path, and authorization path.
+- **Outcome:** [`AUDIT.md` §DataQuality-2](../../../../../AUDIT.md#dataquality-2-adult-pcp-chart-facts-come-from-multiple-source-families-with-different-identifiers-statuses-and-freshness-semantics) landed; presearch §7 now requires source packs that preserve table/resource, row id, field, status, freshness, retrieval path, and authorization path.
 
 ### Decision: Make missing/stale/conflicting data a correctness target
 
 - **Prompt:** "Missing/empty/stale/conflicting data failure modes."
 - **Recommendation:** Treat empty labs/notes/history, stale dates, inactive medication rows, uncoded problems, and conflicting medication sources as normal current behavior. Eval cases must check that the system says what is missing or conflicting instead of inferring around it.
-- **Outcome:** [`AUDIT.md` §DataQuality-3](../../../../AUDIT.md#dataquality-3-missing-empty-stale-and-conflicting-chart-states-are-normal-current-behavior-not-edge-cases) landed; presearch §9 and §10 now include empty, stale, inactive, uncoded, and conflict fixtures.
+- **Outcome:** [`AUDIT.md` §DataQuality-3](../../../../../AUDIT.md#dataquality-3-missing-empty-stale-and-conflicting-chart-states-are-normal-current-behavior-not-edge-cases) landed; presearch §9 and §10 now include empty, stale, inactive, uncoded, and conflict fixtures.
 
 ### Decision: Do not rely on FHIR Provenance as the whole citation layer
 
 - **Prompt:** "Claim categories that must be source-attributed."
 - **Recommendation:** Use FHIR as a useful read boundary, but require AgentForge's own source pack for clinician-grade citations because OpenEMR Provenance is synthesized, often organization-shaped, and does not consistently identify the underlying source field/row enough for eval.
-- **Outcome:** [`AUDIT.md` §DataQuality-4](../../../../AUDIT.md#dataquality-4-fhir-helps-source-attribution-but-does-not-provide-sufficient-provenance-by-itself) landed; presearch §10 now says FHIR resource ids are acceptable only when paired with internal source pointers.
+- **Outcome:** [`AUDIT.md` §DataQuality-4](../../../../../AUDIT.md#dataquality-4-fhir-helps-source-attribution-but-does-not-provide-sufficient-provenance-by-itself) landed; presearch §10 now says FHIR resource ids are acceptable only when paired with internal source pointers.
 
 ### Decision: Choose hybrid Synthea plus curated fixtures
 
 - **Prompt:** "Synthea vs hand-curated vs hybrid augmentation decision evidence."
 - **Recommendation:** Use Synthea import for synthetic longitudinal chart substrate and hand-curate a small adult PCP golden set for expected answers, citations, uncertainty, and known conflicts. Synthea alone populates tables but does not create AgentForge ground truth; hand-curation alone is controllable but too narrow for table/path breadth.
-- **Outcome:** [`AUDIT.md` §DataQuality-5](../../../../AUDIT.md#dataquality-5-eval-ground-truth-requires-hybrid-synthetic-plus-curated-augmentation) landed; presearch §1, §7, and §9 now state the hybrid augmentation direction.
+- **Outcome:** [`AUDIT.md` §DataQuality-5](../../../../../AUDIT.md#dataquality-5-eval-ground-truth-requires-hybrid-synthetic-plus-curated-augmentation) landed; presearch §1, §7, and §9 now state the hybrid augmentation direction.
 
 ## Trade-offs and alternatives
 
@@ -60,8 +60,8 @@ Reviewed representative paths: `sql/database.sql`, `CONTRIBUTING.md`, `src/Servi
 ## Files touched
 
 - **Modified:** `AUDIT.md` (added `DataQuality-2` through `DataQuality-5`; expanded Data Quality methodology).
-- **Modified:** `Documentation/AgentForge/process/03-presearch-checklist.md` (§1, §7, §9, §10).
-- **Modified:** `Documentation/AgentForge/process/06-stage3-audit.md` (Cluster 4 status → Done; status checklist ticked).
+- **Modified:** `Documentation/AgentForge/process/milestones/week-1/03-presearch-checklist.md` (§1, §7, §9, §10).
+- **Modified:** `Documentation/AgentForge/process/milestones/week-1/06-stage3-audit.md` (Cluster 4 status → Done; status checklist ticked).
 - **Created:** `Documentation/AgentForge/process/journal/week-1/0428-T0210-cluster-4-data-quality-eval.md` (this file).
 
 ## Outcomes
@@ -84,7 +84,7 @@ Cluster 4 is complete. AgentForge now has evidence-backed constraints for concre
 
 ## Links
 
-- Hard-gate deliverable: [`AUDIT.md`](../../../../AUDIT.md)
-- Process pointer for Stage 3: [`process/06-stage3-audit.md`](../../06-stage3-audit.md)
-- Presearch checklist: [`process/03-presearch-checklist.md`](../../03-presearch-checklist.md)
+- Hard-gate deliverable: [`AUDIT.md`](../../../../../AUDIT.md)
+- Process pointer for Stage 3: [`process/milestones/week-1/06-stage3-audit.md`](../../milestones/week-1/06-stage3-audit.md)
+- Presearch checklist: [`process/milestones/week-1/03-presearch-checklist.md`](../../milestones/week-1/03-presearch-checklist.md)
 - Prior security/compliance audit: [`0428-T0159-cluster-3-security-compliance-audit.md`](0428-T0159-cluster-3-security-compliance-audit.md)

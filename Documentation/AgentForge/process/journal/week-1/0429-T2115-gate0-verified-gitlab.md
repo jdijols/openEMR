@@ -1,7 +1,7 @@
 ---
 date: 2026-04-30
 topic: Gate 0 verified on host, PHPUnit path, GitLab merge
-related_milestone: process/11-gate0-complete.md
+related_milestone: process/milestones/week-1/11-gate0-complete.md
 ---
 
 # Gate 0 verified + GitLab — session journal
@@ -51,7 +51,7 @@ _None this session — execution followed PRD/task list._
 
 ## Files touched
 
-- **Modified (this wrap-up):** `TASKS.md`, `Documentation/AgentForge/README.md`, `Documentation/AgentForge/process/10-prd.md`, `Documentation/AgentForge/process/02-tooling-and-skills.md`, `Documentation/AgentForge/process/11-gate0-complete.md` (created), this journal (created).
+- **Modified (this wrap-up):** `TASKS.md`, `Documentation/AgentForge/README.md`, `Documentation/AgentForge/process/milestones/week-1/10-prd.md`, `Documentation/AgentForge/process/milestones/week-1/02-tooling-and-skills.md`, `Documentation/AgentForge/process/milestones/week-1/11-gate0-complete.md` (created), this journal (created).
 - **Engineer commit (already on GitLab):** scaffold trees per Gate 0 — `agentforge/`, `docker/agentforge/`, `interface/modules/custom_modules/oe-module-agentforge/`, `tests/Tests/Isolated/Modules/AgentForge/`, `.gitignore`, docs/PRD/task-list material as committed by user.
 
 ## Outcomes
@@ -60,10 +60,10 @@ Gate 0 exit criteria are green on the engineer’s machine; implementation is on
 
 ## Next steps
 
-- [ ] Begin **Gate 1** — security primitives ([`TASKS.md`](../../implementation/TASKS.md#gate-1--security-primitives-first)) in a new session.
+- [ ] Begin **Gate 1** — security primitives ([`TASKS.md`](../../../../../TASKS.md#gate-1--security-primitives-first)) in a new session.
 - [ ] (Optional) Patch root `composer.json` `phpunit-isolated` to invoke `./vendor/bin/phpunit`.
 
 ## Links
 
-- Milestone: [process/11-gate0-complete.md](../11-gate0-complete.md)
+- Milestone: [process/milestones/week-1/11-gate0-complete.md](../../milestones/week-1/11-gate0-complete.md)
 - Prior scaffold journal: [0429-T2130-gate0-scaffold-spine.md](0429-T2130-gate0-scaffold-spine.md)

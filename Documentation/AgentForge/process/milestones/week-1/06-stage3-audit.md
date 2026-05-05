@@ -1,8 +1,8 @@
 # Stage 3 — audit (process pointer)
 
-**Purpose:** Index entry for the **Gauntlet AgentForge Stage 3 hard-gate deliverable** at [`./AUDIT.md`](../../../AUDIT.md). Stage 3 mandates a full audit of the existing system across **five domains** before any new agent code is written. This file is the **process trail's** pointer at that deliverable: it captures methodology, conventions, and the cluster sequence that produces the findings, so the AUDIT.md document itself can stay clean and grader-ready.
+**Purpose:** Index entry for the **Gauntlet AgentForge Stage 3 hard-gate deliverable** at [`./AUDIT.md`](../../../../../AUDIT.md). Stage 3 mandates a full audit of the existing system across **five domains** before any new agent code is written. This file is the **process trail's** pointer at that deliverable: it captures methodology, conventions, and the cluster sequence that produces the findings, so the AUDIT.md document itself can stay clean and grader-ready.
 
-**Status:** Complete; Cluster 8 finalized the executive summary and cross-link/status sweep, then a **parallel-audit synthesis pass** (2026-04-28) cross-referenced the cluster-driven audit with an independent second-pass audit by another agent and merged both into the canonical [`AUDIT.md`](../../../AUDIT.md). The two pre-merge originals are preserved under [`./archive/`](archive/) for traceability — see §6 below.
+**Status:** Complete; Cluster 8 finalized the executive summary and cross-link/status sweep, then a **parallel-audit synthesis pass** (2026-04-28) cross-referenced the cluster-driven audit with an independent second-pass audit by another agent and merged both into the canonical [`AUDIT.md`](../../../../../AUDIT.md). The two pre-merge originals are preserved under [`./archive/`](../../archive/) for traceability — see §6 below.
 
 ---
 
@@ -16,7 +16,7 @@ The Stage 3 brief mandates audits across five domains, each with its own emphasi
 4. **Data Quality** — completeness, consistency, reliability; missing fields, inconsistent formatting, duplicates, stale records (all become agent failure modes).
 5. **Compliance & Regulatory** — audit logging, retention, breach notification, BAA implications when PHI touches an LLM provider.
 
-**Hard gate:** [`./AUDIT.md`](../../../AUDIT.md) at repo root, opening with a ~500-word executive summary that **highlights the most impactful findings** rather than enumerating everything.
+**Hard gate:** [`./AUDIT.md`](../../../../../AUDIT.md) at repo root, opening with a ~500-word executive summary that **highlights the most impactful findings** rather than enumerating everything.
 
 ---
 
@@ -116,26 +116,26 @@ These apply across all five audit domains:
 - [x] **Cluster 6 — Failure Mode + Testing synthesis** — presearch §11 and §13 filled from existing Security, Architecture, Data Quality, Compliance, and Performance findings; §7/§8 lightly sharpened for degradation contracts and regression metrics without adding new audit-domain findings.
 - [x] **Cluster 7 — Deployment/Operations + Iteration Planning close-out** — presearch §14, §15, and §16 finalized with release posture, GPLv3 module implications, synthetic/demo-data boundaries, real-PHI blockers, PHI-safe monitoring/alerting, rollback/disable strategy, eval-driven iteration, and long-term maintenance constraints.
 - [x] **Cluster 8 — Executive Summary + cross-link/status sweep** — `AUDIT.md` status marked complete; executive summary written under 500 words; Stage 3 open threads preserved for Stage 4/5 rather than resolved without implementation or measurement evidence.
-- [x] **Parallel-audit synthesis (2026-04-28)** — Cursor-led cluster audit and an independent Claude (Opus 4.7) second-pass audit cross-referenced; new findings from the second pass (PHI-plaintext columns, CORS reflection bug, `forCore` cookie HttpOnly override, dispatch.php exception leak, zero foreign keys, sparse `log` indexes, ID-system multiplicity, no outbound egress controls, log tamper-evidence gaps) merged into the canonical [`AUDIT.md`](../../../AUDIT.md) under `Severity/Evidence/Implications/Mitigation` format. Pre-merge originals archived (see §6).
+- [x] **Parallel-audit synthesis (2026-04-28)** — Cursor-led cluster audit and an independent Claude (Opus 4.7) second-pass audit cross-referenced; new findings from the second pass (PHI-plaintext columns, CORS reflection bug, `forCore` cookie HttpOnly override, dispatch.php exception leak, zero foreign keys, sparse `log` indexes, ID-system multiplicity, no outbound egress controls, log tamper-evidence gaps) merged into the canonical [`AUDIT.md`](../../../../../AUDIT.md) under `Severity/Evidence/Implications/Mitigation` format. Pre-merge originals archived (see §6).
 
 ---
 
 ## 6. Archive — pre-merge audits
 
-The canonical [`AUDIT.md`](../../../AUDIT.md) at the repo root is the result of a **parallel-audit synthesis** that cross-references two independent audits of the same OpenEMR fork. Both pre-merge originals are preserved here for traceability and grader-defensibility:
+The canonical [`AUDIT.md`](../../../../../AUDIT.md) at the repo root is the result of a **parallel-audit synthesis** that cross-references two independent audits of the same OpenEMR fork. Both pre-merge originals are preserved here for traceability and grader-defensibility:
 
 | File | Author | Approach | Strengths preserved in `AUDIT.md` |
 | --- | --- | --- | --- |
-| [`archive/audit1.md`](archive/audit1.md) | Cursor (cluster-driven, Clusters 1–8) | Highly structured `Severity/Evidence/Implications/Mitigation/Related` finding format with cross-references to presearch §X and journal entries. AgentForge-specific framing ("this audit does not authorize…"). | Per-finding format, evidence chain, FHIR patient-context vs staff-ACL split (Security-2/3), demo-data quantification (DataQuality-1), hybrid Synthea+curated augmentation (DataQuality-5), modules+events integration path (Architecture-4), GPLv3 release-shape (Compliance-4). |
-| [`archive/audit2.md`](archive/audit2.md) | Claude (Opus 4.7), independent second pass | Narrative prose with concrete `file:line` citations and a top-level Recommendations section. Spotted concrete code-level issues missed by the cluster pass. | Accessible executive-summary opener; concrete file:line evidence (CORS reflection at `CORSListener.php:57`, `forCore` HttpOnly override at line 88, `apis/dispatch.php` exception leak); zero-foreign-keys observation; N+1 grep across `src/Services/`; ID-system multiplicity; no outbound egress controls; log tamper-evidence gaps; BAA provider candidates. |
+| [`archive/audit1.md`](../../archive/audit1.md) | Cursor (cluster-driven, Clusters 1–8) | Highly structured `Severity/Evidence/Implications/Mitigation/Related` finding format with cross-references to presearch §X and journal entries. AgentForge-specific framing ("this audit does not authorize…"). | Per-finding format, evidence chain, FHIR patient-context vs staff-ACL split (Security-2/3), demo-data quantification (DataQuality-1), hybrid Synthea+curated augmentation (DataQuality-5), modules+events integration path (Architecture-4), GPLv3 release-shape (Compliance-4). |
+| [`archive/audit2.md`](../../archive/audit2.md) | Claude (Opus 4.7), independent second pass | Narrative prose with concrete `file:line` citations and a top-level Recommendations section. Spotted concrete code-level issues missed by the cluster pass. | Accessible executive-summary opener; concrete file:line evidence (CORS reflection at `CORSListener.php:57`, `forCore` HttpOnly override at line 88, `apis/dispatch.php` exception leak); zero-foreign-keys observation; N+1 grep across `src/Services/`; ID-system multiplicity; no outbound egress controls; log tamper-evidence gaps; BAA provider candidates. |
 
-The merge process (with file:line verification of every audit2 claim before incorporation) is recorded in the dated journal entry at [`journal/week-1/0428-T1210-audit-canonical-merge.md`](journal/week-1/0428-T1210-audit-canonical-merge.md). The current canonical [`AUDIT.md`](../../../AUDIT.md) supersedes both archived originals; do not edit the archived files.
+The merge process (with file:line verification of every audit2 claim before incorporation) is recorded in the dated journal entry at [`journal/week-1/0428-T1210-audit-canonical-merge.md`](../../journal/week-1/0428-T1210-audit-canonical-merge.md). The current canonical [`AUDIT.md`](../../../../../AUDIT.md) supersedes both archived originals; do not edit the archived files.
 
 ---
 
 ## Links
 
-- Hard-gate deliverable: [`AUDIT.md`](../../../AUDIT.md)
-- Pre-merge originals: [`archive/audit1.md`](archive/audit1.md), [`archive/audit2.md`](archive/audit2.md)
+- Hard-gate deliverable: [`AUDIT.md`](../../../../../AUDIT.md)
+- Pre-merge originals: [`archive/audit1.md`](../../archive/audit1.md), [`archive/audit2.md`](../../archive/audit2.md)
 - Forward-looking checklist: [`03-presearch-checklist.md`](03-presearch-checklist.md)
-- Journals: [`journal/`](journal/)
+- Journals: [`journal/`](../../journal/)

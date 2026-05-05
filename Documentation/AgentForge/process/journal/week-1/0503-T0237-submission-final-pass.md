@@ -1,7 +1,7 @@
 ---
 date: 2026-05-03
 topic: Final submission pass — UC 3→10, eval 13→39, CRUD soft-delete tools, rebrand, doc sync
-related_milestone: process/19-final-submission-prep.md
+related_milestone: process/milestones/week-1/19-final-submission-prep.md
 ---
 
 # Final submission pass — session journal
@@ -26,7 +26,7 @@ Thursday-night instructor feedback called the technical work "genuinely strong" 
 
 - **Prompt:** "Doctors don't need medical advice from an AI agent, at least not today... the problem we're solving is centered around automation, ease of data access, and ease of data entry."
 - **Recommendation:** Treat the "no medical advice" framing as the README's lead — not buried in non-goals. Anchor the problem statement with a sourced data point (Sinsky et al. 2016, *Annals of Internal Medicine* — 2:1 EHR/desk vs face time ratio). Make non-goals a real section, not a footnote — strongest builder-judgment signal in a portfolio README. Promote TASKS.md from `Documentation/AgentForge/implementation/clinical-copilot-task-list.md` to root level for convention recognition + portfolio visibility.
-- **Outcome:** New 8-section root [README.md](../../../../README.md) with hook / problem / what-it-does / how-it-handles-arbitrary-input / what-this-is-NOT / V2-plan / architecture-brief / try-it / docs-map / built-on-OpenEMR / license. TASKS.md `git mv`'d to root, 30+ cross-references rewritten with correct relative depths.
+- **Outcome:** New 8-section root [README.md](../../../../../README.md) with hook / problem / what-it-does / how-it-handles-arbitrary-input / what-this-is-NOT / V2-plan / architecture-brief / try-it / docs-map / built-on-OpenEMR / license. TASKS.md `git mv`'d to root, 30+ cross-references rewritten with correct relative depths.
 
 ### Decision: Add CRUD soft-delete tools (vitals_delete, chief_complaint_delete) for matrix completeness
 
@@ -74,7 +74,7 @@ Highlights only — full list is in commit `a0d505905` plus the post-skill follo
 
 - **Created (PHP soft-delete tools):** `interface/modules/custom_modules/oe-module-agentforge/src/Write/{VitalsDeletePayload,EncounterVitalsDeletePort,OpenEmrEncounterVitalsDeleteAdapter,VitalsDeleteAction,ChiefComplaintDeleteAction}.php`; `interface/modules/custom_modules/oe-module-agentforge/public/write/{vitals_delete,chief_complaint_delete}.php`
 - **Created (eval fixtures):** 26 new JSON fixtures under `agentforge/api/eval/cases/curated/` (5 baseline-supported + 6 CRUD happy/negative + 5 instructor-named failure-mode + 10 UC-I/UC-J documentary-vs-advisory pairs)
-- **Created (this session):** `Documentation/AgentForge/process/journal/week-1/0503-T0237-submission-final-pass.md` (this file); `Documentation/AgentForge/process/19-final-submission-prep.md`
+- **Created (this session):** `Documentation/AgentForge/process/journal/week-1/0503-T0237-submission-final-pass.md` (this file); `Documentation/AgentForge/process/milestones/week-1/19-final-submission-prep.md`
 - **Renamed:** `Documentation/AgentForge/implementation/clinical-copilot-task-list.md` → `TASKS.md` (root)
 - **Modified (TS):** `agentforge/api/src/tools/propose_writes.ts`, `agentforge/api/src/conversations/apply_pending_write.ts`, `agentforge/api/eval/runner.ts`, `agentforge/api/src/agent/system_prompt.ts`, `agentforge/api/src/agent/case_presentation_prompt.ts`, `agentforge/cui/src/App.tsx` + `App.test.tsx`, `agentforge/api/test/agent/orchestrator.test.ts`
 - **Modified (root submission docs):** `README.md`, `USERS.md`, `ARCHITECTURE.md`, `VERIFICATION.md`, `EVALUATION.md`, `OBSERVABILITY.md`, `AUDIT.md`, `JOURNEY.md`, `TASKS.md`
@@ -99,7 +99,7 @@ Highlights only — full list is in commit `a0d505905` plus the post-skill follo
 
 ## Links
 
-- Numbered milestone: [process/19-final-submission-prep.md](../../19-final-submission-prep.md)
+- Numbered milestone: [process/milestones/week-1/19-final-submission-prep.md](../../milestones/week-1/19-final-submission-prep.md)
 - Prior session journal: [0502-T1511-submission-checklist-and-resolutions.md](./0502-T1511-submission-checklist-and-resolutions.md)
 - Submission deliverables tracker: [implementation/Submission-Checklist.md](../../../implementation/Submission-Checklist.md)
 - Root README rewrite (the centerpiece): [/README.md](../../../../../README.md)

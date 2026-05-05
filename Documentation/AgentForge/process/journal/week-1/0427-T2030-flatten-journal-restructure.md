@@ -1,7 +1,7 @@
 ---
 date: 2026-04-27
 topic: flatten journal restructure
-related_milestone: none (tooling change; logged in process/02-tooling-and-skills.md changelog)
+related_milestone: none (tooling change; logged in process/milestones/week-1/02-tooling-and-skills.md changelog)
 ---
 
 # Journal restructure: `week-N/MMDD-THHMM-topic.md` — session journal
@@ -37,7 +37,7 @@ After dogfooding the new `agentforge-process-doc` skill in the previous session 
 ### Decision: store `course-start` in AgentForge README frontmatter
 
 - **Prompt:** Implicit in the week-grouping decision — the skill needs to compute `N` from somewhere.
-- **Recommendation:** Use YAML frontmatter at the top of [Documentation/AgentForge/README.md](../../../README.md) instead of a new dotfile. The README is already the canonical "what is this project" file, frontmatter precedent exists in [process/01-agentforge-impressions.md](../../01-agentforge-impressions.md), and a typo or off-by-one is fixable in one line. The skill reads `course-start`, computes `N = max(1, floor((today - course-start) / 7) + 1)`, and asks the user once if the frontmatter is missing.
+- **Recommendation:** Use YAML frontmatter at the top of [Documentation/AgentForge/README.md](../../../README.md) instead of a new dotfile. The README is already the canonical "what is this project" file, frontmatter precedent exists in [process/milestones/week-1/01-agentforge-impressions.md](../../milestones/week-1/01-agentforge-impressions.md), and a typo or off-by-one is fixable in one line. The skill reads `course-start`, computes `N = max(1, floor((today - course-start) / 7) + 1)`, and asks the user once if the frontmatter is missing.
 - **Outcome:** `course-start: 2026-04-27` added to the AgentForge README. The clamp to `>= 1` means any stray pre-course journal entry would still get `week-1` rather than `week-0` or negative.
 
 ## Trade-offs and alternatives
@@ -63,7 +63,7 @@ _None this session._ All changes were file moves and content edits. The journal 
   - `.agents/skills/agentforge-process-doc/SKILL.md` — Section 2 rewritten to compute week from frontmatter and write to `week-N/MMDD-THHMM-topic.md`; example link paths bumped to reflect the new journal depth; added a note explaining how relative links work from `journal/week-N/`
   - `.agents/skills/agentforge-process-doc/MILESTONE-NAMING.md` — replaced the "Dated journal" section with the new path, week-computation formula, and lazy-creation rule; expanded "Things that should never happen" with three new entries (no `course-start` consultation, no proactive future-week scaffolding, no date-only filenames)
   - `.agents/skills/agentforge-process-doc/SESSION-JOURNAL-TEMPLATE.md` — opening line updated to new path
-  - `Documentation/AgentForge/process/02-tooling-and-skills.md` — second `2026-04-27` changelog bullet appended describing the restructure
+  - `Documentation/AgentForge/process/milestones/week-1/02-tooling-and-skills.md` — second `2026-04-27` changelog bullet appended describing the restructure
 
 ## Outcomes
 
@@ -85,5 +85,5 @@ _None this session._ All changes were file moves and content edits. The journal 
 - Previous journal entry (skill creation): [0427-T1956-agentforge-process-skill.md](0427-T1956-agentforge-process-skill.md)
 - Skill source: [.agents/skills/agentforge-process-doc/SKILL.md](../../../../../.agents/skills/agentforge-process-doc/SKILL.md)
 - Naming and week-computation rules: [.agents/skills/agentforge-process-doc/MILESTONE-NAMING.md](../../../../../.agents/skills/agentforge-process-doc/MILESTONE-NAMING.md)
-- Tooling changelog entry: [process/02-tooling-and-skills.md](../../02-tooling-and-skills.md) (Changelog, second 2026-04-27 bullet)
+- Tooling changelog entry: [process/milestones/week-1/02-tooling-and-skills.md](../../milestones/week-1/02-tooling-and-skills.md) (Changelog, second 2026-04-27 bullet)
 - AgentForge README (with `course-start` frontmatter): [Documentation/AgentForge/README.md](../../../README.md)

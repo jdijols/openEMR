@@ -1,7 +1,7 @@
 ---
 date: 2026-04-30
 topic: Gate 2 — session handoff (historical; G2-12 closed 2026-04-30)
-superseded_by: 0430-T1830-gate2-closed-g212-manual-smoke.md
+superseded_by: 0430-T0830-gate2-closed-g212-manual-smoke.md
 related_docs:
   - TASKS.md
   - PRD.md (Gate 2 spine)
@@ -9,7 +9,7 @@ related_docs:
 
 # Gate 2 session handoff — what landed, what’s left
 
-**Update:** **G2-12 closed** and Gate 2 marked **CLOSED** in `TASKS.md` with live smoke evidence in [`0430-T1830-gate2-closed-g212-manual-smoke.md`](./0430-T1830-gate2-closed-g212-manual-smoke.md). **Follow-up:** active chart ↔ rail sync is **G3-12** (Gate 3) in the task list (historical notes below may say “G2-14”).
+**Update:** **G2-12 closed** and Gate 2 marked **CLOSED** in `TASKS.md` with live smoke evidence in [`0430-T0830-gate2-closed-g212-manual-smoke.md`](./0430-T0830-gate2-closed-g212-manual-smoke.md). **Follow-up:** active chart ↔ rail sync is **G3-12** (Gate 3) in the task list (historical notes below may say “G2-14”).
 
 ## Goal of this session
 

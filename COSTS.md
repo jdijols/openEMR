@@ -113,7 +113,7 @@ The full §3 spend reconciliation, §4 unit economics, §5 scaled projections wi
 
 ### 3.3 Hosting (Vultr VPS)
 
-**Total: <$15.** The single Vultr VPS (running OpenEMR + MariaDB + agentforge-api + Postgres + Langfuse self-hosted via Docker Compose) was provisioned during Gate 6 deployment (per [Documentation/AgentForge/process/09-vps-live-deployment.md](Documentation/AgentForge/process/09-vps-live-deployment.md)). One week prorated against a ~$48/month High Frequency 4 vCPU / 16 GB instance ≈ $11–14, consistent with the user-reported balance.
+**Total: <$15.** The single Vultr VPS (running OpenEMR + MariaDB + agentforge-api + Postgres + Langfuse self-hosted via Docker Compose) was provisioned during Gate 6 deployment (per [Documentation/AgentForge/process/milestones/week-1/09-vps-live-deployment.md](Documentation/AgentForge/process/milestones/week-1/09-vps-live-deployment.md)). One week prorated against a ~$48/month High Frequency 4 vCPU / 16 GB instance ≈ $11–14, consistent with the user-reported balance.
 
 ### 3.4 Observability (Langfuse Cloud Hobby)
 

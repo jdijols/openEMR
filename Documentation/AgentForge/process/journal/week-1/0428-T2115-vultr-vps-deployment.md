@@ -1,7 +1,7 @@
 ---
 date: 2026-04-28
 topic: Vultr VPS live deploy + nip.io submission URL + ARCHITECTURE VPS wording
-related_milestone: process/09-vps-live-deployment.md
+related_milestone: process/milestones/week-1/09-vps-live-deployment.md
 ---
 
 # Vultr VPS live deploy — session journal
@@ -12,7 +12,7 @@ Ship a **live OpenEMR URL** for Gauntlet MVP submission after DigitalOcean accou
 
 ## Context
 
-Initial plan referenced DigitalOcean + Docker Compose ([`05-stage2-deployment-decision.md`](../../05-stage2-deployment-decision.md)). DigitalOcean account lockout blocked that path; the user proceeded on **Vultr** with Ubuntu 24.04, Docker Engine + Compose plugin, **`docker/development-easy`**, **`dev-reset-install-demodata`** for curated demo, and **nip.io** for a hostname-based submission URL.
+Initial plan referenced DigitalOcean + Docker Compose ([`05-stage2-deployment-decision.md`](../../milestones/week-1/05-stage2-deployment-decision.md)). DigitalOcean account lockout blocked that path; the user proceeded on **Vultr** with Ubuntu 24.04, Docker Engine + Compose plugin, **`docker/development-easy`**, **`dev-reset-install-demodata`** for curated demo, and **nip.io** for a hostname-based submission URL.
 
 ## Key decisions
 
@@ -44,7 +44,7 @@ Initial plan referenced DigitalOcean + Docker Compose ([`05-stage2-deployment-de
 
 - **Prompt:** Update [`ARCHITECTURE.md`](../../../../../ARCHITECTURE.md) from DigitalOcean **droplets** to **Vultr or generic VPS**.
 - **Recommendation:** Prefer **neutral “single Linux VPS / VM”** language everywhere operationally identical; cite **Vultr** once as the deployed provider for MVP where it adds clarity.
-- **Outcome:** See [`ARCHITECTURE.md`](../../../../../ARCHITECTURE.md) edits in this change; milestone [`09-vps-live-deployment.md`](../../09-vps-live-deployment.md).
+- **Outcome:** See [`ARCHITECTURE.md`](../../../../../ARCHITECTURE.md) edits in this change; milestone [`09-vps-live-deployment.md`](../../milestones/week-1/09-vps-live-deployment.md).
 
 ### Decision: Demo data on fresh VPS
 
@@ -69,7 +69,7 @@ Initial plan referenced DigitalOcean + Docker Compose ([`05-stage2-deployment-de
 ## Files touched
 
 - **Created:** `Documentation/AgentForge/process/journal/week-1/0428-T2115-vultr-vps-deployment.md`
-- **Created:** `Documentation/AgentForge/process/09-vps-live-deployment.md`
+- **Created:** `Documentation/AgentForge/process/milestones/week-1/09-vps-live-deployment.md`
 - **Modified:** `Documentation/AgentForge/README.md`
 - **Modified:** `ARCHITECTURE.md`
 
@@ -86,5 +86,5 @@ Initial plan referenced DigitalOcean + Docker Compose ([`05-stage2-deployment-de
 
 ## Links
 
-- Numbered milestone: [process/09-vps-live-deployment.md](../../09-vps-live-deployment.md)
-- Related: [process/05-stage2-deployment-decision.md](../../05-stage2-deployment-decision.md)
+- Numbered milestone: [process/milestones/week-1/09-vps-live-deployment.md](../../milestones/week-1/09-vps-live-deployment.md)
+- Related: [process/milestones/week-1/05-stage2-deployment-decision.md](../../milestones/week-1/05-stage2-deployment-decision.md)

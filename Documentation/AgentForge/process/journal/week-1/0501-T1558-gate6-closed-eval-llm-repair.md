@@ -1,7 +1,7 @@
 ---
 date: 2026-05-01
 topic: Gate 6 closed — repaired phantom prior-session work (G6-15 source, eval runner refactor) + delivered G6-20 structural backfill
-related_milestone: ../../15-gate6-complete.md
+related_milestone: ../../milestones/week-1/15-gate6-complete.md
 related_task_list: ../../../../../TASKS.md
 ---
 
@@ -144,7 +144,7 @@ the prior summary.
 
 - **Created:**
   - `Documentation/AgentForge/process/journal/week-1/0501-T1558-gate6-closed-eval-llm-repair.md`
-  - `Documentation/AgentForge/process/15-gate6-complete.md`
+  - `Documentation/AgentForge/process/milestones/week-1/15-gate6-complete.md`
 - **Modified:**
   - `agentforge/api/package.json` (+ `@ai-sdk/azure ^3.0.59`)
   - `agentforge/api/package-lock.json`
@@ -169,7 +169,7 @@ the prior summary.
     callouts
   - `Documentation/AgentForge/README.md` — process trail row for
     `15-gate6-complete.md`
-  - `Documentation/AgentForge/process/02-tooling-and-skills.md` —
+  - `Documentation/AgentForge/process/milestones/week-1/02-tooling-and-skills.md` —
     changelog bullet for `@ai-sdk/azure` install
 - **Deleted (re-deleted to restore inherited working-tree state — not
   introduced by this session):**
@@ -213,7 +213,7 @@ the prior summary.
 
 ## Links
 
-- Numbered milestone: [process/15-gate6-complete.md](../../15-gate6-complete.md)
+- Numbered milestone: [process/milestones/week-1/15-gate6-complete.md](../../milestones/week-1/15-gate6-complete.md)
 - Task list: [implementation/TASKS.md](../../../../../TASKS.md)
-- Prior milestone: [process/14-gate4-complete.md](../../14-gate4-complete.md)
+- Prior milestone: [process/milestones/week-1/14-gate4-complete.md](../../milestones/week-1/14-gate4-complete.md)
 - Inherited drift: [post-deploy-bug-log.md](../../../implementation/post-deploy-bug-log.md)

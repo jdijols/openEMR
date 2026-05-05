@@ -1,7 +1,7 @@
 ---
 date: 2026-05-02
 topic: Langfuse observability wiring + AI cost analysis + 4-commit cleanup + prod deploy with DB clone
-related_milestone: process/18-langfuse-observability-cost-analysis.md
+related_milestone: process/milestones/week-1/18-langfuse-observability-cost-analysis.md
 ---
 
 # Langfuse observability + cost analysis + prod deploy — session journal
@@ -82,7 +82,7 @@ Pre-session state was the close of Gate 6 (engineering) and a long evening of CU
 ### Created
 
 - `Documentation/AgentForge/process/journal/week-1/0502-T0208-langfuse-observability-prod-deploy.md` (this file)
-- `Documentation/AgentForge/process/18-langfuse-observability-cost-analysis.md`
+- `Documentation/AgentForge/process/milestones/week-1/18-langfuse-observability-cost-analysis.md`
 - `Documentation/AgentForge/implementation/ai-cost-analysis.md` (committed in `ca2006f74`)
 
 ### Modified — `agentforge/api/`
@@ -103,7 +103,7 @@ Pre-session state was the close of Gate 6 (engineering) and a long evening of CU
 
 - `docker/agentforge/secrets.dev.env`, `docker/agentforge/secrets.prod.env` — three Langfuse keys flipped from placeholders to real cloud values (gitignored).
 - `Documentation/AgentForge/README.md` — process trail row 18.
-- `Documentation/AgentForge/process/02-tooling-and-skills.md` — changelog bullet for `langfuse@3.38.20`.
+- `Documentation/AgentForge/process/milestones/week-1/02-tooling-and-skills.md` — changelog bullet for `langfuse@3.38.20`.
 - `TASKS.md` — G7-07 marked `[~]` partial.
 - `Documentation/AgentForge/implementation/post-deploy-bug-log.md` — P1/P2/P3 status updated to "deployed to prod 2026-05-02; full re-smoke deferred to morning."
 
@@ -137,7 +137,7 @@ Pushed to `gitlab/master` and `origin/master` (master is now `fb9613edb`).
 
 ## Links
 
-- Numbered milestone: [process/18-langfuse-observability-cost-analysis.md](../../18-langfuse-observability-cost-analysis.md)
+- Numbered milestone: [process/milestones/week-1/18-langfuse-observability-cost-analysis.md](../../milestones/week-1/18-langfuse-observability-cost-analysis.md)
 - Cost appendix: [`Documentation/AgentForge/implementation/ai-cost-analysis.md`](../../../implementation/ai-cost-analysis.md)
 - Prior deploy runbook this session adapted from: [process/journal/week-1/0501-T0014-prod-deploy-gates3-5-vps.md](./0501-T0014-prod-deploy-gates3-5-vps.md)
 - Bug log this session updated: [`Documentation/AgentForge/implementation/post-deploy-bug-log.md`](../../../implementation/post-deploy-bug-log.md)

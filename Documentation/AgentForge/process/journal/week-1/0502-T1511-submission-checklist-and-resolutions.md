@@ -50,7 +50,7 @@ submission morning rather than re-deriving the requirement set from the PDF.
   Loom script (45 s / 1 min / 2 min / 30 s / 30 s / 30 s ≈ 5 min); leave
   *script content* for record-time trim with a note in the section header.
 - **Outcome:** Updated in
-  [`PRD.md`](../../../../PRD.md) §0.3 line 35, §13.2.1 header + per-section
+  [`PRD.md`](../../../../../PRD.md) §0.3 line 35, §13.2.1 header + per-section
   timings, §13.2.2 done-means line; in
   [`TASKS.md`](../../../../../TASKS.md)
   G7-01 row; in
@@ -126,15 +126,15 @@ submission).
 
 ## Next steps
 
-- [ ] Update root [`README.md`](../../../../README.md) with an "AgentForge Clinical Copilot" section: deployed link, setup pointer, ARCHITECTURE/AUDIT/USERS/PRD/JOURNEY links (deliverable 1 of the checklist)
+- [ ] Update root [`README.md`](../../../../../README.md) with an "AgentForge Clinical Copilot" section: deployed link, setup pointer, ARCHITECTURE/AUDIT/USERS/PRD/JOURNEY links (deliverable 1 of the checklist)
 - [ ] Pull actual dev-spend numbers from Anthropic console + AssemblyAI dashboard into [`ai-cost-analysis.md`](../../../implementation/ai-cost-analysis.md) §3; flip G7-07 from `[~]` to `[x]`
-- [ ] Record the ~5 min demo video per the compressed [`PRD.md`](../../../../PRD.md) §13.2.1 script; trim content further at record time if it overruns
+- [ ] Record the ~5 min demo video per the compressed [`PRD.md`](../../../../../PRD.md) §13.2.1 script; trim content further at record time if it overruns
 - [ ] Draft the social post in `Documentation/AgentForge/social-post.md` and publish before 12:00 CT Sunday
 - [ ] Run the 11:30 CT cellular smoke check (G7-05) on submission day
 - [ ] Book AI Interview slot within 24 h of submission
 
 ## Links
 
-- Numbered milestone (Gate 7 home): [`process/15-gate6-complete.md`](../../15-gate6-complete.md) (most recent gate close; Gate 7 wraps the submission bundle)
+- Numbered milestone (Gate 7 home): [`process/milestones/week-1/15-gate6-complete.md`](../../milestones/week-1/15-gate6-complete.md) (most recent gate close; Gate 7 wraps the submission bundle)
 - Submission scoreboard: [`implementation/Submission-Checklist.md`](../../../implementation/Submission-Checklist.md)
 - Closed conflict log: [`implementation/open-questions.md`](../../../implementation/open-questions.md) Issue 2

@@ -1,7 +1,7 @@
 ---
 date: 2026-04-28
 topic: Stage 2 deployment stack choice + GitLab push path
-related_milestone: [process/05-stage2-deployment-decision.md](../../05-stage2-deployment-decision.md)
+related_milestone: [process/milestones/week-1/05-stage2-deployment-decision.md](../../milestones/week-1/05-stage2-deployment-decision.md)
 ---
 
 # Stage 2 deployment decision — session journal
@@ -26,7 +26,7 @@ Stage 1 (local Docker easy-dev + demo data) was already verified ([0427-T2145-st
 
 - **Prompt:** Compare **VPS + Docker Compose** vs **Railway / Render / Fly** vs **AWS / GCP**; minimize rework when adding the agent; consider **local LLM on-box** for real-world HIPAA narrative vs Gauntlet’s assumed cloud-provider agreements.
 - **Recommendation:** Prefer **single VPS + Docker Compose** aligned with OpenEMR’s **production-style container story** in-repo—not because most clinics run Compose, but because **upstream artifacts** (Compose layouts, images) map cleanly. Add the agent as **another Compose service** on the **same Docker network**. **Hyperscale cloud** deferred as disproportionate ops for Stage 2. **Vercel** ruled out for **full EMR** (PHP + MariaDB + persistence). **Railway-class PaaS** viable but platform-specific volume/network limits remain a discovery tax versus **one compose file on one VM**.
-- **Outcome:** Documented in [process/05-stage2-deployment-decision.md](../../05-stage2-deployment-decision.md).
+- **Outcome:** Documented in [process/milestones/week-1/05-stage2-deployment-decision.md](../../milestones/week-1/05-stage2-deployment-decision.md).
 
 ### Decision: Defer live provisioning vs diagram / audit priority
 
@@ -37,7 +37,7 @@ Stage 1 (local Docker easy-dev + demo data) was already verified ([0427-T2145-st
 ### Decision: Compliance framing for audits
 
 - **Prompt:** HIPAA, BAAs, local model on VPS vs cloud APIs; presearch checklist alignment.
-- **Recommendation:** Gauntlet allows assuming **provider non-training** agreements for classwork; **Stage 3 audits** should still treat **logging, retention, breach notification, PHI→LLM boundaries** seriously using [03-presearch-checklist.md](../../03-presearch-checklist.md). **Local inference on VPS** is a plausible production direction but **not automatic HIPAA compliance**—still needs encryption, access control, and vendor posture around the VPS itself.
+- **Recommendation:** Gauntlet allows assuming **provider non-training** agreements for classwork; **Stage 3 audits** should still treat **logging, retention, breach notification, PHI→LLM boundaries** seriously using [03-presearch-checklist.md](../../milestones/week-1/03-presearch-checklist.md). **Local inference on VPS** is a plausible production direction but **not automatic HIPAA compliance**—still needs encryption, access control, and vendor posture around the VPS itself.
 - **Outcome:** Fed into process/05 **future outlook** section for agent + optional local LLM sidecar.
 
 ## Trade-offs and alternatives
@@ -54,7 +54,7 @@ Stage 1 (local Docker easy-dev + demo data) was already verified ([0427-T2145-st
 
 ## Files touched
 
-- **Created:** `Documentation/AgentForge/process/05-stage2-deployment-decision.md`
+- **Created:** `Documentation/AgentForge/process/milestones/week-1/05-stage2-deployment-decision.md`
 - **Created:** `Documentation/AgentForge/process/journal/week-1/0428-T0030-stage2-deployment-decision.md`
 - **Modified:** `Documentation/AgentForge/README.md` (process trail table)
 
@@ -65,10 +65,10 @@ The **numbered trail** now includes **process/05** as the canonical **Stage 2 de
 ## Next steps
 
 - [ ] Provision VPS; install Docker + Compose; align with `docker/production` expectations; TLS + DNS; capture **public Stage 2 URL** when ready.
-- [ ] Stage 3 audits per plan: security, performance, architecture, data quality, compliance/regulatory—guided by [03-presearch-checklist.md](../../03-presearch-checklist.md).
+- [ ] Stage 3 audits per plan: security, performance, architecture, data quality, compliance/regulatory—guided by [03-presearch-checklist.md](../../milestones/week-1/03-presearch-checklist.md).
 - [ ] Architecture diagram: client → TLS → OpenEMR container → MariaDB; future **agent** + optional **local inference** sidecar on same host/network.
 
 ## Links
 
-- Numbered milestone: [process/05-stage2-deployment-decision.md](../../05-stage2-deployment-decision.md)
-- Presearch checklist: [process/03-presearch-checklist.md](../../03-presearch-checklist.md)
+- Numbered milestone: [process/milestones/week-1/05-stage2-deployment-decision.md](../../milestones/week-1/05-stage2-deployment-decision.md)
+- Presearch checklist: [process/milestones/week-1/03-presearch-checklist.md](../../milestones/week-1/03-presearch-checklist.md)

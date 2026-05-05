@@ -1,7 +1,7 @@
 ---
 date: 2026-04-29
 topic: Gate 1 security primitives closeout
-related_milestone: process/11-gate0-complete.md
+related_milestone: process/milestones/week-1/11-gate0-complete.md
 ---
 
 # Gate 1 security closeout — session journal
@@ -118,4 +118,4 @@ Gate 1 is closed in the implementation task list. Automated tests and local smok
 
 - Gate 1 smoke evidence: [0429-T2151-gate1-security-smoke.md](0429-T2151-gate1-security-smoke.md)
 - Task list: [TASKS.md](../../../../../TASKS.md)
-- Numbered milestone context: [process/11-gate0-complete.md](../../11-gate0-complete.md)
+- Numbered milestone context: [process/milestones/week-1/11-gate0-complete.md](../../milestones/week-1/11-gate0-complete.md)

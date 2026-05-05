@@ -1,7 +1,7 @@
 ---
 date: 2026-05-01
 topic: Simplify auto case presentation brief to three fixed sections
-related_milestone: [process/13-gate3-complete.md](../../13-gate3-complete.md)
+related_milestone: [process/milestones/week-1/13-gate3-complete.md](../../milestones/week-1/13-gate3-complete.md)
 ---
 
 # Simplify patient brief — session journal
@@ -78,5 +78,5 @@ The auto brief is now **three Markdown headings** with **deterministic** reason 
 
 ## Links
 
-- Numbered milestone: [process/13-gate3-complete.md](../../13-gate3-complete.md)
+- Numbered milestone: [process/milestones/week-1/13-gate3-complete.md](../../milestones/week-1/13-gate3-complete.md)
 

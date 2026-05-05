@@ -1,7 +1,7 @@
 ---
 date: 2026-04-29
 topic: PRD plan + engineer-facing PRD.md deliverable
-related_milestone: none (trail still ends at process/09-vps-live-deployment.md; process/10-prd.md deferred per plan optional step)
+related_milestone: none (trail still ends at process/milestones/week-1/09-vps-live-deployment.md; process/milestones/week-1/10-prd.md deferred per plan optional step)
 ---
 
 # PRD implementation — session journal
@@ -40,9 +40,9 @@ Stage 4–5 inputs were already locked: persona and UC-A/B/C in [`USERS.md`](../
 - **Recommendation:** Patch §12.5, §13.5, §14 opener for explicit AUDIT/USERS/ARCHITECTURE ties; fix broken anchor typo on USERS §5 citation in storyboard.
 - **Outcome:** Every major §0–§18 has ≥3 corpus refs before handoff; appendix §17 maps section → constraint.
 
-### Decision: numbered process milestone `process/10-prd.md`
+### Decision: numbered process milestone `process/milestones/week-1/10-prd.md`
 
-- **Prompt:** Approved plan deferred adding `Documentation/AgentForge/process/10-prd.md` as optional—not required for graders.
+- **Prompt:** Approved plan deferred adding `Documentation/AgentForge/process/milestones/week-1/10-prd.md` as optional—not required for graders.
 - **Recommendation:** Omit from this chat; capture in Next steps so fresh chat can add row to AgentForge README trail if desired.
 - **Outcome:** _Not created this session._
 
@@ -66,7 +66,7 @@ There is now a single **[`PRD.md`](../../../../../PRD.md)** operationalizing AUD
 ## Next steps
 
 - [ ] Spawn task lists per PRD § (start with §3 scaffold → §4 → §5 in order preferred in §14).
-- [ ] Optional: add [`Documentation/AgentForge/process/10-prd.md`](../../10-prd.md) pointer → root `PRD.md` and update [AgentForge README](../../../README.md) trail table (`#` row 10).
+- [ ] Optional: add [`Documentation/AgentForge/process/milestones/week-1/10-prd.md`](../../milestones/week-1/10-prd.md) pointer → root `PRD.md` and update [AgentForge README](../../../README.md) trail table (`#` row 10).
 - [ ] Implement `oe-module-agentforge`, `agentforge/api`, `agentforge/cui`, `docker/agentforge/` per PRD—not started this session beyond doc spec.
 
 ## Links
@@ -74,4 +74,4 @@ There is now a single **[`PRD.md`](../../../../../PRD.md)** operationalizing AUD
 - PRD artifact: [`PRD.md`](../../../../../PRD.md)
 - Inputs: [`AUDIT.md`](../../../../../AUDIT.md) · [`USERS.md`](../../../../../USERS.md) · [`ARCHITECTURE.md`](../../../../../ARCHITECTURE.md)
 - Plan file (conversation artifact; repo root unaffected): Cursor plan `prd-clinical-copilot-v1`
-- VPS runbook pointer: [`process/09-vps-live-deployment.md`](../../09-vps-live-deployment.md)
+- VPS runbook pointer: [`process/milestones/week-1/09-vps-live-deployment.md`](../../milestones/week-1/09-vps-live-deployment.md)

@@ -1,7 +1,7 @@
 ---
 date: 2026-05-01
 topic: Clinical Copilot auto-brief stuck on “could not be displayed” — Session Storage payload cache poisoning
-related_milestone: [process/13-gate3-complete.md](../../13-gate3-complete.md)
+related_milestone: [process/milestones/week-1/13-gate3-complete.md](../../milestones/week-1/13-gate3-complete.md)
 ---
 
 # Session Storage poisoned brief payloads — session journal
@@ -75,5 +75,5 @@ Operators can recover a “stuck” fallback brief by removing poisoned AgentFor
 
 ## Links
 
-- Numbered milestone: [process/13-gate3-complete.md](../../13-gate3-complete.md)
+- Numbered milestone: [process/milestones/week-1/13-gate3-complete.md](../../milestones/week-1/13-gate3-complete.md)
 - Related journals: [0501-T1500-brief-consistency-cache.md](./0501-T1500-brief-consistency-cache.md), [0501-T2105-cui-conversation-cache-refresh-icon-two-hour-ttl.md](./0501-T2105-cui-conversation-cache-refresh-icon-two-hour-ttl.md)

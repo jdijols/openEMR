@@ -1,7 +1,7 @@
 ---
 date: 2026-05-02
 topic: Open encounter binds to appointment day; automated brief vitals scoped to current encounter
-related_milestone: process/17-encounter-scoped-chart-bind-and-brief.md
+related_milestone: process/milestones/week-1/17-encounter-scoped-chart-bind-and-brief.md
 ---
 
 # Encounter-scoped chart binding and brief vitals — session journal
@@ -20,19 +20,19 @@ Prior `AppointmentEncounterBinder` logic anchored “same day” to `DateTimeImm
 
 - **Prompt:** “If the physician is opening a patient from a specific appointment day, … make that encounter … the current open encounter” regardless of system date; implement as discussed.
 - **Recommendation:** Thread **`pc_eid`** and appointment date into `demographics.php` via query params, persist in session keys `agentforge_appointment_context_*`, and have the binder resolve tracker / same-day encounter / create path against **that** context (with **today** fallback when no context).
-- **Outcome:** Calendar **`goPid`** (day/week/month), patient tracker **`topatient`**, and **`demographics.php`** (`af_appointment_id`, `af_appointment_date`) store context; [`AppointmentEncounterBinder`](../../../../interface/modules/custom_modules/oe-module-agentforge/src/Context/AppointmentEncounterBinder.php) consumes it.
+- **Outcome:** Calendar **`goPid`** (day/week/month), patient tracker **`topatient`**, and **`demographics.php`** (`af_appointment_id`, `af_appointment_date`) store context; [`AppointmentEncounterBinder`](../../../../../interface/modules/custom_modules/oe-module-agentforge/src/Context/AppointmentEncounterBinder.php) consumes it.
 
 ### Decision: Encounter-first vitals in the brief
 
 - **Prompt:** Rename “Recorded today” to “Recorded most recently”; pull vitals for the **current open encounter**, not literal today.
 - **Recommendation:** Filter vitals by **`encounter_id`** (and date fallback when id missing); expose **`encounter_id`** from Context Service **`vitals.php`** so rows align with `form_encounter`; rename headings/empty strings; extend prior-visit vitals input to the same encounter/date rule.
-- **Outcome:** [`case_presentation_format.ts`](../../../../agentforge/api/src/agent/case_presentation_format.ts); [`vitals.php`](../../../../interface/modules/custom_modules/oe-module-agentforge/public/context/vitals.php); Vitest in [`case_presentation.test.ts`](../../../../agentforge/api/test/agent/case_presentation.test.ts).
+- **Outcome:** [`case_presentation_format.ts`](../../../../../agentforge/api/src/agent/case_presentation_format.ts); [`vitals.php`](../../../../../interface/modules/custom_modules/oe-module-agentforge/public/context/vitals.php); Vitest in [`case_presentation.test.ts`](../../../../../agentforge/api/test/agent/case_presentation.test.ts).
 
 ### Decision: Tracker-linked encounter lookup by appointment
 
 - **Prompt:** (Implied from binder design) Prefer precise match when **`pc_eid`** + date/time are known.
 - **Recommendation:** Add **`findTrackerLinkedEncounterForAppointment`** joining `patient_tracker` on **`eid`**, **`apptdate`**, **`appttime`** before falling back to date-only tracker query.
-- **Outcome:** Implemented in [`AppointmentEncounterBinder.php`](../../../../interface/modules/custom_modules/oe-module-agentforge/src/Context/AppointmentEncounterBinder.php).
+- **Outcome:** Implemented in [`AppointmentEncounterBinder.php`](../../../../../interface/modules/custom_modules/oe-module-agentforge/src/Context/AppointmentEncounterBinder.php).
 
 ## Trade-offs and alternatives
 
@@ -70,4 +70,4 @@ Chart opens from calendar/tracker now pass appointment identity into session; Ag
 
 ## Links
 
-- Numbered milestone: [process/17-encounter-scoped-chart-bind-and-brief.md](../../17-encounter-scoped-chart-bind-and-brief.md)
+- Numbered milestone: [process/milestones/week-1/17-encounter-scoped-chart-bind-and-brief.md](../../milestones/week-1/17-encounter-scoped-chart-bind-and-brief.md)

@@ -2,7 +2,7 @@
 
 OpenEMR custom module for **AgentForge V1 Clinical Copilot** ([`PRD.md`](../../../../PRD.md)). Gate 0 scaffold; Context Service endpoints and GACL wiring land in later gates.
 
-**Instructor grading / access policy (who may use Clinical Copilot):** **[`Documentation/AgentForge/process/16-clinical-copilot-acl-role-gate.md`](../../../../Documentation/AgentForge/process/16-clinical-copilot-acl-role-gate.md)** (summary table plus **`admin`/`doc`/`clin`/`breakglass`** vs **`front`**/**`back`**). Session journal: **[`0501-T2135-clinical-copilot-acl-role-gate.md`](../../../../Documentation/AgentForge/process/journal/week-1/0501-T2135-clinical-copilot-acl-role-gate.md)**.
+**Instructor grading / access policy (who may use Clinical Copilot):** **[`Documentation/AgentForge/process/milestones/week-1/16-clinical-copilot-acl-role-gate.md`](../../../../Documentation/AgentForge/process/milestones/week-1/16-clinical-copilot-acl-role-gate.md)** (summary table plus **`admin`/`doc`/`clin`/`breakglass`** vs **`front`**/**`back`**). Session journal: **[`0501-T2135-clinical-copilot-acl-role-gate.md`](../../../../Documentation/AgentForge/process/journal/week-1/0501-T2135-clinical-copilot-acl-role-gate.md)**.
 
 ## §4.9 ACL declarations + no parallel privilege plane
 

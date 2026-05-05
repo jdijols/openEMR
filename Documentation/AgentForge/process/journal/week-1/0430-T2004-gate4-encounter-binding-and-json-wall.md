@@ -22,43 +22,43 @@ Get **G4-08 / G4-09 / G4-11** runnable end-to-end against local OpenEMR + Postgr
 
 - **Prompt:** "Right now, the user cannot send any messages … Message could not be sent. Try again."
 - **Recommendation:** Replace the catch-all red banner with a typed `AgentForgeDeliveryError(kind, correlationId)` from `client.ts`, branched in `App.tsx`. Each `kind` (`misconfigured_llm`, `network_unreachable`, `bad_request`, `backend_error`, `invalid_success_response`) gets a distinct user-visible message and surfaces the server's `correlation_id` for support.
-- **Outcome:** [`agentforge/cui/src/api/client.ts`](../../../../agentforge/cui/src/api/client.ts), [`agentforge/cui/src/App.tsx`](../../../../agentforge/cui/src/App.tsx). New unit test asserts 5xx + 501 + network branches. CUI build re-emitted into the OpenEMR module's `public/cui/`.
+- **Outcome:** [`agentforge/cui/src/api/client.ts`](../../../../../agentforge/cui/src/api/client.ts), [`agentforge/cui/src/App.tsx`](../../../../../agentforge/cui/src/App.tsx). New unit test asserts 5xx + 501 + network branches. CUI build re-emitted into the OpenEMR module's `public/cui/`.
 
 ### Decision: `/health` actually probes Postgres
 
 - **Prompt:** Same chat-failure thread — needed an objective signal that "case presentation works but chat fails" was a Postgres readiness issue.
 - **Recommendation:** Have `/health` run `SELECT 1 FROM agentforge.conversations LIMIT 1`; map success to `postgres: "reachable"`, failure to `postgres: "degraded_chat_requires_migrations_or_url"`, and reflect that into the top-level `ok` boolean.
-- **Outcome:** [`agentforge/api/src/app.ts`](../../../../agentforge/api/src/app.ts), test in [`agentforge/api/test/http/health-and-correlation.test.ts`](../../../../agentforge/api/test/http/health-and-correlation.test.ts). Confirmed in dev: degraded → reachable after migrate + `dev:host`.
+- **Outcome:** [`agentforge/api/src/app.ts`](../../../../../agentforge/api/src/app.ts), test in [`agentforge/api/test/http/health-and-correlation.test.ts`](../../../../../agentforge/api/test/http/health-and-correlation.test.ts). Confirmed in dev: degraded → reachable after migrate + `dev:host`.
 
 ### Decision: add `dev:host` script for host-run API instead of mutating `secrets.dev.env`
 
 - **Prompt:** "now what?" after `/health` showed `degraded_chat_requires_migrations_or_url` even though migrations had run.
 - **Recommendation:** Root cause is `secrets.dev.env` ships `POSTGRES_URL=...@postgres:5432/...` which only resolves inside Compose. Don't change the file (containers need it). Add a script that overrides via `dotenv-cli -v POSTGRES_URL=...@127.0.0.1:15432/...` for host runs. Document in the AgentForge docker README's dev section.
-- **Outcome:** `npm run dev:host` in [`agentforge/api/package.json`](../../../../agentforge/api/package.json), guidance in [`docker/agentforge/README.md`](../../../../docker/agentforge/README.md).
+- **Outcome:** `npm run dev:host` in [`agentforge/api/package.json`](../../../../../agentforge/api/package.json), guidance in [`docker/agentforge/README.md`](../../../../../docker/agentforge/README.md).
 
 ### Decision: split inline-claim JSON inside parsed text blocks (no more JSON wall)
 
 - **Prompt:** "the agent responds with a wall of JSON text. I thought we hardened against this type of response coming back to the end user."
 - **Recommendation:** Pre-existing hardening only handled malformed `{blocks:...}` envelopes. Add `expandEmbeddedClaimsInParsedBlocks` in `parseBlocksFromModelText` to walk every `text` block, extract balanced `{"type":"claim", ...}` objects (string-aware brace matcher), and replace them with real `claim` blocks via the same Zod schema. Tighten the system prompt: "every cite belongs as its own JSON block inside `blocks` — do not interleave with markdown."
-- **Outcome:** [`agentforge/api/src/agent/orchestrator.ts`](../../../../agentforge/api/src/agent/orchestrator.ts), [`agentforge/api/src/agent/system_prompt.ts`](../../../../agentforge/api/src/agent/system_prompt.ts). New regression test in [`test/agent/orchestrator.test.ts`](../../../../agentforge/api/test/agent/orchestrator.test.ts). Initial regex used `"claim"\b` which silently never matched (no word boundary between `"` and `,`); fixed.
+- **Outcome:** [`agentforge/api/src/agent/orchestrator.ts`](../../../../../agentforge/api/src/agent/orchestrator.ts), [`agentforge/api/src/agent/system_prompt.ts`](../../../../../agentforge/api/src/agent/system_prompt.ts). New regression test in [`test/agent/orchestrator.test.ts`](../../../../../agentforge/api/test/agent/orchestrator.test.ts). Initial regex used `"claim"\b` which silently never matched (no word boundary between `"` and `,`); fixed.
 
 ### Decision: pass bound `active_encounter_id` into the chat prompt
 
 - **Prompt:** "The writing is not working because we don't have the ability to create the encounter."
 - **Recommendation:** The session token already carries `encounter_id` (handshake binds `$_SESSION['encounter']` from OpenEMR). The orchestrator was only passing `patient_uuid` to the model, so the LLM had no way to know an encounter was bound and kept asking the user. Verify the session token in `runChatTurn` and prepend `patient_uuid for this turn / active_encounter_id for this turn / server_today` to the prompt; add explicit encounter-binding rules to the system prompt.
-- **Outcome:** [`agentforge/api/src/agent/orchestrator.ts`](../../../../agentforge/api/src/agent/orchestrator.ts), [`agentforge/api/src/agent/system_prompt.ts`](../../../../agentforge/api/src/agent/system_prompt.ts).
+- **Outcome:** [`agentforge/api/src/agent/orchestrator.ts`](../../../../../agentforge/api/src/agent/orchestrator.ts), [`agentforge/api/src/agent/system_prompt.ts`](../../../../../agentforge/api/src/agent/system_prompt.ts).
 
 ### Decision: tobacco / allergy schemas are patient-scoped
 
 - **Prompt:** Same encounter thread — discovered while wiring active_encounter_id that `tobaccoSchema` / `allergySchema` still required `encounter_id` even though the PHP module ignores it (per README: "tobacco; patient-level, no encounter_id").
 - **Recommendation:** Remove `encounter_id` from both Zod schemas (tobacco / allergy proposals). Keep `chiefSchema` and `vitalsSchema` requiring it. Update the G4-05 schema test accordingly.
-- **Outcome:** [`agentforge/api/src/tools/propose_writes.ts`](../../../../agentforge/api/src/tools/propose_writes.ts), [`agentforge/api/test/tools/propose_writes_schema.test.ts`](../../../../agentforge/api/test/tools/propose_writes_schema.test.ts).
+- **Outcome:** [`agentforge/api/src/tools/propose_writes.ts`](../../../../../agentforge/api/src/tools/propose_writes.ts), [`agentforge/api/test/tools/propose_writes_schema.test.ts`](../../../../../agentforge/api/test/tools/propose_writes_schema.test.ts).
 
 ### Decision: `Refresh chart` button + clearer "no encounter" guidance
 
 - **Prompt:** "I'm looking at the new encounter form right now … so you should be able to write what I just dictated to you" (followed by the agent still saying `<none>`).
 - **Recommendation:** Two real causes: (a) the new-encounter **form** is not a saved encounter — `$_SESSION['encounter']` stays unset until the physician clicks **Save Encounter**; (b) even after save, the rail iframe is sticky and still has the old launch code. Add a `Refresh chart` button in `App.tsx` that does `window.location.reload()` to force `panel.php` to mint a fresh launch code with the now-current encounter. Rewrite the system prompt's no-encounter branch to spell out the exact save-then-refresh sequence and to include the encounter id in proposal previews.
-- **Outcome:** [`agentforge/cui/src/App.tsx`](../../../../agentforge/cui/src/App.tsx) + header CSS in [`agentforge/cui/src/index.css`](../../../../agentforge/cui/src/index.css); proposal previews now read `Chief complaint (encounter #N)` / `Vitals (encounter #N) — bp, weight_lb`. CUI bundle rebuilt.
+- **Outcome:** [`agentforge/cui/src/App.tsx`](../../../../../agentforge/cui/src/App.tsx) + header CSS in [`agentforge/cui/src/index.css`](../../../../../agentforge/cui/src/index.css); proposal previews now read `Chief complaint (encounter #N)` / `Vitals (encounter #N) — bp, weight_lb`. CUI bundle rebuilt.
 
 ## Trade-offs and alternatives
 
@@ -122,10 +122,10 @@ curl -s http://localhost:3000/health | python3 -m json.tool   # expect ok:true, 
 
 - [ ] **G4-10** — drive the propose → confirm → write → audit loop on a storyboard patient (Raymond Cooper) using the Refresh-chart workflow; capture screenshots and the `log_from='agent'` audit row in a follow-up journal entry.
 - [ ] If proposals still don't appear in the rail after Refresh chart + saved encounter, dump `select * from agentforge.pending_proposals order by created_at desc limit 5;` and the API console output for the offending correlation id.
-- [ ] After G4-10 is captured, write `process/14-gate4-complete.md` and flip the README trail row.
+- [ ] After G4-10 is captured, write `process/milestones/week-1/14-gate4-complete.md` and flip the README trail row.
 - [ ] Optional follow-up: postMessage-driven auto-refresh of the rail when OpenEMR's parent page changes encounters (avoids the manual Refresh button).
 
 ## Links
 
-- Numbered milestone (when G4-10 lands): `process/14-gate4-complete.md`
+- Numbered milestone (when G4-10 lands): `process/milestones/week-1/14-gate4-complete.md`
 - PRD references: §4.7 (write paths), §5.4 (propose tools), §5.7 (orchestrator), §5.9 (conversation/turn store), §6.5 (proposal cards), §10.2 (no write without confirm), §14.3 (UC-B storyboard).

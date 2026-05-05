@@ -18,8 +18,8 @@ Cross-review of `TASKS.md` against `open-questions.md` flagged two execution ris
 | Item | Gate | Summary |
 | ---- | ---- | -------- |
 | **G3-00** | 3 | Lightweight **Agent Postgres readiness**: pick Node DB client + migration runner, initial migration + `db:migrate` smoke against compose `postgres`, document **Langfuse DB vs agent API DB** (shared vs separate / schema isolation). Marked **complete early in Gate 3**; unlocks conversation/transcript tables. |
-| **G3-13** | 3 | **Dev spend + token accounting**: extend **G0-08** path so each LLM completion emits **metadata-only** structured records (tokens, model, est. USD, `correlation_id`); maintain rolling [`implementation/dev-spend-log.md`](../../implementation/dev-spend-log.md); failures in cost math must not break turns (`cost_usd: null`). |
-| **G7-07** | 7 | Submission artifact **[`implementation/ai-cost-analysis.md`](../../implementation/ai-cost-analysis.md)**: actual spend from log + dashboards, **100 / 1K / 10K / 100K** projections with stated assumptions, **architectural inflection points** per tier. Depends on **G3-13** and **G7-03**. |
+| **G3-13** | 3 | **Dev spend + token accounting**: extend **G0-08** path so each LLM completion emits **metadata-only** structured records (tokens, model, est. USD, `correlation_id`); maintain rolling [`implementation/dev-spend-log.md`](../../../implementation/dev-spend-log.md); failures in cost math must not break turns (`cost_usd: null`). |
+| **G7-07** | 7 | Submission artifact **[`implementation/ai-cost-analysis.md`](../../../implementation/ai-cost-analysis.md)**: actual spend from log + dashboards, **100 / 1K / 10K / 100K** projections with stated assumptions, **architectural inflection points** per tier. Depends on **G3-13** and **G7-03**. |
 | **G4-07** | 4 | **Depends on** now includes **`G3-00`** (in addition to G0-06, G0-07) so conversation store work starts only after migration baseline exists. |
 
 **Exit criteria**

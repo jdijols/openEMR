@@ -1,7 +1,7 @@
 ---
 date: 2026-04-29
 topic: Implementation task list + process milestone 10 (PRD trail)
-related_milestone: process/10-prd.md
+related_milestone: process/milestones/week-1/10-prd.md
 ---
 
 # Task list & process/10-prd — session journal
@@ -12,7 +12,7 @@ Capture AgentForge Clinical Copilot execution planning after [`PRD.md`](../../..
 
 ## Context
 
-[`0429-T2200-prd-implementation-complete.md`](0429-T2200-prd-implementation-complete.md) delivered root `PRD.md` and deferred optional `process/10-prd.md`. This session delivered the structured implementation map and promotes PRD into the numbered process trail.
+[`0429-T2000-prd-implementation-complete.md`](0429-T2000-prd-implementation-complete.md) delivered root `PRD.md` and deferred optional `process/milestones/week-1/10-prd.md`. This session delivered the structured implementation map and promotes PRD into the numbered process trail.
 
 ## Key decisions
 
@@ -30,9 +30,9 @@ Capture AgentForge Clinical Copilot execution planning after [`PRD.md`](../../..
 
 ### Decision: Process trail row #10
 
-- **Prompt:** Add `Documentation/AgentForge/process/10-prd.md` and README row #10 if not already present.
+- **Prompt:** Add `Documentation/AgentForge/process/milestones/week-1/10-prd.md` and README row #10 if not already present.
 - **Recommendation:** Short milestone file linking PRD, implementation task list, and prior/next journals; README single index updated.
-- **Outcome:** [`process/10-prd.md`](../../10-prd.md), README trail row 10.
+- **Outcome:** [`process/milestones/week-1/10-prd.md`](../../milestones/week-1/10-prd.md), README trail row 10.
 
 ## Trade-offs and alternatives
 
@@ -46,7 +46,7 @@ _None installed._ Documentation-only session.
 ## Files touched
 
 - **Created:** [`TASKS.md`](../../../../../TASKS.md)
-- **Created:** [`process/10-prd.md`](../../10-prd.md)
+- **Created:** [`process/milestones/week-1/10-prd.md`](../../milestones/week-1/10-prd.md)
 - **Created:** [`process/journal/week-1/0429-T2100-task-list-process-10.md`](0429-T2100-task-list-process-10.md) (this file)
 - **Modified:** [`Documentation/AgentForge/README.md`](../../../README.md) (process trail row #10)
 
@@ -57,10 +57,10 @@ There is a gate-ordered implementation task list with stop-the-line tests and §
 ## Next steps
 
 - [ ] New chat: execute Gate 0 from [`TASKS.md`](../../../../../TASKS.md) (G0-01 onward).
-- [ ] Optional: bump [`0429-T2200-prd-implementation-complete.md`](0429-T2200-prd-implementation-complete.md) “Next steps” to link `process/10-prd.md` (not required for correctness).
+- [ ] Optional: bump [`0429-T2000-prd-implementation-complete.md`](0429-T2000-prd-implementation-complete.md) “Next steps” to link `process/milestones/week-1/10-prd.md` (not required for correctness).
 
 ## Links
 
-- Milestone: [`process/10-prd.md`](../../10-prd.md)
+- Milestone: [`process/milestones/week-1/10-prd.md`](../../milestones/week-1/10-prd.md)
 - Task list: [`TASKS.md`](../../../../../TASKS.md)
 - PRD: [`PRD.md`](../../../../../PRD.md)

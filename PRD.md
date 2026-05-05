@@ -31,7 +31,7 @@
 The Gauntlet AgentForge submission requires four artifacts. The PRD's "done" definition is anchored to all four landing successfully:
 
 - [ ] **Repo deliverables in this fork:** [`AUDIT.md`](AUDIT.md), [`USERS.md`](USERS.md), [`ARCHITECTURE.md`](ARCHITECTURE.md), this [`PRD.md`](PRD.md), and the implementation code under `interface/modules/custom_modules/oe-module-agentforge/`, `agentforge/api/`, `agentforge/cui/`, and `docker/agentforge/`.
-- [ ] **Live URL** — public HTTPS endpoint served by Caddy on a Linux VPS (default: Vultr per [`process/09-vps-live-deployment.md`](Documentation/AgentForge/process/09-vps-live-deployment.md)). OpenEMR shell + copilot reachable to graders.
+- [ ] **Live URL** — public HTTPS endpoint served by Caddy on a Linux VPS (default: Vultr per [`process/milestones/week-1/09-vps-live-deployment.md`](Documentation/AgentForge/process/milestones/week-1/09-vps-live-deployment.md)). OpenEMR shell + copilot reachable to graders.
 - [ ] **Loom** — **~5 min walkthrough (≤7 min cap)** per Gauntlet PDF Submission Requirements row 5 ("Demo Video (3–5 min)"); hitting architecture decisions, UC-A, UC-B (with at least one confirmed write demonstrated end-to-end), and UC-C.
 - [ ] **Social post** — X or LinkedIn thread per the case study, tagging `@GauntletAI`.
 
@@ -1286,7 +1286,7 @@ The full diagram is in [`ARCHITECTURE.md`](ARCHITECTURE.md). PRD does not duplic
 
 #### 7.3.1 Implementation surface
 
-- For Sun-noon submission: A record `oe.<chosen-domain>` and `api.<chosen-domain>` pointing at the VPS public IPv4. Or, fallback per [`process/09-vps-live-deployment.md`](Documentation/AgentForge/process/09-vps-live-deployment.md): `nip.io` / `sslip.io` hostnames using the public IP (e.g. `oe.<ip>.nip.io`, `api.<ip>.nip.io`) — Caddy obtains certs against the nip.io hostname automatically.
+- For Sun-noon submission: A record `oe.<chosen-domain>` and `api.<chosen-domain>` pointing at the VPS public IPv4. Or, fallback per [`process/milestones/week-1/09-vps-live-deployment.md`](Documentation/AgentForge/process/milestones/week-1/09-vps-live-deployment.md): `nip.io` / `sslip.io` hostnames using the public IP (e.g. `oe.<ip>.nip.io`, `api.<ip>.nip.io`) — Caddy obtains certs against the nip.io hostname automatically.
 - Document the chosen hostnames in `docker/agentforge/README.md`.
 
 #### 7.3.2 Done means
@@ -2206,7 +2206,7 @@ For grader and engineer convenience, the tables below map every PRD section to t
 - [`AUDIT.md`](AUDIT.md) — Stage 3 audit (security, performance, architecture, data quality, compliance findings)
 - [`USERS.md`](USERS.md) — Stage 4 persona, use cases, refusals, degraded behavior
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — Stage 5 architecture, decisions, deployment shape
-- [`Documentation/AgentForge/process/09-vps-live-deployment.md`](Documentation/AgentForge/process/09-vps-live-deployment.md) — Vultr VPS deployment runbook
+- [`Documentation/AgentForge/process/milestones/week-1/09-vps-live-deployment.md`](Documentation/AgentForge/process/milestones/week-1/09-vps-live-deployment.md) — Vultr VPS deployment runbook
 - [`Documentation/AgentForge/cohort/appointments.md`](Documentation/AgentForge/cohort/appointments.md) — synthetic appointment grid
 - [`contrib/util/agentforge/seed_cohort.php`](contrib/util/agentforge/seed_cohort.php), [`contrib/util/agentforge/seed_appointments.php`](contrib/util/agentforge/seed_appointments.php) — existing seed scripts reused in §12.1
 - [`Documentation/AgentForge/references/Week 1 - AgentForge.pdf`](Documentation/AgentForge/references/Week%201%20-%20AgentForge.pdf) — case study

@@ -12,7 +12,7 @@ Two related UX threads in one session: (1) replace every UI-rendered "AgentForge
 
 ## Context
 
-Submission deadline is 2026-05-03 noon CT; this session is surface polish ahead of the cut. "AgentForge" remains the **internal** developer-facing name (PHP namespaces, TS class names, file paths, dev docs all stay) — only end-user UI text changes. The Clinical Copilot ACL gate and module install flow already exist ([process/16](../../16-clinical-copilot-acl-role-gate.md)) but the registrar's display fields were write-once, so any stale row on prod/dev would never refresh.
+Submission deadline is 2026-05-03 noon CT; this session is surface polish ahead of the cut. "AgentForge" remains the **internal** developer-facing name (PHP namespaces, TS class names, file paths, dev docs all stay) — only end-user UI text changes. The Clinical Copilot ACL gate and module install flow already exist ([process/16](../../milestones/week-1/16-clinical-copilot-acl-role-gate.md)) but the registrar's display fields were write-once, so any stale row on prod/dev would never refresh.
 
 ## Key decisions
 
@@ -26,7 +26,7 @@ Submission deadline is 2026-05-03 noon CT; this session is surface polish ahead 
 
 - **Prompt:** "The module listing still reads 'AgentForge...' when it should read 'Clinical Copilot by Jason Dijols'"
 - **Recommendation:** The stale row predated the rename — registrar's `ensureRegistered()` only INSERTed on missing row, never UPDATEd. Split the single MOD_NAME into three constants (MOD_NAME for the Module column, MOD_UI_NAME for Menu Text, MOD_NICK_NAME for Nick Name) and updated `moduleConfig.php` `author` to "Jason Dijols".
-- **Outcome:** [AgentForgeModuleRegistrar.php](../../../../interface/modules/custom_modules/oe-module-agentforge/src/Install/AgentForgeModuleRegistrar.php) now carries three display constants; one-shot SQL UPDATE applied to dev DB.
+- **Outcome:** [AgentForgeModuleRegistrar.php](../../../../../interface/modules/custom_modules/oe-module-agentforge/src/Install/AgentForgeModuleRegistrar.php) now carries three display constants; one-shot SQL UPDATE applied to dev DB.
 
 ### Decision: registrar gains an auto-refresh path with operator-disable precedence
 
@@ -38,13 +38,13 @@ Submission deadline is 2026-05-03 noon CT; this session is surface polish ahead 
 
 - **Prompt:** (Discovered when re-running `bin/agentforge-enable.php` and seeing `Module (Clinical Copilot by Jason Dijols) could not be initialized` from Laminas.)
 - **Recommendation:** The `modules` table's PRIMARY KEY is the composite `(mod_id, mod_directory)` — `mod_id` alone is NOT unique. The initial `UPDATE … WHERE mod_id = ?` clobbered an unrelated Laminas fixture row (`Patientvalidation`) that happened to share `mod_id=6`, causing Laminas to try to load a class literally named "Clinical Copilot by Jason Dijols". Re-scoped the UPDATE to `WHERE mod_id = ? AND mod_directory = ?` and restored the Patientvalidation row.
-- **Outcome:** [QueryUtilsModulesRegistryStore.php](../../../../interface/modules/custom_modules/oe-module-agentforge/src/Install/QueryUtilsModulesRegistryStore.php) UPDATE now safe; interface signature updated; test fixtures track `(mod_id, mod_directory)` pairs explicitly.
+- **Outcome:** [QueryUtilsModulesRegistryStore.php](../../../../../interface/modules/custom_modules/oe-module-agentforge/src/Install/QueryUtilsModulesRegistryStore.php) UPDATE now safe; interface signature updated; test fixtures track `(mod_id, mod_directory)` pairs explicitly.
 
 ### Decision: CUI header gains Today + Visit History buttons; OpenEMR top strip auto-collapses
 
 - **Prompt:** "I want to add a second text that reads 'Today'... opens up the current open encounter for this patient. I also want to add a second button to the left of the refresh button in the header [with] a clock icon... [opens] the visit history... I also want the CUI panel to default to the widest width possible... [and] the top section of the open EMR UI to be collapsed by default."
 - **Recommendation:** "Today" reuses the existing NAV_REQUEST `kind: 'encounter'` plumbing pointed at `data-bound-encounter-id` (the AppointmentEncounterBinder's pick). New NAV_REQUEST `kind: 'visit_history'` mirrors `topWin.encounterList()` → `/interface/patient_file/history/encounters.php` in the "enc" tab. Default width raised to MAX_WIDTH (600px) only when sessionStorage is empty (preserves sticky width). Top strip (`#attendantData`) collapsed once per session via an `agentforge.attendant.initialized` sessionStorage flag — sticky if user manually re-expands.
-- **Outcome:** Header restructured into two columns (left: patient name link + Today; right: visit history + refresh). Bootstrap.php `RAIL_WIDTH_PX` raised to 600 to prevent FOUC. Three new functions in [App.tsx](../../../../agentforge/cui/src/App.tsx): `requestEncounterNavigation`, `requestVisitHistoryNavigation`, `IconVisitHistory`.
+- **Outcome:** Header restructured into two columns (left: patient name link + Today; right: visit history + refresh). Bootstrap.php `RAIL_WIDTH_PX` raised to 600 to prevent FOUC. Three new functions in [App.tsx](../../../../../agentforge/cui/src/App.tsx): `requestEncounterNavigation`, `requestVisitHistoryNavigation`, `IconVisitHistory`.
 
 ### Decision: Today restyled from text-link to bordered pill button matching icon-button chrome
 
@@ -119,4 +119,4 @@ Submission deadline is 2026-05-03 noon CT; this session is surface polish ahead 
 ## Links
 
 - Numbered milestone (if any): _None this session — could fold into a future "G6 polish" entry._
-- Related ADR / external doc: [process/16-clinical-copilot-acl-role-gate.md](../../16-clinical-copilot-acl-role-gate.md) — same brand surface, ACL/role context.
+- Related ADR / external doc: [process/milestones/week-1/16-clinical-copilot-acl-role-gate.md](../../milestones/week-1/16-clinical-copilot-acl-role-gate.md) — same brand surface, ACL/role context.

@@ -1,7 +1,7 @@
 ---
 date: 2026-04-30
 topic: Gate 3 formal close + CUI/case presentation/session doc (task list, parser, citations)
-related_milestone: process/13-gate3-complete.md, implementation/TASKS.md
+related_milestone: process/milestones/week-1/13-gate3-complete.md, implementation/TASKS.md
 ---
 
 # Gate 3 closed — session journal
@@ -37,8 +37,8 @@ Gate 3 engineering (endpoints, verification, auto case presentation, G3-00 / G3-
 ### Decision: Gate 3 closed vs deferred work
 
 - **Prompt:** Mark G3-01 / G3-11 complete without blocking on small changes; move polish to a later gate if needed.
-- **Recommendation:** **`[x]`** G3-01 / G3-11 for shipped MUST scope; **G6-20** = Context HTTP matrix backfill; **G6-14** = ≥3 chart-open case presentation rehearsals + demo storyboard; **G7-08** = case presentation + CUI polish (tier 1). Gate 3 status **CLOSED (2026-04-30)**; add **process/13-gate3-complete.md** and README trail row 13.
-- **Outcome:** `TASKS.md` (Gate 3 header, G6-14/20, G7-08, cut-tier matrix); `README.md`; `dev-spend-log.md` row; this journal; **`process/13-gate3-complete.md`**.
+- **Recommendation:** **`[x]`** G3-01 / G3-11 for shipped MUST scope; **G6-20** = Context HTTP matrix backfill; **G6-14** = ≥3 chart-open case presentation rehearsals + demo storyboard; **G7-08** = case presentation + CUI polish (tier 1). Gate 3 status **CLOSED (2026-04-30)**; add **process/milestones/week-1/13-gate3-complete.md** and README trail row 13.
+- **Outcome:** `TASKS.md` (Gate 3 header, G6-14/20, G7-08, cut-tier matrix); `README.md`; `dev-spend-log.md` row; this journal; **`process/milestones/week-1/13-gate3-complete.md`**.
 
 ### Decision: Remove “Refresh case presentation” control
 
@@ -60,14 +60,14 @@ Gate 3 engineering (endpoints, verification, auto case presentation, G3-00 / G3-
 - **Modified:** `TASKS.md`
 - **Modified:** `Documentation/AgentForge/README.md`
 - **Modified:** `Documentation/AgentForge/implementation/dev-spend-log.md`
-- **Created:** `Documentation/AgentForge/process/13-gate3-complete.md`
+- **Created:** `Documentation/AgentForge/process/milestones/week-1/13-gate3-complete.md`
 - **Created:** `Documentation/AgentForge/process/journal/week-1/0430-T1558-gate3-closed-session-summary.md`
 - **Earlier in same thread (code):** `agentforge/api/src/agent/orchestrator.ts`, `verification.ts`, `openemr/types.ts`, `case_presentation_prompt.ts`, `system_prompt.ts`, `agentforge/cui/src/chat/MessageList.tsx`, `App.tsx`, `types/chat.ts`, `index.css`, tests under `agentforge/api/test/` and `agentforge/cui/src/`, bundled assets under `interface/modules/custom_modules/oe-module-agentforge/public/cui/`
 
 ## Outcomes
 
 - **Gate 3** is marked **CLOSED** in the task list with explicit deferrals (**G6-14**, **G6-20**, **G7-08**).
-- Process trail includes **[`process/13-gate3-complete.md`](../../13-gate3-complete.md)**.
+- Process trail includes **[`process/milestones/week-1/13-gate3-complete.md`](../../milestones/week-1/13-gate3-complete.md)**.
 - This journal captures parser/citation/UI/gate decisions so a **new Gate 4 chat** can start from a clear baseline.
 
 ## Next steps
@@ -78,5 +78,5 @@ Gate 3 engineering (endpoints, verification, auto case presentation, G3-00 / G3-
 
 ## Links
 
-- Milestone: [process/13-gate3-complete.md](../../13-gate3-complete.md)
+- Milestone: [process/milestones/week-1/13-gate3-complete.md](../../milestones/week-1/13-gate3-complete.md)
 - Task list: [TASKS.md](../../../../../TASKS.md)

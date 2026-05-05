@@ -1,11 +1,11 @@
 ---
 source: Gauntlet AI — Week 1 AgentForge case study
-fork_docs_path: Documentation/AgentForge/process/01-agentforge-impressions.md
+fork_docs_path: Documentation/AgentForge/process/milestones/week-1/01-agentforge-impressions.md
 ---
 
 # AgentForge Clinical Copilot — Impressions & Open Questions
 
-Notes expanding on [Week 1 - AgentForge.pdf](../references/Week%201%20-%20AgentForge.pdf) (*Gauntlet AI — Clinical Copilot / Project Requirements*).
+Notes expanding on [Week 1 - AgentForge.pdf](../../../references/Week%201%20-%20AgentForge.pdf) (*Gauntlet AI — Clinical Copilot / Project Requirements*).
 
 ---
 

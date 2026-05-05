@@ -8,7 +8,7 @@ Copy this file to `Documentation/AgentForge/process/journal/week-N/MMDD-THHMM-<s
 ---
 date: YYYY-MM-DD
 topic: <one-line topic>
-related_milestone: <e.g. process/04-users-and-workflow.md, or "none">
+related_milestone: <e.g. process/milestones/week-1/04-users-and-workflow.md, or "none">
 ---
 
 # <Topic> — session journal
@@ -73,7 +73,7 @@ related_milestone: <e.g. process/04-users-and-workflow.md, or "none">
 
 ## Links
 
-- Numbered milestone (if any): [process/NN-...](../NN-....md)
+- Numbered milestone (if any): [process/milestones/week-N/NN-...](../../milestones/week-N/NN-....md)
 - Related ADR / external doc: <url>
 ```
 

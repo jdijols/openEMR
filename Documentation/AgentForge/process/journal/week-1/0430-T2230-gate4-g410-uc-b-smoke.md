@@ -44,5 +44,5 @@
 
 ## Handoff
 
-- **Gate 4** marked closed in [`TASKS.md`](../../../../../TASKS.md); milestone [`../../14-gate4-complete.md`](../../14-gate4-complete.md).
+- **Gate 4** marked closed in [`TASKS.md`](../../../../../TASKS.md); milestone [`../../milestones/week-1/14-gate4-complete.md`](../../milestones/week-1/14-gate4-complete.md).
 - **Next chat:** Gate 5 — STT + UC-C per task list § Gate 5.

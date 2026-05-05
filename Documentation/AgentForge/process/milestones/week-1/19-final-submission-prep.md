@@ -4,7 +4,7 @@
 
 ## Decisions
 
-The full pivot-by-pivot reasoning lives in the session journal: [journal/week-1/0503-T0237-submission-final-pass.md](journal/week-1/0503-T0237-submission-final-pass.md). One-line summaries:
+The full pivot-by-pivot reasoning lives in the session journal: [journal/week-1/0503-T0237-submission-final-pass.md](../../journal/week-1/0503-T0237-submission-final-pass.md). One-line summaries:
 
 - **Rebrand product/program split.** "Clinical Copilot" is the product (front-of-portfolio); "AgentForge" stays as the Gauntlet program/cohort context. Internal `agentforge/` directory and `oe-module-agentforge` PHP module names preserved to avoid disrupting the live demo. Filesystem rename deferred post-submission.
 - **README narrative leads with "automation, not advice".** Sinsky 2016 *Annals of Internal Medicine* 2:1 EHR/desk-vs-face-time ratio anchors the problem statement. Non-goals are a real section, not a footnote.
@@ -23,8 +23,8 @@ The full pivot-by-pivot reasoning lives in the session journal: [journal/week-1/
 
 ## Cross-references
 
-- Session journal (full reasoning): [journal/week-1/0503-T0237-submission-final-pass.md](journal/week-1/0503-T0237-submission-final-pass.md)
-- Eval suite: [agentforge/api/eval/](../../../agentforge/api/eval/)
-- New write-side PHP code: [interface/modules/custom_modules/oe-module-agentforge/src/Write/](../../../interface/modules/custom_modules/oe-module-agentforge/src/Write/) (VitalsDelete*, ChiefComplaintDeleteAction)
-- Submission deliverables tracker: [implementation/Submission-Checklist.md](../implementation/Submission-Checklist.md)
+- Session journal (full reasoning): [journal/week-1/0503-T0237-submission-final-pass.md](../../journal/week-1/0503-T0237-submission-final-pass.md)
+- Eval suite: [agentforge/api/eval/](../../../../../agentforge/api/eval/)
+- New write-side PHP code: [interface/modules/custom_modules/oe-module-agentforge/src/Write/](../../../../../interface/modules/custom_modules/oe-module-agentforge/src/Write/) (VitalsDelete*, ChiefComplaintDeleteAction)
+- Submission deliverables tracker: [implementation/Submission-Checklist.md](../../../implementation/Submission-Checklist.md)
 - Prior milestone: [18-langfuse-observability-cost-analysis.md](18-langfuse-observability-cost-analysis.md)

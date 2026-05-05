@@ -21,7 +21,7 @@ types that the agent sends."*
 
 Pre-session state:
 
-- [agentforge/cui/src/chat/MessageList.tsx](../../../../agentforge/cui/src/chat/MessageList.tsx)
+- [agentforge/cui/src/chat/MessageList.tsx](../../../../../agentforge/cui/src/chat/MessageList.tsx)
   rendered all assistant `text` and `claim` content as React string children.
   `displayAssistantText` only stripped a legacy `One-liner:` prefix; no
   Markdown pipeline existed.
@@ -39,14 +39,14 @@ Pre-session state:
 - **Prompt:** *"Can we have some mechanism inside whatever is our final
   validation of agent messages to include the proper formatting…"*
 - **Recommendation:** Keep `verifyClinicalBlocks`
-  ([agentforge/api/src/agent/orchestrator.ts](../../../../agentforge/api/src/agent/orchestrator.ts))
+  ([agentforge/api/src/agent/orchestrator.ts](../../../../../agentforge/api/src/agent/orchestrator.ts))
   focused on clinical integrity (claims, citations, evidence). Markdown is a
   **presentation** concern — render it once in the rail so the same model
   output reads identically in chat turns and the auto-brief, without
   rewriting bytes mid-pipeline or expanding the block schema with a
   `format` flag.
 - **Outcome:** No server-side block transform. Single rendering point added
-  in [agentforge/cui/src/chat/AssistantMarkdown.tsx](../../../../agentforge/cui/src/chat/AssistantMarkdown.tsx).
+  in [agentforge/cui/src/chat/AssistantMarkdown.tsx](../../../../../agentforge/cui/src/chat/AssistantMarkdown.tsx).
 
 ### Decision: `react-markdown` + `remark-gfm` + `rehype-sanitize` over a micro-renderer
 
@@ -71,7 +71,7 @@ Pre-session state:
   EHR. `refusal.reason` is a machine code (`blocked_cross_patient_tool_args`),
   not prose. Everything else (text, claim text segments, claim legacy text,
   warning text) gets Markdown.
-- **Outcome:** [renderBlock in MessageList.tsx](../../../../agentforge/cui/src/chat/MessageList.tsx)
+- **Outcome:** [renderBlock in MessageList.tsx](../../../../../agentforge/cui/src/chat/MessageList.tsx)
   branches on `assistantMessage === true` for exactly those four call sites;
   user / proposal / refusal / tool blocks untouched.
 
@@ -80,7 +80,7 @@ Pre-session state:
 - **Prompt:** *(implementation pivot — claim text segments and warning text
   render inside an existing `<p>` or `<button>`; nesting block-level
   Markdown there is invalid HTML.)*
-- **Recommendation:** Two render modes in [AssistantMarkdown.tsx](../../../../agentforge/cui/src/chat/AssistantMarkdown.tsx):
+- **Recommendation:** Two render modes in [AssistantMarkdown.tsx](../../../../../agentforge/cui/src/chat/AssistantMarkdown.tsx):
   block (`<div>` wrapper, full schema) and inline (`<span>` wrapper plus
   `disallowedElements` for `p, h1-h6, ul, ol, li, blockquote, hr, pre,
   table, …` with `unwrapDisallowed: true`). Block Markdown that appears
@@ -95,7 +95,7 @@ Pre-session state:
 - **Prompt:** *(design pivot — the rail iframe is narrow and the panel
   header already owns the largest type.)*
 - **Recommendation:** `components` overrides in
-  [AssistantMarkdown.tsx](../../../../agentforge/cui/src/chat/AssistantMarkdown.tsx)
+  [AssistantMarkdown.tsx](../../../../../agentforge/cui/src/chat/AssistantMarkdown.tsx)
   remap `h1 → h3` and `h2 → h4`. Sanitize schema also strips `img, picture,
   source, input, details, summary, section, div` from GitHub defaults so the
   model can't render a giant photo or open a `<details>` payload inside the
@@ -110,10 +110,10 @@ Pre-session state:
 - **Prompt:** *"…so it shows the markdown syntax as a readable preview"* +
   the brief should benefit too.
 - **Recommendation:** Update
-  [system_prompt.ts](../../../../agentforge/api/src/agent/system_prompt.ts)
+  [system_prompt.ts](../../../../../agentforge/api/src/agent/system_prompt.ts)
   to permit Markdown inside `text` block strings (envelope still must not
   be Markdown-fenced) and update
-  [case_presentation_prompt.ts](../../../../agentforge/api/src/agent/case_presentation_prompt.ts)
+  [case_presentation_prompt.ts](../../../../../agentforge/api/src/agent/case_presentation_prompt.ts)
   to specify `### Interval`, `### Objective`, `### Problems & meds`,
   `### Allergies`, `### Visit topics` instead of bare `"Interval:"` labels.
   Claim blocks stay plain prose so cited phrases remain legible.
@@ -197,7 +197,7 @@ Pre-session state:
   - `agentforge/api/src/agent/case_presentation_prompt.ts` — section
     labels switched from `"Interval:"` to `### Interval` (etc.); claim
     bodies stay plain prose
-  - `Documentation/AgentForge/process/02-tooling-and-skills.md` —
+  - `Documentation/AgentForge/process/milestones/week-1/02-tooling-and-skills.md` —
     changelog bullet for the three new CUI deps
 - **Deleted:** _None this session._
 
@@ -236,6 +236,6 @@ Pre-session state:
 ## Links
 
 - Prior journal: [0501-T1838-cui-panel-polish-header-empty-textarea-buttons.md](./0501-T1838-cui-panel-polish-header-empty-textarea-buttons.md)
-- Component: [agentforge/cui/src/chat/AssistantMarkdown.tsx](../../../../agentforge/cui/src/chat/AssistantMarkdown.tsx)
-- Render wiring: [agentforge/cui/src/chat/MessageList.tsx](../../../../agentforge/cui/src/chat/MessageList.tsx)
-- Prompts: [agentforge/api/src/agent/system_prompt.ts](../../../../agentforge/api/src/agent/system_prompt.ts) · [agentforge/api/src/agent/case_presentation_prompt.ts](../../../../agentforge/api/src/agent/case_presentation_prompt.ts)
+- Component: [agentforge/cui/src/chat/AssistantMarkdown.tsx](../../../../../agentforge/cui/src/chat/AssistantMarkdown.tsx)
+- Render wiring: [agentforge/cui/src/chat/MessageList.tsx](../../../../../agentforge/cui/src/chat/MessageList.tsx)
+- Prompts: [agentforge/api/src/agent/system_prompt.ts](../../../../../agentforge/api/src/agent/system_prompt.ts) · [agentforge/api/src/agent/case_presentation_prompt.ts](../../../../../agentforge/api/src/agent/case_presentation_prompt.ts)

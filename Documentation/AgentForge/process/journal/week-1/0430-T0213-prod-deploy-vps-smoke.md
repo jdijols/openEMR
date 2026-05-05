@@ -1,7 +1,7 @@
 ---
 date: 2026-04-30
 topic: Prod deploy on Vultr VPS — Gate 2 smoke green; G6-18 added
-related_milestone: process/11-gate0-complete.md
+related_milestone: process/milestones/week-1/11-gate0-complete.md
 ---
 
 # Prod deploy + Gate 2 smoke on VPS — session journal
@@ -91,5 +91,5 @@ Earlier today: Gate 2 closed in dev (G2-12 smoke), and G2-14 was renamed/moved t
 ## Links
 
 - Task list: [`TASKS.md`](../../../../../TASKS.md) — see **Gate 6 / G6-18**.
-- Earlier same-day journals: [`0430-T0050-gate2-session-handoff-g212-g214.md`](./0430-T0050-gate2-session-handoff-g212-g214.md), [`0430-T1830-gate2-closed-g212-manual-smoke.md`](./0430-T1830-gate2-closed-g212-manual-smoke.md).
-- Prior VPS deploy reference: [`process/09-vps-live-deployment.md`](../../09-vps-live-deployment.md).
+- Earlier same-day journals: [`0430-T0050-gate2-session-handoff-g212-g214.md`](./0430-T0050-gate2-session-handoff-g212-g214.md), [`0430-T0830-gate2-closed-g212-manual-smoke.md`](./0430-T0830-gate2-closed-g212-manual-smoke.md).
+- Prior VPS deploy reference: [`process/milestones/week-1/09-vps-live-deployment.md`](../../milestones/week-1/09-vps-live-deployment.md).

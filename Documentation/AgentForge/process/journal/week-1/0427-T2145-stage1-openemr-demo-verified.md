@@ -1,7 +1,7 @@
 ---
 date: 2026-04-27
 topic: Stage 1 OpenEMR local — Docker, demo data, Finder
-related_milestone: process/04-stage1-local-dev-runbook.md
+related_milestone: process/milestones/week-1/04-stage1-local-dev-runbook.md
 ---
 
 # Stage 1 OpenEMR demo verified — session journal
@@ -19,8 +19,8 @@ Earlier in the week the plan favored **Docker easy-dev** + **`dev-reset-install-
 ### Decision: Docker easy-dev as canonical local path
 
 - **Prompt:** Plan Stage 1 and later discussion of Gauntlet instructors suggesting Docker might add complexity; deploy target TBD.
-- **Recommendation:** Stay with [docker/development-easy](../../../../docker/development-easy) per upstream [CONTRIBUTING.md](../../../../CONTRIBUTING.md); defer native LAMP and production shape to Presearch ([03-presearch-checklist.md](../../03-presearch-checklist.md)).
-- **Outcome:** Runbook [04-stage1-local-dev-runbook.md](../../04-stage1-local-dev-runbook.md) remains the single source for commands and ports.
+- **Recommendation:** Stay with [docker/development-easy](../../../../../docker/development-easy) per upstream [CONTRIBUTING.md](../../../../../CONTRIBUTING.md); defer native LAMP and production shape to Presearch ([03-presearch-checklist.md](../../milestones/week-1/03-presearch-checklist.md)).
+- **Outcome:** Runbook [04-stage1-local-dev-runbook.md](../../milestones/week-1/04-stage1-local-dev-runbook.md) remains the single source for commands and ports.
 
 ### Decision: Curated demo data only (no Synthea in Stage 1)
 
@@ -54,7 +54,7 @@ Earlier in the week the plan favored **Docker easy-dev** + **`dev-reset-install-
 
 ## Files touched
 
-- **Modified:** `Documentation/AgentForge/process/04-stage1-local-dev-runbook.md`
+- **Modified:** `Documentation/AgentForge/process/milestones/week-1/04-stage1-local-dev-runbook.md`
 - **Created:** `Documentation/AgentForge/process/journal/week-1/0427-T2145-stage1-openemr-demo-verified.md`
 - **Modified:** `Documentation/AgentForge/README.md` (“How to extend” next milestone = `05-`, not duplicate `04-`)
 
@@ -64,11 +64,11 @@ OpenEMR easy-dev runs locally; curated demo dataset is loaded; **Finder** shows 
 
 ## Next steps
 
-- [ ] Work through [03-presearch-checklist.md](../../03-presearch-checklist.md) using a running instance for grounded notes.
+- [ ] Work through [03-presearch-checklist.md](../../milestones/week-1/03-presearch-checklist.md) using a running instance for grounded notes.
 - [ ] (Optional) Record `docker --version` / `docker compose version` in the runbook session table for reproducibility.
 - [ ] (Optional) Log in as `receptionist` or `physician` to compare ACL-visible menus for user-story drafting.
 
 ## Links
 
-- Milestone runbook: [process/04-stage1-local-dev-runbook.md](../../04-stage1-local-dev-runbook.md)
-- Upstream contributor setup: [CONTRIBUTING.md](../../../../CONTRIBUTING.md) (local development + devtools)
+- Milestone runbook: [process/milestones/week-1/04-stage1-local-dev-runbook.md](../../milestones/week-1/04-stage1-local-dev-runbook.md)
+- Upstream contributor setup: [CONTRIBUTING.md](../../../../../CONTRIBUTING.md) (local development + devtools)

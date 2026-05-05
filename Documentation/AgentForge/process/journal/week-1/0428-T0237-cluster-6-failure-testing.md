@@ -1,7 +1,7 @@
 ---
 date: 2026-04-28
 topic: Cluster 6 — Failure modes + testing synthesis
-related_milestone: process/06-stage3-audit.md
+related_milestone: process/milestones/week-1/06-stage3-audit.md
 ---
 
 # Cluster 6 — Failure modes + testing synthesis — session journal
@@ -20,25 +20,25 @@ Cluster 1.5 locked the v1 persona as adult PCP / family medicine for non-emergen
 
 - **Prompt:** "Failure Mode Analysis (§11): tool failures, ambiguous queries, rate limiting/fallbacks, graceful degradation."
 - **Recommendation:** Treat failed chart readers as structured source states rather than generic errors. The agent can answer from successful, cited sources, but must name failed source families as unavailable, unauthorized, unsupported, timed out, malformed, empty, stale, or conflicting.
-- **Outcome:** [`process/03-presearch-checklist.md` §11](../../03-presearch-checklist.md#11-failure-mode-analysis) now blocks uncited fallback prose and separates missing data from authorization failures.
+- **Outcome:** [`process/milestones/week-1/03-presearch-checklist.md` §11](../../milestones/week-1/03-presearch-checklist.md#11-failure-mode-analysis) now blocks uncited fallback prose and separates missing data from authorization failures.
 
 ### Decision: Speed-vs-completeness becomes staged retrieval
 
 - **Prompt:** "Resolve or sharpen open threads only where the audit evidence is sufficient: graceful degradation; speed-vs-completeness."
 - **Recommendation:** Use a speed-first core chart bundle for first useful answers, then make deeper note/document/broad Observation reads explicit follow-ups unless measurement proves they fit the initial latency budget.
-- **Outcome:** [`process/03-presearch-checklist.md` §11](../../03-presearch-checklist.md#11-failure-mode-analysis) now frames speed-vs-completeness as staged answering, preserving Stage 4/5 benchmarks before final architecture selection.
+- **Outcome:** [`process/milestones/week-1/03-presearch-checklist.md` §11](../../milestones/week-1/03-presearch-checklist.md#11-failure-mode-analysis) now frames speed-vs-completeness as staged answering, preserving Stage 4/5 benchmarks before final architecture selection.
 
 ### Decision: Conversational UI needs structured degradation surfaces
 
 - **Prompt:** "conversation-vs-cards interface shape."
 - **Recommendation:** Do not select final UI yet, but require the answer shape to support conversational questions plus structured sections/cards for citations, missing sources, conflicts, and follow-up reads. Pure chat text is too easy to misread when answers are degraded.
-- **Outcome:** [`process/03-presearch-checklist.md` §11](../../03-presearch-checklist.md#11-failure-mode-analysis) records the hybrid evidence direction while preserving Stage 4/5 implementation decisions.
+- **Outcome:** [`process/milestones/week-1/03-presearch-checklist.md` §11](../../milestones/week-1/03-presearch-checklist.md#11-failure-mode-analysis) records the hybrid evidence direction while preserving Stage 4/5 implementation decisions.
 
 ### Decision: Testing starts with source packs and degradation states
 
 - **Prompt:** "Testing Strategy (§13): unit tests for tools, integration tests for agent flows, adversarial tests, regression setup."
 - **Recommendation:** Test deterministic chart readers and answer flows against synthetic fixtures by source-pack shape, claim category, authorization path, missing/conflicting/stale states, prompt injection, and PHI-safe logging behavior before adding provider-heavy evals.
-- **Outcome:** [`process/03-presearch-checklist.md` §13](../../03-presearch-checklist.md#13-testing-strategy) now defines unit, integration, adversarial, and regression coverage without implementing tests or choosing an eval vendor.
+- **Outcome:** [`process/milestones/week-1/03-presearch-checklist.md` §13](../../milestones/week-1/03-presearch-checklist.md#13-testing-strategy) now defines unit, integration, adversarial, and regression coverage without implementing tests or choosing an eval vendor.
 
 ## Trade-offs and alternatives
 
@@ -53,8 +53,8 @@ No installs, schema changes, data imports, runtime benchmarks, or test implement
 
 ## Files touched
 
-- **Modified:** `Documentation/AgentForge/process/03-presearch-checklist.md` (§7, §8, §11, §13).
-- **Modified:** `Documentation/AgentForge/process/06-stage3-audit.md` (Cluster 6 status → Done; status checklist ticked).
+- **Modified:** `Documentation/AgentForge/process/milestones/week-1/03-presearch-checklist.md` (§7, §8, §11, §13).
+- **Modified:** `Documentation/AgentForge/process/milestones/week-1/06-stage3-audit.md` (Cluster 6 status → Done; status checklist ticked).
 - **Created:** `Documentation/AgentForge/process/journal/week-1/0428-T0237-cluster-6-failure-testing.md` (this file).
 
 ## Outcomes
@@ -77,7 +77,7 @@ Cluster 6 is complete. The presearch checklist now has a synthesized failure-mod
 
 ## Links
 
-- Hard-gate deliverable: [`AUDIT.md`](../../../../AUDIT.md)
-- Process pointer for Stage 3: [`process/06-stage3-audit.md`](../../06-stage3-audit.md)
-- Presearch checklist: [`process/03-presearch-checklist.md`](../../03-presearch-checklist.md)
+- Hard-gate deliverable: [`AUDIT.md`](../../../../../AUDIT.md)
+- Process pointer for Stage 3: [`process/milestones/week-1/06-stage3-audit.md`](../../milestones/week-1/06-stage3-audit.md)
+- Presearch checklist: [`process/milestones/week-1/03-presearch-checklist.md`](../../milestones/week-1/03-presearch-checklist.md)
 - Prior performance audit: [`0428-T0225-cluster-5-performance-audit.md`](0428-T0225-cluster-5-performance-audit.md)

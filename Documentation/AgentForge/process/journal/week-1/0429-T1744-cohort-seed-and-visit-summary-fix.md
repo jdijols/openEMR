@@ -55,7 +55,7 @@ Stage 1 demo data path is `dev-reset-install-demodata` (3 patients, thin charts)
 
 - **Use Synthea / `import-random-patients`** — rejected for now. Synthea generates volume but its narratives are not deterministic for an agent-eval setup; the curated cohort gives us *known* clinical content to score retrieval against. Synthea remains a future option for stress / load.
 - **Implement `ImmunizationService::insert` and `ProcedureService::insert` instead of direct SQL** — rejected for scope. Both are real refactors; deferred to a future PR not gated on this cohort.
-- **Promote this work to `process/10-cohort-seed.md`** — deferred. User asked to *document the chat*, not add the next milestone. The cohort + seed mechanism is durable enough to warrant a numbered file when the demo data flow is formally Stage 6 / Stage 7 work; this journal is the source-of-truth in the meantime.
+- **Promote this work to `process/milestones/week-1/10-cohort-seed.md`** — deferred. User asked to *document the chat*, not add the next milestone. The cohort + seed mechanism is durable enough to warrant a numbered file when the demo data flow is formally Stage 6 / Stage 7 work; this journal is the source-of-truth in the meantime.
 - **Patch `interface/globals.php` to store `inhouse_pharmacy` as int** — rejected as the wrong end of the pipe. Every other reader expects truthy; only `newpatient/report.php` was the outlier.
 
 ## Tools, dependencies, commands
@@ -96,10 +96,10 @@ docker compose exec openemr /root/devtools php-log
 
 - [ ] Plan + script the appointments / scheduling layer (recurring cohort + brand-new patients with future visits) so the calendar/tracker UI is also demo-ready.
 - [ ] Decide commit posture: this session leaves `seed_cohort.php`, `cohort/roster.md`, and the `report.php` patch uncommitted. The patch in particular is a clean isolated fix and a candidate for its own commit.
-- [ ] If the cohort generator graduates from "session artifact" to "stage deliverable", lift the highlights into a new numbered file (e.g. `process/10-stage6-cohort-seeding.md` or similar).
+- [ ] If the cohort generator graduates from "session artifact" to "stage deliverable", lift the highlights into a new numbered file (e.g. `process/milestones/week-1/10-stage6-cohort-seeding.md` or similar).
 
 ## Links
 
 - AUDIT cross-refs: [`AUDIT.md` DataQuality-1, DataQuality-5, §6 Pre-Build Imperative #10](../../../../../AUDIT.md)
-- Stage 1 demo data context: [`process/04-stage1-local-dev-runbook.md`](../../04-stage1-local-dev-runbook.md)
+- Stage 1 demo data context: [`process/milestones/week-1/04-stage1-local-dev-runbook.md`](../../milestones/week-1/04-stage1-local-dev-runbook.md)
 - Upstream regression source: OpenEMR PR #11144 (introduced the `getInt(inhouse_pharmacy)` pattern)

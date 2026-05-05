@@ -1,7 +1,7 @@
 ---
 date: 2026-04-30
 topic: Mic-enabled-on-load, WS hardening, and AssemblyAI STT for demo cut
-related_milestone: process/14-gate4-complete.md
+related_milestone: process/milestones/week-1/14-gate4-complete.md
 ---
 
 # Mic-enabled-on-load + AssemblyAI STT — session journal
@@ -107,4 +107,4 @@ Gate 5 had closed earlier today for engineering (G5-01..G5-07) with G5-08 left f
 
 - Plan: [`.cursor/plans/mic-enabled-on-load_d6277ee1.plan.md`](../../../../../.cursor/plans/mic-enabled-on-load_d6277ee1.plan.md)
 - Earlier same-day journals: [`0430-T2145-gate5-stt-uc-c-manual-smoke.md`](./0430-T2145-gate5-stt-uc-c-manual-smoke.md), [`0430-T2230-gate4-g410-uc-b-smoke.md`](./0430-T2230-gate4-g410-uc-b-smoke.md).
-- Gate 4 milestone: [`process/14-gate4-complete.md`](../../14-gate4-complete.md).
+- Gate 4 milestone: [`process/milestones/week-1/14-gate4-complete.md`](../../milestones/week-1/14-gate4-complete.md).

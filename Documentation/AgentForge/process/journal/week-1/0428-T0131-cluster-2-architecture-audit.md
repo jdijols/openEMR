@@ -1,7 +1,7 @@
 ---
 date: 2026-04-28
 topic: Cluster 2 — Architecture audit
-related_milestone: process/06-stage3-audit.md
+related_milestone: process/milestones/week-1/06-stage3-audit.md
 ---
 
 # Cluster 2 — Architecture audit — session journal
@@ -20,25 +20,25 @@ Cluster 1.5 locked the v1 persona as adult PCP / family medicine, non-emergent v
 
 - **Prompt:** "Document how the existing OpenEMR system is organized, where data lives, how the layers interact..."
 - **Recommendation:** Frame OpenEMR as a hybrid system: modern PSR-4 services and API code in `src/`, legacy browser pages in `interface/`, legacy helpers in `library/`, all converging through `interface/globals.php` for site/session/database/auth/module setup.
-- **Outcome:** [`AUDIT.md` §Architecture-1](../../../../AUDIT.md#architecture-1-openemr-is-a-hybrid-legacymodern-system-with-interfaceglobalsphp-as-the-shared-runtime-bridge) landed; presearch §5 now favors a small custom orchestration layer first instead of premature framework complexity.
+- **Outcome:** [`AUDIT.md` §Architecture-1](../../../../../AUDIT.md#architecture-1-openemr-is-a-hybrid-legacymodern-system-with-interfaceglobalsphp-as-the-shared-runtime-bridge) landed; presearch §5 now favors a small custom orchestration layer first instead of premature framework complexity.
 
 ### Decision: Model "chart" as an explicit aggregation, not a native OpenEMR object
 
 - **Prompt:** "Where data lives — Core tables/resources relevant to the v1 persona..."
 - **Recommendation:** Record the v1 chart as distributed sources: `patient_data`, `form_encounter`, `lists`, `prescriptions`, `form_vitals`/`forms`, procedure order/report/result tables, documents, and users/providers, with service/FHIR adapters layered on top.
-- **Outcome:** [`AUDIT.md` §Architecture-2](../../../../AUDIT.md#architecture-2-chart-data-for-the-v1-pcp-persona-is-distributed-across-clinical-tables-and-servicefhir-adapters-not-a-single-chart-summary-object) landed; presearch §7 now lists deterministic chart-reader tools and a source-pack/citation builder.
+- **Outcome:** [`AUDIT.md` §Architecture-2](../../../../../AUDIT.md#architecture-2-chart-data-for-the-v1-pcp-persona-is-distributed-across-clinical-tables-and-servicefhir-adapters-not-a-single-chart-summary-object) landed; presearch §7 now lists deterministic chart-reader tools and a source-pack/citation builder.
 
 ### Decision: Prefer REST/FHIR as the read boundary, but keep an identifier-normalization layer
 
 - **Prompt:** "Integration points for new capabilities... REST/FHIR API consumer..."
 - **Recommendation:** Use REST/FHIR where practical because it is the cleanest read boundary and easiest extraction path, but do not assume it is uniform. Standard routes mix `puuid` and numeric `pid`/`eid`; FHIR resources are cleaner but composite and category-sensitive.
-- **Outcome:** [`AUDIT.md` §Architecture-3](../../../../AUDIT.md#architecture-3-restfhir-apis-provide-the-cleanest-read-boundary-but-identifier-and-resource-coverage-are-uneven-across-standard-and-fhir-routes) landed; presearch §7 now explicitly calls out identifier normalization and FHIR category/code filtering.
+- **Outcome:** [`AUDIT.md` §Architecture-3](../../../../../AUDIT.md#architecture-3-restfhir-apis-provide-the-cleanest-read-boundary-but-identifier-and-resource-coverage-are-uneven-across-standard-and-fhir-routes) landed; presearch §7 now explicitly calls out identifier normalization and FHIR category/code filtering.
 
 ### Decision: Recommend a custom module for the v1 embedded demo path
 
 - **Prompt:** "Recommend the most plausible integration path for v1, but only as far as architecture evidence supports."
 - **Recommendation:** Choose an OpenEMR custom module as the strongest in-repo v1 path because the repo has first-class module bootstrap, namespace loading, menu/page-heading hooks, REST/FHIR route extension events, and active-module access checks. Keep API-only extraction as a design constraint, not the immediate demo surface.
-- **Outcome:** [`AUDIT.md` §Architecture-4](../../../../AUDIT.md#architecture-4-custom-modules-plus-event-hooks-are-the-most-plausible-in-repo-integration-path-for-a-v1-embedded-read-only-copilot) landed; presearch §15 now has a partial hosting/rollback answer based on module architecture.
+- **Outcome:** [`AUDIT.md` §Architecture-4](../../../../../AUDIT.md#architecture-4-custom-modules-plus-event-hooks-are-the-most-plausible-in-repo-integration-path-for-a-v1-embedded-read-only-copilot) landed; presearch §15 now has a partial hosting/rollback answer based on module architecture.
 
 ## Trade-offs and alternatives
 
@@ -55,8 +55,8 @@ Reviewed representative paths: `composer.json`, `public/index.php`, `src/BC/Fall
 ## Files touched
 
 - **Modified:** `AUDIT.md` (added `Architecture-1` through `Architecture-4`; added Architecture methodology in Appendix A).
-- **Modified:** `Documentation/AgentForge/process/03-presearch-checklist.md` (§5 Agent Framework Selection, §7 Tool Design, partial §15 Deployment & Operations).
-- **Modified:** `Documentation/AgentForge/process/06-stage3-audit.md` (Cluster 2 status → Done; status checklist ticked).
+- **Modified:** `Documentation/AgentForge/process/milestones/week-1/03-presearch-checklist.md` (§5 Agent Framework Selection, §7 Tool Design, partial §15 Deployment & Operations).
+- **Modified:** `Documentation/AgentForge/process/milestones/week-1/06-stage3-audit.md` (Cluster 2 status → Done; status checklist ticked).
 - **Created/modified:** `Documentation/AgentForge/process/journal/week-1/0428-T0131-cluster-2-architecture-audit.md` (this file; later postscript added after a clarification pass).
 
 ## Outcomes
@@ -88,7 +88,7 @@ After the formal Cluster 2 write-up, the user asked to slow down and explain the
 
 ## Links
 
-- Hard-gate deliverable: [`AUDIT.md`](../../../../AUDIT.md)
-- Process pointer for Stage 3: [`process/06-stage3-audit.md`](../../06-stage3-audit.md)
-- Presearch checklist: [`process/03-presearch-checklist.md`](../../03-presearch-checklist.md)
+- Hard-gate deliverable: [`AUDIT.md`](../../../../../AUDIT.md)
+- Process pointer for Stage 3: [`process/milestones/week-1/06-stage3-audit.md`](../../milestones/week-1/06-stage3-audit.md)
+- Presearch checklist: [`process/milestones/week-1/03-presearch-checklist.md`](../../milestones/week-1/03-presearch-checklist.md)
 - Prior data spike: [`0428-T0118-cluster-1-5-demo-data-spike.md`](0428-T0118-cluster-1-5-demo-data-spike.md)

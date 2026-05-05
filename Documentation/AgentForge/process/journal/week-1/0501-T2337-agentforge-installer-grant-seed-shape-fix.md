@@ -1,7 +1,7 @@
 ---
 date: 2026-05-01
 topic: Donna Lee Clinical Copilot missing — ACL installer group row shape
-related_milestone: process/16-clinical-copilot-acl-role-gate.md
+related_milestone: process/milestones/week-1/16-clinical-copilot-acl-role-gate.md
 ---
 
 # Donna Lee Clinical Copilot missing — ACL installer grant seed bug
@@ -59,5 +59,5 @@ Sites that ran the module **before** this fix may have **`agentforge` ACO rows**
 
 ## Links
 
-- Policy / layering reference: [process/16-clinical-copilot-acl-role-gate.md](../../16-clinical-copilot-acl-role-gate.md)
+- Policy / layering reference: [process/milestones/week-1/16-clinical-copilot-acl-role-gate.md](../../milestones/week-1/16-clinical-copilot-acl-role-gate.md)
 - Earlier policy journal: [0501-T2135-clinical-copilot-acl-role-gate.md](0501-T2135-clinical-copilot-acl-role-gate.md)

@@ -1,7 +1,7 @@
 # Clinical Copilot
 
-> An OpenEMR-embedded conversational copilot for adult primary care visits.
-> Built on OpenEMR. Developed during the Gauntlet AI AgentForge program.
+> A conversational AI agent for primary healthcare physicians embedded inside the most popular open source electronic health record and medical practice management solution, OpenEMR.  
+> Developed by Jason Dijols during Cohort 5 of the Gauntlet AI program.
 
 **Live demo:** [http://108-61-145-220.nip.io:8300/](http://108-61-145-220.nip.io:8300/) · **Login:** `physician` / `password123` (synthetic data only)
 
@@ -15,7 +15,7 @@ Physicians in adult primary care spend nearly two hours on EHR documentation and
 
 Clinical Copilot is built around that observation. It does not interpret labs, suggest diagnoses, or recommend treatments. It pulls data from the patient's chart on request, proposes structured writes from physician dictation (only after explicit confirmation), and otherwise stays out of the way. The conversational interface is the surface; the work underneath is **automation, not advice**.
 
-\* Sinsky C, Colligan L, Li L, et al. *"Allocation of Physician Time in Ambulatory Practice: A Time and Motion Study in 4 Specialties."* Annals of Internal Medicine. 2016;165(11):753-760.
+ Sinsky C, Colligan L, Li L, et al. *"Allocation of Physician Time in Ambulatory Practice: A Time and Motion Study in 4 Specialties."* Annals of Internal Medicine. 2016;165(11):753-760.
 
 ---
 
@@ -98,8 +98,8 @@ The CUI never holds LLM API keys; only the Agent API talks to the model and STT 
 ## Try it
 
 - **Live demo:** [http://108-61-145-220.nip.io:8300/](http://108-61-145-220.nip.io:8300/) — `physician` / `password123`, synthetic patients only
-- **Local development (Docker):** see [docker/development-easy/](docker/development-easy/) and [Documentation/AgentForge/process/04-stage1-local-dev-runbook.md](Documentation/AgentForge/process/04-stage1-local-dev-runbook.md)
-- **VPS deployment runbook:** see [Documentation/AgentForge/process/09-vps-live-deployment.md](Documentation/AgentForge/process/09-vps-live-deployment.md)
+- **Local development (Docker):** see [docker/development-easy/](docker/development-easy/) and [Documentation/AgentForge/process/milestones/week-1/04-stage1-local-dev-runbook.md](Documentation/AgentForge/process/milestones/week-1/04-stage1-local-dev-runbook.md)
+- **VPS deployment runbook:** see [Documentation/AgentForge/process/milestones/week-1/09-vps-live-deployment.md](Documentation/AgentForge/process/milestones/week-1/09-vps-live-deployment.md)
 
 ---
 
@@ -116,7 +116,7 @@ The submission package and project context, in the order a reader should approac
 | [VERIFICATION.md](VERIFICATION.md)   | Chart-fidelity gate: citation enforcement, negative-claim backing, range guard, med-status warnings — and what verification *does not* catch.                                                                                                                                                                                                                |
 | [EVALUATION.md](EVALUATION.md)       | Eval suite: ten deterministic check rules (stop-the-line invariants + instructor-named failure modes + the constraint-boundary "automation, not advice" gate), 39 curated cases, defense of scope.                                                                                                                                                           |
 | [OBSERVABILITY.md](OBSERVABILITY.md) | Langfuse tracing: per-turn forensic reconstruction, the four required questions answered from logs, PHI redaction.                                                                                                                                                                                                                                           |
-| [COSTS.md](COSTS.md)                 | Actual dev spend (~$258 build total of which $3.34 is variable LLM), per-encounter unit economics, projections at 100 / 1K / 10K / 100K clinicians, architectural inflection points per tier, shipped cost mitigations.                                                                                                                                       |
+| [COSTS.md](COSTS.md)                 | Actual dev spend (~$258 build total of which $3.34 is variable LLM), per-encounter unit economics, projections at 100 / 1K / 10K / 100K clinicians, architectural inflection points per tier, shipped cost mitigations.                                                                                                                                      |
 | [PRD.md](PRD.md)                     | Engineer-facing implementation spec, mapped 1:1 to gates and acceptance criteria.                                                                                                                                                                                                                                                                            |
 | [JOURNEY.md](JOURNEY.md)             | Physician's-eye narrative of one full visit through the shipped CUI.                                                                                                                                                                                                                                                                                         |
 | [TASKS.md](TASKS.md)                 | Gate-by-gate implementation tracking, dependency-ordered.                                                                                                                                                                                                                                                                                                    |

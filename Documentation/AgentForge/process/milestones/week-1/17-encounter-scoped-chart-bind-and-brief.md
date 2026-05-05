@@ -10,7 +10,7 @@ related_journal: process/journal/week-1/0502-T0051-encounter-scope-binding-brief
 
 Anchor product behavior where **the chart open path carries the appointment the clinician clicked**, so **session encounter**, **AgentForge JWT encounter**, and **host “Open Encounter”** stay consistent **across calendar days**, not PHP `today` alone. Extend the **simplified case brief** so **“Recorded most recently”** lists vitals for the **current open encounter**, with Context Service vitals rows carrying **`encounter_id`** for a reliable join.
 
-Session pivot history: [0502-T0051-encounter-scope-binding-brief.md](journal/week-1/0502-T0051-encounter-scope-binding-brief.md).
+Session pivot history: [0502-T0051-encounter-scope-binding-brief.md](../../journal/week-1/0502-T0051-encounter-scope-binding-brief.md).
 
 ---
 
@@ -27,14 +27,14 @@ Session pivot history: [0502-T0051-encounter-scope-binding-brief.md](journal/wee
 
 | Area | Path |
 | ---- | ---- |
-| Binder | [`interface/modules/custom_modules/oe-module-agentforge/src/Context/AppointmentEncounterBinder.php`](../../../interface/modules/custom_modules/oe-module-agentforge/src/Context/AppointmentEncounterBinder.php) |
-| Session + query | [`interface/patient_file/summary/demographics.php`](../../../interface/patient_file/summary/demographics.php) |
-| Calendar | [`interface/main/calendar/modules/PostCalendar/pntemplates/default/views/day/ajax_template.html`](../../../interface/main/calendar/modules/PostCalendar/pntemplates/default/views/day/ajax_template.html) (and `week` / `month` siblings) |
-| Tracker | [`interface/patient_tracker/patient_tracker.php`](../../../interface/patient_tracker/patient_tracker.php) |
-| Brief | [`agentforge/api/src/agent/case_presentation_format.ts`](../../../agentforge/api/src/agent/case_presentation_format.ts) |
-| Vitals context | [`interface/modules/custom_modules/oe-module-agentforge/public/context/vitals.php`](../../../interface/modules/custom_modules/oe-module-agentforge/public/context/vitals.php) |
-| Tests (API) | [`agentforge/api/test/agent/case_presentation.test.ts`](../../../agentforge/api/test/agent/case_presentation.test.ts) |
-| Tests (PHP isolated) | [`tests/Tests/Isolated/Modules/AgentForge/AppointmentEncounterBinderStaticStructureTest.php`](../../../tests/Tests/Isolated/Modules/AgentForge/AppointmentEncounterBinderStaticStructureTest.php) |
+| Binder | [`interface/modules/custom_modules/oe-module-agentforge/src/Context/AppointmentEncounterBinder.php`](../../../../../interface/modules/custom_modules/oe-module-agentforge/src/Context/AppointmentEncounterBinder.php) |
+| Session + query | [`interface/patient_file/summary/demographics.php`](../../../../../interface/patient_file/summary/demographics.php) |
+| Calendar | [`interface/main/calendar/modules/PostCalendar/pntemplates/default/views/day/ajax_template.html`](../../../../../interface/main/calendar/modules/PostCalendar/pntemplates/default/views/day/ajax_template.html) (and `week` / `month` siblings) |
+| Tracker | [`interface/patient_tracker/patient_tracker.php`](../../../../../interface/patient_tracker/patient_tracker.php) |
+| Brief | [`agentforge/api/src/agent/case_presentation_format.ts`](../../../../../agentforge/api/src/agent/case_presentation_format.ts) |
+| Vitals context | [`interface/modules/custom_modules/oe-module-agentforge/public/context/vitals.php`](../../../../../interface/modules/custom_modules/oe-module-agentforge/public/context/vitals.php) |
+| Tests (API) | [`agentforge/api/test/agent/case_presentation.test.ts`](../../../../../agentforge/api/test/agent/case_presentation.test.ts) |
+| Tests (PHP isolated) | [`tests/Tests/Isolated/Modules/AgentForge/AppointmentEncounterBinderStaticStructureTest.php`](../../../../../tests/Tests/Isolated/Modules/AgentForge/AppointmentEncounterBinderStaticStructureTest.php) |
 
 ---
 

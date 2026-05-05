@@ -1,6 +1,6 @@
 # Stage 2 — deployment decision (VPS + Docker Compose)
 
-**Purpose:** Record the **target hosting model** for AgentForge Stage 2 (“live, publicly reachable OpenEMR fork”) and for **later deployment of the clinical agent on the same infrastructure**, without requiring execution notes to exist before the decision is made. This file is the index-worthy summary; session narrative lives in [journal/week-1/0428-T0030-stage2-deployment-decision.md](journal/week-1/0428-T0030-stage2-deployment-decision.md).
+**Purpose:** Record the **target hosting model** for AgentForge Stage 2 (“live, publicly reachable OpenEMR fork”) and for **later deployment of the clinical agent on the same infrastructure**, without requiring execution notes to exist before the decision is made. This file is the index-worthy summary; session narrative lives in [journal/week-1/0428-T0030-stage2-deployment-decision.md](../../journal/week-1/0428-T0030-stage2-deployment-decision.md).
 
 **Status:** **Decision locked.** **Provisioning** (VPS, Compose bring-up, HTTPS, stable URL) may follow in a separate execution block.
 
@@ -10,7 +10,7 @@
 
 **Chosen approach:** A **single Linux VPS** running **Docker Compose**, structured to match OpenEMR’s **production-oriented Docker layout** in this fork: an **OpenEMR/PHP application container**, **MariaDB/MySQL** with **persistent volumes**, and (later) **HTTPS termination** via a reverse proxy (e.g. Caddy, Traefik, or nginx + Let’s Encrypt).
 
-**Execution target (cohort, 2026):** **DigitalOcean Droplet** — same mental model as “generic VPS,” with Compose on Ubuntu, DO Cloud Firewall (80/443/SSH only; DB not public), and DNS to the droplet. Locked in [`ARCHITECTURE.md`](../../../ARCHITECTURE.md) for Stage 5.
+**Execution target (cohort, 2026):** **DigitalOcean Droplet** — same mental model as “generic VPS,” with Compose on Ubuntu, DO Cloud Firewall (80/443/SSH only; DB not public), and DNS to the droplet. Locked in [`ARCHITECTURE.md`](../../../../../ARCHITECTURE.md) for Stage 5.
 
 The **agent** will deploy as **additional Compose services** on the **same host and Docker network**, calling OpenEMR through documented integration surfaces rather than introducing a second hosting paradigm mid-program.
 
@@ -113,4 +113,4 @@ _This section lists expectations only—no claim these steps are completed._
 | Hosting | VPS + Compose | §1–4 above. |
 | Timeline | Decision before live URL | Diagrams target §1 topology without blocking on VPS completion. |
 
-**Journal link:** [0428-T0030-stage2-deployment-decision.md](journal/week-1/0428-T0030-stage2-deployment-decision.md)
+**Journal link:** [0428-T0030-stage2-deployment-decision.md](../../journal/week-1/0428-T0030-stage2-deployment-decision.md)

@@ -1,7 +1,7 @@
 ---
 date: 2026-05-01
 topic: Clinical Copilot GACL role gate — policy + examiner documentation
-related_milestone: process/16-clinical-copilot-acl-role-gate.md
+related_milestone: process/milestones/week-1/16-clinical-copilot-acl-role-gate.md
 ---
 
 # Clinical Copilot GACL role gate — session journal
@@ -51,7 +51,7 @@ _None this session — documentation-only._
 
 ## Files touched
 
-- **Created:** `Documentation/AgentForge/process/16-clinical-copilot-acl-role-gate.md`
+- **Created:** `Documentation/AgentForge/process/milestones/week-1/16-clinical-copilot-acl-role-gate.md`
 - **Created:** `Documentation/AgentForge/process/journal/week-1/0501-T2135-clinical-copilot-acl-role-gate.md`
 - **Modified:** `Documentation/AgentForge/README.md`
 - **Modified:** `README.md`
@@ -68,4 +68,4 @@ Examiner-visible **process/16** describes the **`demo`** + **`use`** stack, writ
 
 ## Links
 
-- Numbered milestone: [process/16-clinical-copilot-acl-role-gate.md](../../16-clinical-copilot-acl-role-gate.md)
+- Numbered milestone: [process/milestones/week-1/16-clinical-copilot-acl-role-gate.md](../../milestones/week-1/16-clinical-copilot-acl-role-gate.md)

@@ -1,7 +1,7 @@
 ---
 date: 2026-04-30
 topic: Gate 3 UX — citation shell navigation, chart_section routing, closing chart clears CUI + session wrap
-related_milestone: Documentation/AgentForge/process/12-gate1-gate2-complete.md, implementation/TASKS.md (Gate 3)
+related_milestone: Documentation/AgentForge/process/milestones/week-1/12-gate1-gate2-complete.md, implementation/TASKS.md (Gate 3)
 ---
 
 # Gate 3 navigation, active chart sync, no-chart UX — session journal

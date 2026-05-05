@@ -1,7 +1,7 @@
 ---
 date: 2026-04-29
 topic: Future appointment seeding, demo patient ID polish, and VPS database mirror
-related_milestone: process/09-vps-live-deployment.md
+related_milestone: process/milestones/week-1/09-vps-live-deployment.md
 ---
 
 # Demo data + VPS mirror — session journal
@@ -12,7 +12,7 @@ Finish the AgentForge demo data layer so the public OpenEMR instance shows a rea
 
 ## Context
 
-The prior session created the longitudinal cohort seeder and fixed Visit Summary rendering. That left one gap: the scheduling layer in `openemr_postcalendar_events`, plus deployment of the resulting local MariaDB state to the Vultr VPS documented in [`process/09-vps-live-deployment.md`](../../09-vps-live-deployment.md).
+The prior session created the longitudinal cohort seeder and fixed Visit Summary rendering. That left one gap: the scheduling layer in `openemr_postcalendar_events`, plus deployment of the resulting local MariaDB state to the Vultr VPS documented in [`process/milestones/week-1/09-vps-live-deployment.md`](../../milestones/week-1/09-vps-live-deployment.md).
 
 ## Key decisions
 
@@ -102,7 +102,7 @@ The local and VPS demo databases now have 28 patients sorted by External ID `000
 
 ## Links
 
-- Numbered milestone: [`process/09-vps-live-deployment.md`](../../09-vps-live-deployment.md)
+- Numbered milestone: [`process/milestones/week-1/09-vps-live-deployment.md`](../../milestones/week-1/09-vps-live-deployment.md)
 - Related journal: [`0429-T1744-cohort-seed-and-visit-summary-fix.md`](0429-T1744-cohort-seed-and-visit-summary-fix.md)
 - Generated cohort manifest: [`Documentation/AgentForge/cohort/roster.md`](../../../cohort/roster.md)
 - Generated appointment manifest: [`Documentation/AgentForge/cohort/appointments.md`](../../../cohort/appointments.md)

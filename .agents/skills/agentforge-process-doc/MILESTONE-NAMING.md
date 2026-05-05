@@ -2,13 +2,14 @@
 
 Quick reference for the AgentForge process trail. The README index is the source of truth; this doc only restates the rules so the agent does not have to re-derive them.
 
-## Numbered process file: `process/NN-<slug>.md`
+## Numbered process file: `process/milestones/week-N/NN-<slug>.md`
 
-- **NN** — two digits, zero-padded (`01`, `02`, …). Next index = `max(#)` in the README table + 1.
+- **Week directory `week-N`** — same `N` as the journal directory; computed from `course-start` (see "Dated journal" section below). Numbering restarts at `01` per week, so `process/milestones/week-1/01-...md` and `process/milestones/week-2/01-...md` both exist as distinct files.
+- **NN** — two digits, zero-padded (`01`, `02`, …). Next index = `max(#)` **within the current week's sub-table** in the README + 1.
 - **slug** — kebab-case, 2–4 words, lowercase, ASCII only. Examples: `users-and-workflow`, `data-model-v1`, `agent-eval-harness`.
-- **One row per file in the README** — same `#`, same path, one-line purpose. Never let a file exist without a row, and never let a row point at a missing file.
+- **One row per file in the README** — same `#`, same path, one-line purpose, in the matching week's sub-table. Never let a file exist without a row, and never let a row point at a missing file.
 - **First version stays small** — title + one-paragraph purpose + whatever decisions exist now. Do not pre-fill empty headings.
-- **Splitting:** if a numbered file grows past ~300 lines or covers two distinct topics, split with a `b` suffix (e.g. `02b-skills-changelog.md`) and add a new row.
+- **Splitting:** if a numbered file grows past ~300 lines or covers two distinct topics, split with a `b` suffix (e.g. `02b-skills-changelog.md`) in the same week directory and add a new row.
 
 ## Dated journal: `process/journal/week-N/MMDD-THHMM-<short-topic>.md`
 
@@ -41,6 +42,8 @@ Quick reference for the AgentForge process trail. The README index is the source
 - A README row with no file.
 - A numbered file that duplicates the entire journal verbatim. (Lift summaries, link the journal.)
 - Writing under `docs/agentforge/` instead of `Documentation/AgentForge/`.
+- Writing a numbered file at the legacy flat path `process/NN-<slug>.md` instead of `process/milestones/week-N/NN-<slug>.md`.
+- Continuing Week 1's numbering into Week 2 (each week's sub-table restarts at `01`).
 - Writing a journal entry without consulting `course-start` in the AgentForge README to compute the week.
-- Proactively creating `week-2/`, `week-3/`, etc. before the first entry for that week is being written.
+- Proactively creating `milestones/week-N/` or `journal/week-N/` for a future week before the first entry for that week is being written.
 - Using a date-only filename (`YYYY-MM-DD-topic.md`) — the convention is `MMDD-THHMM-topic.md` so multiple sessions per day stay distinguishable.

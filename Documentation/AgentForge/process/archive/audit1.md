@@ -1,6 +1,6 @@
 # OpenEMR / AgentForge — Stage 3 Audit
 
-> **Status:** _Complete._ This is the Stage 3 hard-gate evidence and constraints deliverable for the AgentForge work on this OpenEMR fork. Full reasoning lives in dated journal entries under [Documentation/AgentForge/process/journal/](Documentation/AgentForge/process/journal/). For methodology, conventions, and the cluster→section mapping that produced this document, see [Documentation/AgentForge/process/06-stage3-audit.md](Documentation/AgentForge/process/06-stage3-audit.md).
+> **Status:** _Complete._ This is the Stage 3 hard-gate evidence and constraints deliverable for the AgentForge work on this OpenEMR fork. Full reasoning lives in dated journal entries under [Documentation/AgentForge/process/journal/](../journal/). For methodology, conventions, and the cluster→section mapping that produced this document, see [Documentation/AgentForge/process/milestones/week-1/06-stage3-audit.md](../milestones/week-1/06-stage3-audit.md).
 
 ---
 
@@ -28,7 +28,7 @@ Stage 3 does **not** implement AgentForge. It delivers evidence, constraints, an
 
 Sending real PHI to external models without documented compliance controls; role-specific UX promises validated only at the token layer; treating REST/FHIR as automatically identical to “what the clinician sees” without path-by-path authorization proof; or evaluating the PCP persona on stock demo data alone.
 
-Severity, evidence, and mitigations follow in §1–§5 below; dated working notes live under [Documentation/AgentForge/process/journal/](Documentation/AgentForge/process/journal/).
+Severity, evidence, and mitigations follow in §1–§5 below; dated working notes live under [Documentation/AgentForge/process/journal/](../journal/).
 
 ---
 
@@ -260,7 +260,7 @@ _Cluster 1.5 landed `DataQuality-1`; Cluster 4 completed the broader data-qualit
 ### DataQuality-1: Persona viability — adult PCP returning-patient demo coverage
 
 - **Severity:** High
-- **Description:** The bundled OpenEMR development demo dataset (loaded via `dev-reset-install-demodata`) does not support the v1 persona ([→ presearch §1](Documentation/AgentForge/process/03-presearch-checklist.md)). The dataset contains 3 patients with 1 encounter each, all dated 2014-02-01, with placeholder/test SOAP narratives and no labs, immunizations, longitudinal vitals, or modern clinical-notes content. The persona — adult PCP, non-emergent, **returning patients with rich charts** — depends on multi-visit history, lab trends, and meaningful narratives that this dataset cannot produce. Demo-data caveat per §06-stage3-audit §4 methodology rules: this is a finding about the curated dev dataset shipped with OpenEMR, not a guarantee about the shape of real production charts.
+- **Description:** The bundled OpenEMR development demo dataset (loaded via `dev-reset-install-demodata`) does not support the v1 persona ([→ presearch §1](../milestones/week-1/03-presearch-checklist.md)). The dataset contains 3 patients with 1 encounter each, all dated 2014-02-01, with placeholder/test SOAP narratives and no labs, immunizations, longitudinal vitals, or modern clinical-notes content. The persona — adult PCP, non-emergent, **returning patients with rich charts** — depends on multi-visit history, lab trends, and meaningful narratives that this dataset cannot produce. Demo-data caveat per §06-stage3-audit §4 methodology rules: this is a finding about the curated dev dataset shipped with OpenEMR, not a guarantee about the shape of real production charts.
 - **Evidence:** All queries below run via `docker compose exec -T openemr mysql -h mysql -u openemr -popenemr openemr` against the easy-dev stack on 2026-04-28.
     - **Patient roster (3 rows total):** `SELECT pid, fname, lname, DOB, sex FROM patient_data;` → Phil Belford (54M, b. 1972-02-09), Susan Underwood (59F, b. 1967-02-08), Wanda Moore (19F, b. 2007-02-18). No pediatric (<18) and no geriatric (>65) patients.
     - **Encounter depth — zero longitudinal coverage:** `SELECT pid, COUNT(*), MIN(date), MAX(date) FROM form_encounter GROUP BY pid;` → exactly 1 encounter per patient; first = last = 2014-02-01 for all three. **0 patients meet the "≥2 visits" threshold the persona requires.**
@@ -274,7 +274,7 @@ _Cluster 1.5 landed `DataQuality-1`; Cluster 4 completed the broader data-qualit
     - **History-data social fields blank:** `coffee`, `tobacco`, `alcohol`, `exercise_patterns` are empty strings on all 3 `history_data` rows.
 - **Implications for the agent:** The case-study scenario the v1 persona is built around — *"what changed since the last visit"*, *"dense EHR notes... lab results... medication lists"* — cannot be demonstrated, evaluated, or red-teamed against this dataset. Three follow-on consequences: **(1)** any agent demo built directly on the bundled dataset will fail at the persona's core promise; a data-augmentation step (Synthea import or hand-curated longitudinal patients) becomes a hard prerequisite before Cluster 6 (demo) is viable. **(2)** Eval ground truth for verification implementation cannot be authored against patient charts that don't exist — the eval harness requires augmented data first. **(3)** If the verification layer is exercised against this dataset as-is, every claim hits the empty/missing path — useful for refusal/negation behavior but not for source-attribution behavior on populated fields. The persona shape itself remains correct; it is the substrate, not the target, that needs work.
 - **Mitigation / next step:** Treat data augmentation as a hard prerequisite gate before verification/eval implementation and Cluster 6 (demo). Cluster 4 resolved the augmentation direction as hybrid Synthea import (`/root/devtools import-random-patients`) plus hand-curated golden fixtures; see `DataQuality-5`.
-- **Related:** [→ presearch §1](Documentation/AgentForge/process/03-presearch-checklist.md), [→ presearch §3.1](Documentation/AgentForge/process/03-presearch-checklist.md), full Data Quality audit in **Cluster 4**, demo build in **Cluster 6**, [Cluster 1.5 spike journal](Documentation/AgentForge/process/journal/week-1/0428-T0118-cluster-1-5-demo-data-spike.md).
+- **Related:** [→ presearch §1](../milestones/week-1/03-presearch-checklist.md), [→ presearch §3.1](../milestones/week-1/03-presearch-checklist.md), full Data Quality audit in **Cluster 4**, demo build in **Cluster 6**, [Cluster 1.5 spike journal](../journal/week-1/0428-T0118-cluster-1-5-demo-data-spike.md).
 
 ### DataQuality-2: Adult PCP chart facts come from multiple source families with different identifiers, statuses, and freshness semantics
 

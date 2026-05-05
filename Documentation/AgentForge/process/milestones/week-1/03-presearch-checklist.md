@@ -10,7 +10,7 @@ Complete this before writing code. Save your AI conversation as a reference docu
 
 ### **1\. Domain Selection**
 
-_**Persona target locked** by the Cluster 1.5 spike (2026-04-28). The persona shape below holds; **the bundled OpenEMR demo dataset does not support it as shipped** — see [→ AUDIT.md §DataQuality-1](../../../AUDIT.md#dataquality-1-persona-viability--adult-pcp-returning-patient-demo-coverage). Cluster 4 resolved the augmentation direction as **hybrid Synthea + hand-curated eval fixtures**; data augmentation remains a hard prerequisite before verification/eval implementation and Cluster 6 demo work. Persona shape itself was not the problem; the substrate was._
+_**Persona target locked** by the Cluster 1.5 spike (2026-04-28). The persona shape below holds; **the bundled OpenEMR demo dataset does not support it as shipped** — see [→ AUDIT.md §DataQuality-1](../../../../../AUDIT.md#dataquality-1-persona-viability--adult-pcp-returning-patient-demo-coverage). Cluster 4 resolved the augmentation direction as **hybrid Synthea + hand-curated eval fixtures**; data augmentation remains a hard prerequisite before verification/eval implementation and Cluster 6 demo work. Persona shape itself was not the problem; the substrate was._
 
 * Which domain: healthcare, insurance, finance, legal, or custom?
   * **Healthcare** — clinical copilot embedded in this OpenEMR fork.
@@ -20,7 +20,7 @@ _**Persona target locked** by the Cluster 1.5 spike (2026-04-28). The persona sh
   * **v1 visit-type scope:** common, non-emergent appointments — annual physicals, simple acute visits (flu, earache, throat infection, uncomplicated URI), and routine stable-chronic-disease follow-ups (HTN, T2DM, hyperlipidemia at stable doses). **Excludes:** ED / urgent care, specialist consults, complex polypharmacy, oncology, mental-health-only encounters.
   * **v1 workflow:** physician between rooms uses the agent to recall who the patient is, what changed since the last visit, what's on file, and what matters today — using the prior chart as the rich substrate the case study scenario is built around.
   * **Why not pediatric well-child:** attractive in theory (lower acuity, structured vaccine/screening substrate) but the bundled demo has no immunizations, no longitudinal pediatric charts, and no growth data. Adult PCP is the demo-realistic version of the same low-risk story (low-acuity scoped visit types + a longitudinal record once augmented).
-  * **Cluster 1.5 outcome (2026-04-28):** the bundled `dev-reset-install-demodata` ships **3 patients, 1 encounter each, all dated 2014-02-01**, with placeholder SOAP narratives, no labs at any layer, no clinical notes, no immunizations, ICD9-coded problems, and **0 patients meeting the ≥2-visits threshold** the persona requires. Full evidence in [`AUDIT.md` §DataQuality-1](../../../AUDIT.md#dataquality-1-persona-viability--adult-pcp-returning-patient-demo-coverage). Implication: nothing downstream of this line can produce a meaningful demo or eval against the bundled dataset alone — data augmentation remains a prerequisite before verification/eval implementation and demo work.
+  * **Cluster 1.5 outcome (2026-04-28):** the bundled `dev-reset-install-demodata` ships **3 patients, 1 encounter each, all dated 2014-02-01**, with placeholder SOAP narratives, no labs at any layer, no clinical notes, no immunizations, ICD9-coded problems, and **0 patients meeting the ≥2-visits threshold** the persona requires. Full evidence in [`AUDIT.md` §DataQuality-1](../../../../../AUDIT.md#dataquality-1-persona-viability--adult-pcp-returning-patient-demo-coverage). Implication: nothing downstream of this line can produce a meaningful demo or eval against the bundled dataset alone — data augmentation remains a prerequisite before verification/eval implementation and demo work.
   * Personas iterate; pediatric, specialist, hospitalist, and ED variants reserved for later iterations.
 
 * What are the verification requirements for this domain?
@@ -39,18 +39,18 @@ _**Persona target locked** by the Cluster 1.5 spike (2026-04-28). The persona sh
 
 * Expected query volume?
   * **v1 interaction shape:** one selected patient at a time, usually one chart-refresh / summary request when the physician is between rooms, followed by a small number of follow-up questions against the same patient context.
-  * **Current OpenEMR implication:** a useful adult PCP context is not one cheap query. It likely touches 6-8 source families: patient identity/demographics, encounters, problems, allergies, medications/prescriptions, vitals, labs/results, notes/documents, and history/social history. Via REST/FHIR this can become many independent HTTP calls; via internal services it is fewer round-trips but still multiple DB queries and PHP hydration passes. See [→ AUDIT.md §Performance-1](../../../AUDIT.md#performance-1-adult-pcp-chart-context-is-currently-a-multi-read-aggregation-not-a-single-low-latency-chart-summary) and [§Performance-3](../../../AUDIT.md#performance-3-restfhir-is-cleaner-as-a-boundary-but-adds-per-resource-overhead-and-uneven-pagination-behavior).
+  * **Current OpenEMR implication:** a useful adult PCP context is not one cheap query. It likely touches 6-8 source families: patient identity/demographics, encounters, problems, allergies, medications/prescriptions, vitals, labs/results, notes/documents, and history/social history. Via REST/FHIR this can become many independent HTTP calls; via internal services it is fewer round-trips but still multiple DB queries and PHP hydration passes. See [→ AUDIT.md §Performance-1](../../../../../AUDIT.md#performance-1-adult-pcp-chart-context-is-currently-a-multi-read-aggregation-not-a-single-low-latency-chart-summary) and [§Performance-3](../../../../../AUDIT.md#performance-3-restfhir-is-cleaner-as-a-boundary-but-adds-per-resource-overhead-and-uneven-pagination-behavior).
   * **Do not assume batch scale yet:** the course/demo path can start with one active clinician session, but the architecture decision must be based on measured per-patient chart bundle latency before making claims about multi-clinician clinic load.
 
 * Acceptable latency for responses?
   * **Workflow expectation:** "between patient rooms" implies the first useful response must arrive quickly enough to fit a rooming transition, not minutes later. Working budget for planning: first useful chart answer should target seconds, with source-specific fallbacks if slow sources exceed budget.
   * **Not finalized:** speed-vs-completeness remains an open Cluster 6 product decision, but Cluster 5 narrows the measurement requirement: report cold/warm retrieval latency, source-by-source latency, LLM latency, and end-to-end time-to-first-useful-answer before choosing final architecture.
-  * **High-risk sources:** broad Observation reads, labs/procedure lineage, medications/prescriptions, notes/documents, and any route that retrieves full document or note text. See [→ AUDIT.md §Performance-2](../../../AUDIT.md#performance-2-chart-relevant-service-queries-use-wide-joins-unions-and-one-to-many-hydration-that-can-grow-faster-than-the-final-summary) and [§Performance-4](../../../AUDIT.md#performance-4-payload-and-context-window-risk-comes-from-wide-clinical-rows-documents-fhir-wrappers-and-observation-expansion).
+  * **High-risk sources:** broad Observation reads, labs/procedure lineage, medications/prescriptions, notes/documents, and any route that retrieves full document or note text. See [→ AUDIT.md §Performance-2](../../../../../AUDIT.md#performance-2-chart-relevant-service-queries-use-wide-joins-unions-and-one-to-many-hydration-that-can-grow-faster-than-the-final-summary) and [§Performance-4](../../../../../AUDIT.md#performance-4-payload-and-context-window-risk-comes-from-wide-clinical-rows-documents-fhir-wrappers-and-observation-expansion).
 
 * Concurrent user requirements?
   * **Demo requirement:** one authenticated clinician using one selected synthetic/demo patient at a time is enough for course demonstration.
   * **Production-shaped constraint:** do not design a cache or precomputation scheme that assumes a single user, single site, or static permissions. Any cache must be scoped by site, authenticated user/permission context, patient, source set, and retrieval timestamp, and must be invalidated or bypassed when chart facts or access rights change.
-  * **Measurement before scale claims:** measure at least cold/warm single-user performance first; later multi-user load testing should include audit/API logging settings because those settings can add DB writes and PHI-bearing payload storage. See [→ AUDIT.md §Performance-5](../../../AUDIT.md#performance-5-caching-and-observability-can-improve-latency-but-are-phi-sensitive-and-invalidation-heavy).
+  * **Measurement before scale claims:** measure at least cold/warm single-user performance first; later multi-user load testing should include audit/API logging settings because those settings can add DB writes and PHI-bearing payload storage. See [→ AUDIT.md §Performance-5](../../../../../AUDIT.md#performance-5-caching-and-observability-can-improve-latency-but-are-phi-sensitive-and-invalidation-heavy).
 
 * Cost constraints for LLM calls?
   * **No dollar budget selected yet.** Cost is currently a performance/context constraint: wide chart payloads, FHIR wrappers, notes/documents, and broad Observation bundles can inflate tokens before the LLM does any useful reasoning.
@@ -69,7 +69,7 @@ _Cluster 3 filled the security/compliance baseline and Cluster 4 filled the veri
 * What verification is non-negotiable?
   * Source attribution on every clinical claim (allergies, meds, vitals, labs).
   * Hard refusal when the structured data needed for a claim is missing.
-  * Permission-aware retrieval: each chart read must preserve whether access came from UI session inheritance, user ACL, OAuth scope, or patient binding. See [→ AUDIT.md §Security-2](../../../AUDIT.md#security-2-restfhir-auth-is-oauth-scope-based-but-staff-job-roles-collapse-to-users) and [§Security-3](../../../AUDIT.md#security-3-fhir-patient-context-reads-and-staff-acl-reads-follow-different-enforcement-paths).
+  * Permission-aware retrieval: each chart read must preserve whether access came from UI session inheritance, user ACL, OAuth scope, or patient binding. See [→ AUDIT.md §Security-2](../../../../../AUDIT.md#security-2-restfhir-auth-is-oauth-scope-based-but-staff-job-roles-collapse-to-users) and [§Security-3](../../../../../AUDIT.md#security-3-fhir-patient-context-reads-and-staff-acl-reads-follow-different-enforcement-paths).
   * Source-rating policy (signed vs unsigned notes, pharmacy feed vs patient-reported list, etc.) — addressed in **Cluster 4 (Data Quality + Verification)**.
 
 * Human-in-the-loop requirements?
@@ -78,9 +78,9 @@ _Cluster 3 filled the security/compliance baseline and Cluster 4 filled the veri
 
 * Audit/compliance needs?
   * **HIPAA-shaped throughout:** access logging, minimum-necessary reads, PHI-safe logs, retention boundaries, and breach-response handoffs.
-  * Agent read audit must record who accessed which patient/source set and when, without storing full prompts/responses/chart text by default. See [→ AUDIT.md §Compliance-1](../../../AUDIT.md#compliance-1-openemr-has-configurable-audit-logging-but-agent-reads-need-their-own-traceability-model).
-  * External LLM calls against real PHI are blocked until BAA/provider retention/training-data posture is documented. Synthetic/demo data remains acceptable for course work if clearly labeled. See [→ AUDIT.md §Compliance-2](../../../AUDIT.md#compliance-2-external-llm-use-requires-a-phi-boundary-decision-before-any-real-chart-data-leaves-openemr).
-  * Agent artifacts need a retention and breach-response policy before real PHI use: prompts, responses, source packs, eval traces, and provider payload logs are all PHI-bearing unless minimized. See [→ AUDIT.md §Compliance-3](../../../AUDIT.md#compliance-3-current-audit-tables-support-traceability-and-tamper-review-but-do-not-define-an-agentforge-retention-policy).
+  * Agent read audit must record who accessed which patient/source set and when, without storing full prompts/responses/chart text by default. See [→ AUDIT.md §Compliance-1](../../../../../AUDIT.md#compliance-1-openemr-has-configurable-audit-logging-but-agent-reads-need-their-own-traceability-model).
+  * External LLM calls against real PHI are blocked until BAA/provider retention/training-data posture is documented. Synthetic/demo data remains acceptable for course work if clearly labeled. See [→ AUDIT.md §Compliance-2](../../../../../AUDIT.md#compliance-2-external-llm-use-requires-a-phi-boundary-decision-before-any-real-chart-data-leaves-openemr).
+  * Agent artifacts need a retention and breach-response policy before real PHI use: prompts, responses, source packs, eval traces, and provider payload logs are all PHI-bearing unless minimized. See [→ AUDIT.md §Compliance-3](../../../../../AUDIT.md#compliance-3-current-audit-tables-support-traceability-and-tamper-review-but-do-not-define-an-agentforge-retention-policy).
 
 ### **4\. Team & Skill Constraints**
 
@@ -101,7 +101,7 @@ _Cluster 3 filled the security/compliance baseline and Cluster 4 filled the veri
 ### **5\. Agent Framework Selection**
 
 * LangChain vs LangGraph vs CrewAI vs custom?
-  * **Architecture-informed direction:** favor a **small custom orchestration layer first**, not a broad multi-agent framework. OpenEMR already has a complex runtime boundary (legacy UI + `interface/globals.php` + modern services + REST/FHIR), so the early risk is reliable, source-attributed chart retrieval rather than agentic planning. See [→ AUDIT.md §Architecture-1](../../../AUDIT.md#architecture-1-openemr-is-a-hybrid-legacymodern-system-with-interfaceglobalsphp-as-the-shared-runtime-bridge) and [§Architecture-2](../../../AUDIT.md#architecture-2-chart-data-for-the-v1-pcp-persona-is-distributed-across-clinical-tables-and-servicefhir-adapters-not-a-single-chart-summary-object).
+  * **Architecture-informed direction:** favor a **small custom orchestration layer first**, not a broad multi-agent framework. OpenEMR already has a complex runtime boundary (legacy UI + `interface/globals.php` + modern services + REST/FHIR), so the early risk is reliable, source-attributed chart retrieval rather than agentic planning. See [→ AUDIT.md §Architecture-1](../../../../../AUDIT.md#architecture-1-openemr-is-a-hybrid-legacymodern-system-with-interfaceglobalsphp-as-the-shared-runtime-bridge) and [§Architecture-2](../../../../../AUDIT.md#architecture-2-chart-data-for-the-v1-pcp-persona-is-distributed-across-clinical-tables-and-servicefhir-adapters-not-a-single-chart-summary-object).
   * If a framework is added later, **LangGraph** is the leading candidate over CrewAI-style multi-agent orchestration because the use case is a deterministic read-only clinical workflow: retrieve chart facts, cite sources, verify claims, degrade gracefully. Cluster 5 clarified the latency measurements needed before final architecture selection; do not commit until Cluster 6 synthesizes the implementation plan.
 
 * Single agent or multi-agent architecture?
@@ -124,7 +124,7 @@ _Cluster 3 filled the security/compliance baseline and Cluster 4 filled the veri
   * Required for the likely v1 shape: deterministic chart-reader tools need structured arguments, bounded windows/counts, and structured returns with source ids. Function/tool calling performance should be measured as part of end-to-end latency, especially if multiple sequential chart reads are needed.
 
 * Context window needs?
-  * **TBD from measurement.** Current code evidence shows context risk from wide `patient_data` rows, medication/lab joins, document/clinical-note text, FHIR bundle wrappers, and Observation expansion. See [→ AUDIT.md §Performance-4](../../../AUDIT.md#performance-4-payload-and-context-window-risk-comes-from-wide-clinical-rows-documents-fhir-wrappers-and-observation-expansion).
+  * **TBD from measurement.** Current code evidence shows context risk from wide `patient_data` rows, medication/lab joins, document/clinical-note text, FHIR bundle wrappers, and Observation expansion. See [→ AUDIT.md §Performance-4](../../../../../AUDIT.md#performance-4-payload-and-context-window-risk-comes-from-wide-clinical-rows-documents-fhir-wrappers-and-observation-expansion).
   * Minimum requirement is enough room for a bounded source pack, a concise chart summary, the user's question, and citations. Do not choose a massive context model to compensate for unbounded chart retrieval.
 
 * Cost per query acceptable?
@@ -146,7 +146,7 @@ _Cluster 3 filled the security/compliance baseline and Cluster 4 filled the veri
 
 * External API dependencies?
   * **Preferred boundary:** OpenEMR REST/FHIR APIs where they cover the needed chart slice. FHIR is attractive for standardized resources and patient-binding semantics; standard REST is useful for existing OpenEMR-specific resources but mixes `puuid` and numeric `pid` routes.
-  * **In-repo demo boundary:** a custom module can call internal services or narrow read-only module routes, but should keep the data access layer shaped like an API consumer so later extraction remains plausible. See [→ AUDIT.md §Architecture-3](../../../AUDIT.md#architecture-3-restfhir-apis-provide-the-cleanest-read-boundary-but-identifier-and-resource-coverage-are-uneven-across-standard-and-fhir-routes) and [§Architecture-4](../../../AUDIT.md#architecture-4-custom-modules-plus-event-hooks-are-the-most-plausible-in-repo-integration-path-for-a-v1-embedded-read-only-copilot).
+  * **In-repo demo boundary:** a custom module can call internal services or narrow read-only module routes, but should keep the data access layer shaped like an API consumer so later extraction remains plausible. See [→ AUDIT.md §Architecture-3](../../../../../AUDIT.md#architecture-3-restfhir-apis-provide-the-cleanest-read-boundary-but-identifier-and-resource-coverage-are-uneven-across-standard-and-fhir-routes) and [§Architecture-4](../../../../../AUDIT.md#architecture-4-custom-modules-plus-event-hooks-are-the-most-plausible-in-repo-integration-path-for-a-v1-embedded-read-only-copilot).
 
 * Mock vs real data for development?
   * **Real OpenEMR chart reads are required for integration testing**, but the bundled demo data is insufficient for persona/eval work as-is (see `DataQuality-1`). Cluster 4 decision: use a **hybrid** approach — import a small synthetic Synthea cohort for longitudinal chart substrate, then hand-curate 2-3 adult PCP returning-patient cases with ground-truth questions, expected answers, citations, and known missing/conflicting facts. Existing demo data remains useful only for empty/missing-data behavior.
@@ -172,7 +172,7 @@ _Cluster 3 filled the security/compliance baseline and Cluster 4 filled the veri
 
 * Real-time monitoring needs?
   * For demo: lightweight local timing and structured logs over synthetic data are sufficient.
-  * For real PHI: operational logs must avoid full prompts, chart excerpts, API bodies, and generated summaries by default. Log source ids, route names, counts, timings, answer/session ids, and error classes instead. See [→ AUDIT.md §Performance-5](../../../AUDIT.md#performance-5-caching-and-observability-can-improve-latency-but-are-phi-sensitive-and-invalidation-heavy) and [§Security-4](../../../AUDIT.md#security-4-current-logging-surfaces-can-retain-phi-rich-request-sql-and-api-payload-details).
+  * For real PHI: operational logs must avoid full prompts, chart excerpts, API bodies, and generated summaries by default. Log source ids, route names, counts, timings, answer/session ids, and error classes instead. See [→ AUDIT.md §Performance-5](../../../../../AUDIT.md#performance-5-caching-and-observability-can-improve-latency-but-are-phi-sensitive-and-invalidation-heavy) and [§Security-4](../../../../../AUDIT.md#security-4-current-logging-surfaces-can-retain-phi-rich-request-sql-and-api-payload-details).
   * Alerting should cover slow/failed source readers, LLM/provider timeouts, repeated degraded answers, and unexpected API/audit logging configuration changes before production-like use.
 
 * Cost tracking requirements?
@@ -212,7 +212,7 @@ _Cluster 3 filled the security/compliance baseline and Cluster 4 filled the veri
   * **Data-quality claims:** stale, uncoded, inactive/resolved, unsigned/unauthorized where available, source unsupported, and conflicting-source statements.
 
 * Fact-checking data sources?
-  * The canonical fact-checking sources are the exact OpenEMR tables/resources read by the tool boundary, not generated summaries. FHIR resources are acceptable read surfaces when they preserve the underlying OpenEMR row/resource id; FHIR Provenance is useful metadata but not sufficient as the only citation layer. See [→ AUDIT.md §DataQuality-4](../../../AUDIT.md#dataquality-4-fhir-helps-source-attribution-but-does-not-provide-sufficient-provenance-by-itself).
+  * The canonical fact-checking sources are the exact OpenEMR tables/resources read by the tool boundary, not generated summaries. FHIR resources are acceptable read surfaces when they preserve the underlying OpenEMR row/resource id; FHIR Provenance is useful metadata but not sufficient as the only citation layer. See [→ AUDIT.md §DataQuality-4](../../../../../AUDIT.md#dataquality-4-fhir-helps-source-attribution-but-does-not-provide-sufficient-provenance-by-itself).
   * For each verified fact, keep a source pack: source family, table/resource, row UUID/id, patient id, encounter id/date where applicable, field name(s), status/activity/freshness fields, retrieval path, and authorization path from Cluster 3.
   * Labs/results must traverse order/report/result data or the equivalent FHIR Observation/DiagnosticReport resources; medication claims must preserve whether they came from `prescriptions` or `lists`/`lists_medication`.
 
@@ -262,9 +262,9 @@ _Cluster 3 filled the security/compliance baseline and Cluster 4 filled the veri
   * Prompt-injection testing is captured in §13 and remains part of implementation verification; Cluster 3 established the PHI/auth boundary and Cluster 4 established source-attribution requirements.
 
 * Data leakage risks?
-  * **Primary leakage surfaces:** API full-response logging, SQL audit statements/binds, HTTP query-string logging, browser-rendered errors when debug is enabled, generated summaries, and any external LLM prompt/response. See [→ AUDIT.md §Security-4](../../../AUDIT.md#security-4-current-logging-surfaces-can-retain-phi-rich-request-sql-and-api-payload-details).
+  * **Primary leakage surfaces:** API full-response logging, SQL audit statements/binds, HTTP query-string logging, browser-rendered errors when debug is enabled, generated summaries, and any external LLM prompt/response. See [→ AUDIT.md §Security-4](../../../../../AUDIT.md#security-4-current-logging-surfaces-can-retain-phi-rich-request-sql-and-api-payload-details).
   * Do not persist generated clinical summaries as chart data in v1. If summaries are logged for debugging/evals, they are PHI-bearing artifacts and need explicit retention/encryption rules.
-  * The browser UI already exposes PHI to authenticated users; the agent panel should not expand visibility beyond the active user's OpenEMR session/site/patient context. See [→ AUDIT.md §Security-1](../../../AUDIT.md#security-1-browser-ui-authentication-and-chart-context-are-sessionglobal-driven).
+  * The browser UI already exposes PHI to authenticated users; the agent panel should not expand visibility beyond the active user's OpenEMR session/site/patient context. See [→ AUDIT.md §Security-1](../../../../../AUDIT.md#security-1-browser-ui-authentication-and-chart-context-are-sessionglobal-driven).
 
 * API key management?
   * Store LLM/API credentials outside source control and outside patient chart tables. Do not expose provider keys to browser JavaScript.
@@ -273,7 +273,7 @@ _Cluster 3 filled the security/compliance baseline and Cluster 4 filled the veri
 * Audit logging requirements?
   * Log agent read events with authenticated user, site, patient, source ids, retrieval path, timestamp, and answer/session id.
   * Avoid logging full prompts, full chart excerpts, or full generated summaries by default; OpenEMR's current API/audit defaults show why this must be deliberate.
-  * Define retention and purge behavior for every PHI-bearing agent artifact before real-PHI use; current OpenEMR audit tables provide traceability, not an AgentForge-specific retention policy. See [→ AUDIT.md §Compliance-3](../../../AUDIT.md#compliance-3-current-audit-tables-support-traceability-and-tamper-review-but-do-not-define-an-agentforge-retention-policy).
+  * Define retention and purge behavior for every PHI-bearing agent artifact before real-PHI use; current OpenEMR audit tables provide traceability, not an AgentForge-specific retention policy. See [→ AUDIT.md §Compliance-3](../../../../../AUDIT.md#compliance-3-current-audit-tables-support-traceability-and-tamper-review-but-do-not-define-an-agentforge-retention-policy).
   * Preserve the open authorization thread: physician/nurse/resident read scoping must be verified with concrete ACL users before claiming role-specific behavior.
 
 ### **13\. Testing Strategy**
@@ -316,7 +316,7 @@ _Stage 3 close-out — release posture, license posture, and PHI/demo-data bound
 * Licensing considerations?
   * OpenEMR is **GPLv3** — anything that derives from or links into the OpenEMR codebase inherits **GPLv3**.
   * Agent layer designed for **API-only coupling** (HTTP / FHIR) keeps the option to license that layer separately if ever extracted; if shipped as part of this fork, **GPLv3**.
-  * Security/compliance evidence does not change the architecture direction: in-repo module/demo code should be GPLv3-compatible; a separately licensed future service needs true API-only separation and later legal review. See [→ AUDIT.md §Compliance-4](../../../AUDIT.md#compliance-4-gplv3-constrains-release-shape-for-in-repomodule-integration).
+  * Security/compliance evidence does not change the architecture direction: in-repo module/demo code should be GPLv3-compatible; a separately licensed future service needs true API-only separation and later legal review. See [→ AUDIT.md §Compliance-4](../../../../../AUDIT.md#compliance-4-gplv3-constrains-release-shape-for-in-repomodule-integration).
 
 * Documentation requirements?
   * `Documentation/AgentForge/` trail + `AUDIT.md` already double as course deliverable and portfolio evidence.
@@ -333,7 +333,7 @@ _Stage 3 close-out — release posture, license posture, and PHI/demo-data bound
 * Hosting approach?
   * **Evidence-supported direction, not final architecture:** for the in-course v1, the most practical embedded path is an OpenEMR custom module under `interface/modules/custom_modules/`, optionally backed by a separate agent service that consumes REST/FHIR. A pure external service is cleaner for long-term separation, but a module gives the demo an authenticated OpenEMR UI entry point and established menu/page hooks.
   * Do not claim production deployment readiness until Stage 4/5 proves the chart-read boundary, authorization behavior, measured latency/payload budgets, PHI logging posture, and rollback path.
-  * Real-PHI deployment is blocked until BAA/provider status, retention, training-data prohibition, audit traceability, and breach-response ownership are documented. See [→ AUDIT.md §Compliance-2](../../../AUDIT.md#compliance-2-external-llm-use-requires-a-phi-boundary-decision-before-any-real-chart-data-leaves-openemr) and [§Compliance-3](../../../AUDIT.md#compliance-3-current-audit-tables-support-traceability-and-tamper-review-but-do-not-define-an-agentforge-retention-policy).
+  * Real-PHI deployment is blocked until BAA/provider status, retention, training-data prohibition, audit traceability, and breach-response ownership are documented. See [→ AUDIT.md §Compliance-2](../../../../../AUDIT.md#compliance-2-external-llm-use-requires-a-phi-boundary-decision-before-any-real-chart-data-leaves-openemr) and [§Compliance-3](../../../../../AUDIT.md#compliance-3-current-audit-tables-support-traceability-and-tamper-review-but-do-not-define-an-agentforge-retention-policy).
 
 * CI/CD for agent updates?
   * If implemented as an in-repo module, updates ride with this OpenEMR fork's normal branch/PR workflow and GPLv3 posture.
@@ -341,9 +341,9 @@ _Stage 3 close-out — release posture, license posture, and PHI/demo-data bound
   * CI should initially run synthetic/non-PHI checks and source-pack/eval regressions. Real-PHI traces, provider dashboards, and exported eval artifacts remain blocked until retention and BAA posture are approved.
 
 * Monitoring and alerting?
-  * Use OpenEMR's audit surfaces for access traceability where possible, but add an agent-specific read-audit event if needed. Monitoring must avoid full PHI payloads by default; log source ids, route/source family, counts, timings, answer/session ids, degraded-state categories, and error classes instead. See [→ AUDIT.md §Compliance-1](../../../AUDIT.md#compliance-1-openemr-has-configurable-audit-logging-but-agent-reads-need-their-own-traceability-model).
+  * Use OpenEMR's audit surfaces for access traceability where possible, but add an agent-specific read-audit event if needed. Monitoring must avoid full PHI payloads by default; log source ids, route/source family, counts, timings, answer/session ids, degraded-state categories, and error classes instead. See [→ AUDIT.md §Compliance-1](../../../../../AUDIT.md#compliance-1-openemr-has-configurable-audit-logging-but-agent-reads-need-their-own-traceability-model).
   * Alert before production-like use on slow/failed source readers, repeated degraded answers, LLM/provider timeouts, citation/source-pack failures, permission-denied spikes, unexpected broad chart reads, and configuration changes that enable full API/prompt/response logging.
-  * If an external agent service is added, operations must cover provider/API failures, PHI-safe error logs, secret rotation, BAA/provider retention settings, artifact purge, and breach-response handoffs before any real patient data is used. See [→ AUDIT.md §Compliance-3](../../../AUDIT.md#compliance-3-current-audit-tables-support-traceability-and-tamper-review-but-do-not-define-an-agentforge-retention-policy).
+  * If an external agent service is added, operations must cover provider/API failures, PHI-safe error logs, secret rotation, BAA/provider retention settings, artifact purge, and breach-response handoffs before any real patient data is used. See [→ AUDIT.md §Compliance-3](../../../../../AUDIT.md#compliance-3-current-audit-tables-support-traceability-and-tamper-review-but-do-not-define-an-agentforge-retention-policy).
 
 * Rollback strategy?
   * A module-based v1 should have a simple disable path through OpenEMR's module activation model, with no chart-write behavior and no dependency on persisted generated summaries.

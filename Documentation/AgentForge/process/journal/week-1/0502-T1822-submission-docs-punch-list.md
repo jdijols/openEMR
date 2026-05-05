@@ -26,19 +26,19 @@ Gate 6 had already closed (eval suite + Langfuse-live in prod) before this sessi
 
 - **Prompt:** *"this skill should automatically just update the necessary files. That's the big difference here."*
 - **Recommendation:** User reversed earlier propose-then-confirm choice. Pushed back briefly: pure auto-apply on hand-crafted narrative prose is risky if the audit misclassifies. Suggested adding a clean-tree precondition (skill refuses to run if any in-scope file has uncommitted changes) plus an end-of-run summary with `⚠ prose change` markers on `GAP RESOLVED` / `NEW GAP` edits. User accepted.
-- **Outcome:** [.agents/skills/update-submission-files/SKILL.md](../../../.agents/skills/update-submission-files/SKILL.md) runs in auto-apply mode with `git diff HEAD` as the safety net. AUDIT.md and PRD.md excluded from scope (Stage-3 locked content / spec upstream of code). Symlinked into `.claude/skills/` matching the existing project pattern; `.claude/` is gitignored so the symlinks are local-only — canonical files live in `.agents/skills/`.
+- **Outcome:** [.agents/skills/update-submission-files/SKILL.md](../../../../../.agents/skills/update-submission-files/SKILL.md) runs in auto-apply mode with `git diff HEAD` as the safety net. AUDIT.md and PRD.md excluded from scope (Stage-3 locked content / spec upstream of code). Symlinked into `.claude/skills/` matching the existing project pattern; `.claude/` is gitignored so the symlinks are local-only — canonical files live in `.agents/skills/`.
 
 ### Decision: external evidence citation = V2, not V1
 
 - **Prompt:** *"is this something that would be included in the verification layer as described in the project brief PDF and as required by our submission checklist?"*
 - **Recommendation:** No. The brief is consistent that "source attribution" means *patient's file*, not external literature. What the user described (citing PubMed / NEJM / OpenEvidence for general medical-knowledge questions) is *evidence-based citation* — a complementary safety layer, not the brief's verification. Architecturally clean V2 extension though: the citation enforcement layer already operates on UUIDs from any tool source; adding a `lookup_clinical_evidence` tool would extend the same logic without redesign.
-- **Outcome:** Added §7 *"External evidence grounding"* to VERIFICATION.md known-limitations (closes the brief's explicit ask for limitations). Created [Documentation/AgentForge/implementation/v2-roadmap.md](../../implementation/v2-roadmap.md) with evidence-based citation as Theme 1 lead candidate. Avoided adding the implementation < 24 hours from submission.
+- **Outcome:** Added §7 *"External evidence grounding"* to VERIFICATION.md known-limitations (closes the brief's explicit ask for limitations). Created [Documentation/AgentForge/implementation/v2-roadmap.md](../../../implementation/v2-roadmap.md) with evidence-based citation as Theme 1 lead candidate. Avoided adding the implementation < 24 hours from submission.
 
 ### Decision: paraphrase coverage lives at vitest layer, not eval JSON fixtures
 
 - **Prompt:** original punch-list item suggested adding `neg-claim-allergies-paraphrase-*.json` fixtures under `eval/cases/curated/` to cover the documented regex limitation.
 - **Recommendation:** That's the architecturally wrong layer. The eval runner's `negative_claim_requires_empty_query` check operates on synthesized booleans (`negative_claim: true`, `backed_by_empty_query: true`), not on prose, so paraphrase JSON fixtures wouldn't actually exercise the regex. The right location is a vitest end-to-end test through `verifyClinicalBlocks` that asserts both what the regex catches AND what it intentionally misses.
-- **Outcome:** [agentforge/api/test/agent/verification-negative-coverage.test.ts](../../../../agentforge/api/test/agent/verification-negative-coverage.test.ts) — 24 cases. EVALUATION.md "Open gaps" section explains the architectural reframing explicitly so an instructor reading the doc understands why this didn't ship as an eval fixture.
+- **Outcome:** [agentforge/api/test/agent/verification-negative-coverage.test.ts](../../../../../agentforge/api/test/agent/verification-negative-coverage.test.ts) — 24 cases. EVALUATION.md "Open gaps" section explains the architectural reframing explicitly so an instructor reading the doc understands why this didn't ship as an eval fixture.
 
 ### Decision: two commits, push deferred
 
@@ -94,12 +94,12 @@ The submission package now has all six instructor-facing docs at repo root (AUDI
 
 - [ ] Push to `gitlab` (Gauntlet remote) and possibly `origin` per user's call.
 - [ ] Optional: mirror `.github/workflows/agentforge-eval.yml` to `.gitlab-ci.yml` if Gauntlet enforcement matters before submission.
-- [ ] Continue submission preparation per [Submission-Checklist.md](../../implementation/Submission-Checklist.md) — Loom, social post, `submission.md` URL bundle.
+- [ ] Continue submission preparation per [Submission-Checklist.md](../../../implementation/Submission-Checklist.md) — Loom, social post, `submission.md` URL bundle.
 - [ ] Run the `update-submission-files` skill once against a real code change (e.g., the parallel clinical-note write work) to verify the auto-apply flow in practice.
 
 ## Links
 
 - Commit `2b99defb7` — VERIFICATION + EVALUATION + OBSERVABILITY docs at repo root + update-submission-files skill.
 - Commit `885e15e28` — 15-item punch list closure: schema validation, perf budget, eval README, CI workflow, redactor coverage matrix, Langfuse `/health` probe, observability runbook, V2 roadmap.
-- Related milestones: [process/15-gate6-complete.md](../../15-gate6-complete.md) (Gate 6 close — eval + observability infrastructure), [process/18-langfuse-observability-cost-analysis.md](../../18-langfuse-observability-cost-analysis.md) (Langfuse-live in prod).
-- Submission-side: [Submission-Checklist.md](../../implementation/Submission-Checklist.md), [v2-roadmap.md](../../implementation/v2-roadmap.md).
+- Related milestones: [process/milestones/week-1/15-gate6-complete.md](../../milestones/week-1/15-gate6-complete.md) (Gate 6 close — eval + observability infrastructure), [process/milestones/week-1/18-langfuse-observability-cost-analysis.md](../../milestones/week-1/18-langfuse-observability-cost-analysis.md) (Langfuse-live in prod).
+- Submission-side: [Submission-Checklist.md](../../../implementation/Submission-Checklist.md), [v2-roadmap.md](../../../implementation/v2-roadmap.md).
