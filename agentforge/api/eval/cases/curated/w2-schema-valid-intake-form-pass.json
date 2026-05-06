@@ -1,0 +1,49 @@
+{
+  "case_id": "w2-schema-valid-intake-form-pass",
+  "check": "schema_valid",
+  "category": "schema_valid",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-w2-schema-valid-intake-form-pass",
+  "use_case": "W2 §6 — minimal §6-shaped intake_form extraction validates",
+  "context": {
+    "schema": "intake_form",
+    "extraction": {
+      "document_type": "intake_form",
+      "patient_uuid": "22222222-2222-2222-2222-222222222222",
+      "source_document_id": "docref-intake-pass",
+      "demographics": {
+        "name": null,
+        "dob": null,
+        "sex": null,
+        "contact_phone": null,
+        "citation": {
+          "source_type": "intake_form",
+          "source_id": "docref-intake-pass",
+          "page_or_section": "page 1",
+          "field_or_chunk_id": "demographics",
+          "quote_or_value": "header"
+        }
+      },
+      "chief_concern": {
+        "text": "follow-up visit",
+        "onset": null,
+        "citation": {
+          "source_type": "intake_form",
+          "source_id": "docref-intake-pass",
+          "page_or_section": "page 1",
+          "field_or_chunk_id": "chief_concern.text",
+          "quote_or_value": "follow-up visit"
+        }
+      },
+      "current_medications": [],
+      "allergies": [],
+      "family_history": [],
+      "extraction_metadata": {
+        "pages_processed": 1,
+        "overall_confidence": "high",
+        "fields_uncertain": [],
+        "fields_unsupported": []
+      }
+    }
+  }
+}

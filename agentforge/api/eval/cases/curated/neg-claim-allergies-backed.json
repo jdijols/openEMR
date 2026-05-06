@@ -1,6 +1,7 @@
 {
   "case_id": "negative-claim-no-allergies-with-empty-query",
   "check": "negative_claim_requires_empty_query",
+  "category": "factually_consistent",
   "expect_pass_for_eval_report": true,
   "correlation_id": "eval-neg-claim-allergies",
   "use_case": "PRD §9.3 — negative-statement guard happy path",

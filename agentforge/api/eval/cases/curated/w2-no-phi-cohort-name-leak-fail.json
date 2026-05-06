@@ -1,0 +1,11 @@
+{
+  "case_id": "w2-no-phi-cohort-name-leak-fail",
+  "check": "no_phi_in_logs",
+  "category": "no_phi_in_logs",
+  "expect_pass_for_eval_report": false,
+  "correlation_id": "eval-w2-no-phi-cohort-name-leak-fail",
+  "use_case": "W2 §12/§13 (S7+S11) — adversarial: cohort patient full name surfaced in trace text means the redactor missed something; gate must trip (rule_holds=false; expected fail)",
+  "context": {
+    "trace_text": "extracted facts for Margaret Chen written to chart, 5 lab results persisted"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "case_id": "w2-citation-present-missing-citation-fail",
+  "check": "citation_present",
+  "category": "citation_present",
+  "expect_pass_for_eval_report": false,
+  "correlation_id": "eval-w2-citation-present-missing-citation-fail",
+  "use_case": "W2 §6/§9 — adversarial: clinical claim shipped to CUI without citation must trip the gate (rule_holds=false; expected fail)",
+  "context": {
+    "claims": [
+      {
+        "text": "LDL is 158 mg/dL (high)"
+      }
+    ]
+  }
+}

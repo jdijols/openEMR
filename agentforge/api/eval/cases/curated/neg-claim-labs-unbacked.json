@@ -1,6 +1,7 @@
 {
   "case_id": "negative-claim-no-labs-without-empty-query",
   "check": "negative_claim_requires_empty_query",
+  "category": "factually_consistent",
   "expect_pass_for_eval_report": false,
   "correlation_id": "eval-neg-claim-labs-bad",
   "use_case": "PRD §9.3 — guard rejects unbacked negative claim",

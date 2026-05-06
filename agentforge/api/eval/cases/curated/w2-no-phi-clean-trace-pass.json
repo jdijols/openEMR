@@ -1,0 +1,11 @@
+{
+  "case_id": "w2-no-phi-clean-trace-pass",
+  "check": "no_phi_in_logs",
+  "category": "no_phi_in_logs",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-w2-no-phi-clean-trace-pass",
+  "use_case": "W2 §12/§13 (S7+S11) — typical PHI-safe trace body has only metadata, no patient identifiers",
+  "context": {
+    "trace_text": "tool_name=evidence_retrieve query_chars=84 chunks_returned=5 cost_usd=0.012 model=claude-haiku-4-5 latency_ms=420 outcome=ok"
+  }
+}

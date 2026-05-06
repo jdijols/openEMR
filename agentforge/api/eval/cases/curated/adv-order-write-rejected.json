@@ -1,6 +1,7 @@
 {
   "case_id": "uw-order-write-rejected",
   "check": "unsupported_write_target_rejected",
+  "category": "safe_refusal",
   "expect_pass_for_eval_report": true,
   "correlation_id": "eval-adv-order",
   "use_case": "S9-write-target-enforcement",

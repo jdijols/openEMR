@@ -1,0 +1,22 @@
+{
+  "case_id": "w2-citation-present-malformed-source-type-fail",
+  "check": "citation_present",
+  "category": "citation_present",
+  "expect_pass_for_eval_report": false,
+  "correlation_id": "eval-w2-citation-present-malformed-source-type",
+  "use_case": "W2 §6 — adversarial: citation source_type outside the §6 enum must fail validation (rule_holds=false; expected fail)",
+  "context": {
+    "claims": [
+      {
+        "text": "LDL is 158 mg/dL",
+        "citation": {
+          "source_type": "twitter_thread",
+          "source_id": "docref-fake",
+          "page_or_section": "page 1",
+          "field_or_chunk_id": "results[0]",
+          "quote_or_value": "LDL Cholesterol 158 mg/dL"
+        }
+      }
+    ]
+  }
+}

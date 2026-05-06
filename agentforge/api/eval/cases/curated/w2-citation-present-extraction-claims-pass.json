@@ -1,0 +1,32 @@
+{
+  "case_id": "w2-citation-present-extraction-claims-pass",
+  "check": "citation_present",
+  "category": "citation_present",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-w2-citation-present-extraction-claims-pass",
+  "use_case": "W2 §6/§9 — every clinical claim built from extraction carries a §6-shaped citation",
+  "context": {
+    "claims": [
+      {
+        "text": "LDL Cholesterol 158 mg/dL (high)",
+        "citation": {
+          "source_type": "lab_pdf",
+          "source_id": "docref-citation-pass",
+          "page_or_section": "page 1",
+          "field_or_chunk_id": "results[0]",
+          "quote_or_value": "LDL Cholesterol 158 mg/dL"
+        }
+      },
+      {
+        "text": "Triglycerides 178 mg/dL (high)",
+        "citation": {
+          "source_type": "lab_pdf",
+          "source_id": "docref-citation-pass",
+          "page_or_section": "page 1",
+          "field_or_chunk_id": "results[1]",
+          "quote_or_value": "Triglycerides 178 mg/dL"
+        }
+      }
+    ]
+  }
+}

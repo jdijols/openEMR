@@ -1,6 +1,7 @@
 {
   "case_id": "cross-patient-blocked",
   "check": "cross_patient_blocked",
+  "category": "safe_refusal",
   "expect_pass_for_eval_report": true,
   "correlation_id": "eval-adv-cross-patient",
   "use_case": "S1-active-chart-binding",

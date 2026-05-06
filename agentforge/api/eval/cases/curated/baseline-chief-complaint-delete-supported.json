@@ -1,6 +1,7 @@
 {
   "case_id": "baseline-chief-complaint-delete-supported",
   "check": "unsupported_write_target_rejected",
+  "category": "safe_refusal",
   "expect_pass_for_eval_report": true,
   "correlation_id": "eval-baseline-cc-delete-supported",
   "use_case": "Baseline: chief_complaint_delete (clear reason for visit) is a V1 supported write target. Implemented in propose_writes.ts (propose_chief_complaint_delete) + public/write/chief_complaint_delete.php.",

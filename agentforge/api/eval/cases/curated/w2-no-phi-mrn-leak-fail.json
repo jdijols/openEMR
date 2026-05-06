@@ -1,0 +1,11 @@
+{
+  "case_id": "w2-no-phi-mrn-leak-fail",
+  "check": "no_phi_in_logs",
+  "category": "no_phi_in_logs",
+  "expect_pass_for_eval_report": false,
+  "correlation_id": "eval-w2-no-phi-mrn-leak-fail",
+  "use_case": "W2 §12/§13 (S7+S11) — adversarial: MRN-shaped identifier leaked into a span body must trip the gate (rule_holds=false; expected fail)",
+  "context": {
+    "trace_text": "audit row write_attempt MRN: 04492 docref=abcd-1234 outcome=ok"
+  }
+}

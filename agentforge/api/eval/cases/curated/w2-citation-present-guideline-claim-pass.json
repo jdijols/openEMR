@@ -1,0 +1,22 @@
+{
+  "case_id": "w2-citation-present-guideline-claim-pass",
+  "check": "citation_present",
+  "category": "citation_present",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-w2-citation-present-guideline-claim-pass",
+  "use_case": "W2 §8 — guideline_chunk citation produced by evidence_retrieve passes the contract",
+  "context": {
+    "claims": [
+      {
+        "text": "ADA recommends statin therapy for adults age 40-75 with diabetes.",
+        "citation": {
+          "source_type": "guideline_chunk",
+          "source_id": "ada-glycemic#statin-therapy-in-diabetes",
+          "page_or_section": "Standards of Care 2025 §8.3",
+          "field_or_chunk_id": "ada-glycemic#statin-therapy-in-diabetes",
+          "quote_or_value": "Adults aged 40-75 with diabetes should receive moderate-intensity statin therapy."
+        }
+      }
+    ]
+  }
+}

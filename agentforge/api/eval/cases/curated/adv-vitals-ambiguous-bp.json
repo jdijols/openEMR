@@ -1,6 +1,7 @@
 {
   "case_id": "ambiguous-bp-yields-uncertain",
   "check": "vitals_parser_uncertain_not_guess",
+  "category": "factually_consistent",
   "expect_pass_for_eval_report": true,
   "correlation_id": "eval-adv-ambiguous-bp",
   "use_case": "PRD §9.4 — vitals parser must not guess",
