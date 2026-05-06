@@ -5,14 +5,26 @@ name: AgentForge Eval Suite
 # no DB. Architecture: agentforge/api/eval/README.md and EVALUATION.md at repo root.
 
 on:
+  # G2-Early-41 / S12 — eval-gate triggers expanded so changes that affect
+  # what the runner consumes also trigger the gate:
+  #   - eval/**: case fixtures, baseline.json, runner.ts, guidelines/
+  #   - src/schemas/extraction.ts: imported by the schema_valid runner
+  #   - src/observability/redact.ts: PHI redactor referenced by no_phi_in_logs
+  #   - Documentation/AgentForge/assets/W2-documents/**: cohort fixtures
+  #     referenced by extraction cases
+  #   - package(-lock).json: any dep change that could shift behavior
+  #   - the workflow file itself
   push:
     branches:
     - master
     - rel-*
     paths:
     - agentforge/api/eval/**
+    - agentforge/api/src/schemas/extraction.ts
+    - agentforge/api/src/observability/redact.ts
     - agentforge/api/package.json
     - agentforge/api/package-lock.json
+    - Documentation/AgentForge/assets/W2-documents/**
     - .github/workflows/agentforge-eval.yml
   pull_request:
     branches:
@@ -20,8 +32,11 @@ on:
     - rel-*
     paths:
     - agentforge/api/eval/**
+    - agentforge/api/src/schemas/extraction.ts
+    - agentforge/api/src/observability/redact.ts
     - agentforge/api/package.json
     - agentforge/api/package-lock.json
+    - Documentation/AgentForge/assets/W2-documents/**
     - .github/workflows/agentforge-eval.yml
 
 permissions:

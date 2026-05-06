@@ -162,3 +162,18 @@ repos:
     language: system
     files: ^agentforge/cui/(src/|index\.html$|package(-lock)?\.json$|tsconfig\.json$|vite\.config\.ts$)
     pass_filenames: false
+
+  # G2-Early-40 / S12 — PR-blocking eval gate. Runs the 50-case W2 boolean
+  # rubric suite on `pre-push` (matches the GitHub Actions workflow's
+  # contract — the local hook is the same gate, just earlier). Fails the
+  # push on any case-level failure or per-category regression beyond the
+  # pinned baseline (>5pp drop or sub-95% absolute). Triggers only when
+  # the relevant files change so the typical commit isn't slowed down.
+  # The full check is sub-second so even a wide trigger is cheap.
+  - id: agentforge-eval-gate
+    name: AgentForge eval gate (50 cases, 5 boolean rubrics)
+    entry: bash -c 'cd agentforge/api && npm run eval'
+    language: system
+    files: ^(agentforge/api/(eval/|src/|package(-lock)?\.json$)|\.github/workflows/agentforge-eval\.yml$)
+    pass_filenames: false
+    stages: [pre-push]
