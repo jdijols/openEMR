@@ -118,19 +118,31 @@
 }
 
 /* Iframe embed: give the body a definite height so the chat column can flex
-   the messages region and pin the input form to the bottom. */
+   the messages region and pin the input form to the bottom.
+ *
+ * `overflow: hidden` at every level above `.agentforge-messages` is
+ * load-bearing: the only element that may ever scroll inside the panel is
+ * `.agentforge-messages` itself. Anything else scrolling means the header
+ * or composer footer will scroll out of view, which is a user-visible bug.
+ * Use `100dvh` (with `100vh` fallback) on the body/root so the height is
+ * tied to the iframe viewport rather than a chain of `height: 100%`
+ * inheritance that has been observed to break in some embed contexts. */
 html,
 body,
-#agentforge-panel-root {
-  height: 100%;
+#agentforge-panel-root,
+#root {
+  height: 100vh;
+  height: 100dvh;
   margin: 0;
+  overflow: hidden;
 }
 
 body {
   background: var(--af-surface);
 }
 
-#agentforge-panel-root {
+#agentforge-panel-root,
+#root {
   display: flex;
   flex-direction: column;
 }
