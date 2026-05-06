@@ -39,7 +39,12 @@ services:
       - agentforge_internal
 
   agentforge-api:
-    image: node:20-alpine
+    # node:20-bookworm-slim (debian/glibc), not -alpine. `onnxruntime-node`
+    # ships prebuilt binaries linked against glibc; on alpine they fail to
+    # load `ld-linux-x86-64.so.2` and the W2 RAG index build (and any
+    # @xenova/transformers embed call) crashes. Bookworm-slim is the
+    # smallest official image that includes glibc.
+    image: node:20-bookworm-slim
     command: ['sleep', 'infinity']
     working_dir: /app
     env_file:
