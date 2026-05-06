@@ -4,6 +4,7 @@ import type { Env } from '../env.js';
 import type { Observability } from '../observability/index.js';
 import { assertBoundPatient } from './_binding.js';
 import { runIntakeExtractor, type IntakeExtractorDeps, type IntakeExtractorResult } from '../workers/intake_extractor.js';
+import { recordSupervisorHandoff, summarizeIntakeExtractorHandoff } from '../agent/handoff.js';
 
 /**
  * §5 / §7 / G2-MVP-35 — `attach_and_extract` tool surface (brief signature).
@@ -75,6 +76,17 @@ export async function runAttachAndExtract(
     return { ok: false, error: 'active_chart_mismatch' };
   }
 
+  // §7 / G2-Early-10 — supervisor → intake_extractor handoff event. Emitted
+  // BEFORE the tool span so the handoff appears as the first node of this
+  // worker's trace branch, with PHI-safe input_summary and one-sentence
+  // routing rationale.
+  await recordSupervisorHandoff(
+    deps.observability,
+    deps.correlationId,
+    'intake_extractor',
+    summarizeIntakeExtractorHandoff({ docrefUuid: input.docref_uuid, docType: input.doc_type }),
+  );
+
   const span = await deps.observability.recordToolCall({
     correlationId: deps.correlationId,
     toolName: 'attach_and_extract',
@@ -103,6 +115,11 @@ export async function runAttachAndExtract(
       deps.extractorDeps,
     );
 
+    // §12 / G2-Early-51 — required Langfuse `extraction confidence` fields.
+    // Walks the §6 extraction object once to derive: VLM-reported overall
+    // confidence, count of fields the VLM flagged uncertain, and a
+    // per-fact confidence summary (bucketed counts across all citations).
+    const confidence = summarizeExtractionConfidence(result);
     await span.end({
       meta: {
         outcome: 'ok',
@@ -110,6 +127,9 @@ export async function runAttachAndExtract(
         cross_check_status: result.crossCheckStatus,
         facts_total: result.factsTotal,
         facts_verified: result.factsVerified,
+        overall_confidence: confidence.overallConfidence,
+        fields_uncertain_count: confidence.fieldsUncertainCount,
+        per_fact_confidence_summary: confidence.perFactConfidenceSummary,
       },
     });
 
@@ -127,4 +147,75 @@ export async function runAttachAndExtract(
     await span.end({ error: e });
     return { ok: false, error: 'openemr_error' };
   }
+}
+
+/**
+ * §12 / G2-Early-51 — derive PHI-safe extraction-confidence metadata for the
+ * intake_extractor span. Walks the §6 extraction object once and reports:
+ *
+ *   - `overallConfidence`  — VLM-reported `extraction_metadata.overall_confidence`
+ *   - `fieldsUncertainCount` — length of `extraction_metadata.fields_uncertain`
+ *   - `perFactConfidenceSummary` — bucketed counts of per-citation `confidence`
+ *                                  values across every leaf citation in the
+ *                                  extraction (high / medium / low / missing).
+ *
+ * No PHI surfaces here: only category counts, not the underlying values.
+ */
+type ExtractionConfidenceSummary = {
+  readonly overallConfidence: 'high' | 'medium' | 'low' | 'unknown';
+  readonly fieldsUncertainCount: number;
+  readonly perFactConfidenceSummary: Readonly<{
+    high: number;
+    medium: number;
+    low: number;
+    missing: number;
+  }>;
+};
+
+function summarizeExtractionConfidence(
+  result: IntakeExtractorResult,
+): ExtractionConfidenceSummary {
+  if (result.extraction === null) {
+    return {
+      overallConfidence: 'unknown',
+      fieldsUncertainCount: 0,
+      perFactConfidenceSummary: { high: 0, medium: 0, low: 0, missing: 0 },
+    };
+  }
+  const meta = result.extraction.extraction_metadata;
+  const overallConfidence = meta.overall_confidence;
+  const fieldsUncertainCount = meta.fields_uncertain.length;
+
+  // Walk every leaf citation across both schema shapes and bucket
+  // each citation's `confidence` value.
+  const buckets = { high: 0, medium: 0, low: 0, missing: 0 };
+  const visit = (c: { confidence?: number } | undefined): void => {
+    if (c === undefined) return;
+    const v = c.confidence;
+    if (typeof v !== 'number') {
+      buckets.missing += 1;
+      return;
+    }
+    if (v >= 0.8) buckets.high += 1;
+    else if (v >= 0.5) buckets.medium += 1;
+    else buckets.low += 1;
+  };
+
+  if (result.extraction.document_type === 'lab_pdf') {
+    for (const r of result.extraction.results) {
+      visit(r.citation);
+    }
+  } else {
+    visit(result.extraction.demographics.citation);
+    visit(result.extraction.chief_concern.citation);
+    for (const m of result.extraction.current_medications) visit(m.citation);
+    for (const a of result.extraction.allergies) visit(a.citation);
+    for (const f of result.extraction.family_history) visit(f.citation);
+  }
+
+  return {
+    overallConfidence,
+    fieldsUncertainCount,
+    perFactConfidenceSummary: buckets,
+  };
 }

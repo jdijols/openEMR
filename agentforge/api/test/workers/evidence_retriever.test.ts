@@ -44,7 +44,7 @@ describe('§8 G2-MVP-55 — evidence_retriever', () => {
     });
     const cohere = makeCohere([0, 1]);
 
-    const chunks = await runEvidenceRetriever(
+    const { chunks, stats } = await runEvidenceRetriever(
       { query: 'should we intensify her statin?', maxChunks: 5 },
       { pool, embedQuery: embedQueryStub, cohere },
     );
@@ -54,6 +54,14 @@ describe('§8 G2-MVP-55 — evidence_retriever', () => {
     expect(chunks[0]?.citation.source_id).toBe('uspstf-statin#statin-intensification-in-diabetes');
     expect(chunks[0]?.citation.quote_or_value.length).toBeGreaterThan(0);
     expect(chunks[0]?.rerank_score).toBeGreaterThan(0);
+
+    // §12 / G2-Early-50 — per-stage retrieval stats surface for span meta.
+    expect(stats.hits_sparse).toBe(1);
+    expect(stats.hits_dense).toBe(1);
+    expect(stats.hits_unioned).toBe(2);
+    expect(stats.hits_after_rerank).toBe(2);
+    expect(stats.top_chunk_ids).toHaveLength(2);
+    expect(stats.rerank_scores).toHaveLength(2);
   });
 
   it('dedupes overlap between sparse and dense', async () => {
@@ -65,12 +73,15 @@ describe('§8 G2-MVP-55 — evidence_retriever', () => {
     });
     const cohere = makeCohere([0]);
 
-    const chunks = await runEvidenceRetriever(
+    const { chunks, stats } = await runEvidenceRetriever(
       { query: 'statin intensification', maxChunks: 5 },
       { pool, embedQuery: embedQueryStub, cohere },
     );
 
     expect(chunks).toHaveLength(1);
+    expect(stats.hits_sparse).toBe(1);
+    expect(stats.hits_dense).toBe(1);
+    expect(stats.hits_unioned).toBe(1); // dedupe collapsed to one
     const rerankFn = cohere.rerank as ReturnType<typeof vi.fn>;
     expect(rerankFn).toHaveBeenCalledOnce();
     const firstCall = rerankFn.mock.calls[0]?.[0] as { documents: unknown[] } | undefined;
@@ -81,12 +92,14 @@ describe('§8 G2-MVP-55 — evidence_retriever', () => {
     const pool = makePool({ sparse: [], dense: [] });
     const cohere = makeCohere([]);
 
-    const chunks = await runEvidenceRetriever(
+    const { chunks, stats } = await runEvidenceRetriever(
       { query: 'no matching evidence here', maxChunks: 5 },
       { pool, embedQuery: embedQueryStub, cohere },
     );
 
     expect(chunks).toHaveLength(0);
+    expect(stats.hits_unioned).toBe(0);
+    expect(stats.hits_after_rerank).toBe(0);
     // Cohere should not be called when there are no candidates to rerank.
     expect(cohere.rerank).not.toHaveBeenCalled();
   });

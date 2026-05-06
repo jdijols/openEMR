@@ -537,7 +537,10 @@ describe('runChatTurn (PRD §5.7 wiring)', () => {
       prompt: string;
     };
     expect(Object.keys(args.tools).sort()).toEqual([
+      'attach_and_extract',
+      'evidence_retrieve',
       'get_allergies',
+      'get_clinical_notes',
       'get_encounters',
       'get_identity',
       'get_labs',
@@ -547,8 +550,12 @@ describe('runChatTurn (PRD §5.7 wiring)', () => {
       'get_social_history',
       'get_vitals',
       'propose_allergy_write',
+      'propose_chief_complaint_delete',
       'propose_chief_complaint_write',
+      'propose_clinical_note_edit',
+      'propose_clinical_note_write',
       'propose_tobacco_write',
+      'propose_vitals_delete',
       'propose_vitals_write',
     ]);
     expect(args.system).toMatch(/clinical copilot/i);

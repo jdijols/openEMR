@@ -4,6 +4,7 @@ import type { Pool } from 'pg';
 import type { CohereClient } from 'cohere-ai';
 import type { Observability } from '../observability/index.js';
 import { runEvidenceRetriever, type EvidenceRetrieverDeps } from '../workers/evidence_retriever.js';
+import { recordSupervisorHandoff, summarizeEvidenceRetrieverHandoff } from '../agent/handoff.js';
 
 /**
  * §8 / G2-MVP-56 — `evidence_retrieve` Vercel AI SDK tool. Supervisor calls
@@ -30,6 +31,14 @@ export function createEvidenceRetrieveTool(deps: EvidenceRetrieveDeps) {
       'Search the clinical guideline corpus for evidence relevant to a clinical question. Returns up to 5 ranked snippets, each with a citation back to the source guideline section. Use whenever the user asks about recommendations, intensification, screening criteria, or other guideline-driven decisions.',
     inputSchema: InputSchema,
     execute: async ({ query, max_chunks }) => {
+      // §7 / G2-Early-10 — supervisor → evidence_retriever handoff event.
+      await recordSupervisorHandoff(
+        deps.observability,
+        deps.correlationId,
+        'evidence_retriever',
+        summarizeEvidenceRetrieverHandoff({ query, maxChunks: max_chunks }),
+      );
+
       const span = await deps.observability.recordToolCall({
         correlationId: deps.correlationId,
         toolName: 'evidence_retrieve',
@@ -37,15 +46,24 @@ export function createEvidenceRetrieveTool(deps: EvidenceRetrieveDeps) {
       });
 
       try {
-        const chunks = await runEvidenceRetriever(
+        const { chunks, stats } = await runEvidenceRetriever(
           { query, maxChunks: max_chunks },
           { pool: deps.pool, embedQuery: deps.embedQuery, cohere: deps.cohere },
         );
+        // §12 / G2-Early-50 — required Langfuse `retrieval hits` fields.
+        // The full funnel shape (sparse → dense → unioned → reranked) +
+        // top chunk ids + rerank scores surface in the span end-meta so
+        // a reviewer can audit the retrieval quality of every turn.
         await span.end({
           meta: {
             outcome: 'ok',
             chunks_returned: chunks.length,
-            top_chunk_ids: chunks.map((c) => c.chunk_id),
+            hits_sparse: stats.hits_sparse,
+            hits_dense: stats.hits_dense,
+            hits_unioned: stats.hits_unioned,
+            hits_after_rerank: stats.hits_after_rerank,
+            top_chunk_ids: stats.top_chunk_ids,
+            rerank_scores: stats.rerank_scores,
           },
         });
         // Wrap each chunk in a W1-shaped source_pack so the verification

@@ -22,6 +22,9 @@ function makeEnv(): Env {
 function makeObs(): AttachAndExtractDeps['observability'] {
   return {
     recordToolCall: vi.fn(async () => ({ end: vi.fn(async () => undefined) })),
+    // §7 / G2-Early-10 — handoff event surface; the worker emits this
+    // BEFORE its own tool span. Stub returns void.
+    recordEvent: vi.fn(async () => undefined),
   } as unknown as AttachAndExtractDeps['observability'];
 }
 

@@ -26,6 +26,25 @@ export type EvidenceChunk = {
   readonly citation: SourceCitation;
 };
 
+/**
+ * §12 / G2-Early-50 — Per-stage retrieval stats. Surfaced into the
+ * evidence_retrieve tool's Langfuse span so a reviewer can see the funnel
+ * shape (sparse vs dense vs unioned vs reranked) at every turn.
+ */
+export type RetrievalStats = {
+  readonly hits_sparse: number;
+  readonly hits_dense: number;
+  readonly hits_unioned: number;
+  readonly hits_after_rerank: number;
+  readonly top_chunk_ids: readonly string[];
+  readonly rerank_scores: readonly number[];
+};
+
+export type EvidenceRetrieverResult = {
+  readonly chunks: readonly EvidenceChunk[];
+  readonly stats: RetrievalStats;
+};
+
 export type EvidenceRetrieverInput = {
   readonly query: string;
   readonly maxChunks: number;
@@ -45,6 +64,15 @@ export type EvidenceRetrieverDeps = {
   readonly cohereModel?: string;
 };
 
+const EMPTY_STATS: RetrievalStats = {
+  hits_sparse: 0,
+  hits_dense: 0,
+  hits_unioned: 0,
+  hits_after_rerank: 0,
+  top_chunk_ids: [],
+  rerank_scores: [],
+};
+
 const SPARSE_TOP_K = 10;
 const DENSE_TOP_K = 10;
 const QUOTE_MAX_LEN = 400;
@@ -53,10 +81,10 @@ const DEFAULT_RERANK_MODEL = 'rerank-english-v3.0';
 export async function runEvidenceRetriever(
   input: EvidenceRetrieverInput,
   deps: EvidenceRetrieverDeps,
-): Promise<readonly EvidenceChunk[]> {
+): Promise<EvidenceRetrieverResult> {
   const query = input.query.trim();
   if (query.length === 0) {
-    return [];
+    return { chunks: [], stats: EMPTY_STATS };
   }
 
   // 1. Sparse retrieval (tsvector + ts_rank_cd)
@@ -99,7 +127,17 @@ export async function runEvidenceRetriever(
   }
   const candidates = [...dedupe.values()];
   if (candidates.length === 0) {
-    return [];
+    return {
+      chunks: [],
+      stats: {
+        hits_sparse: sparseRows.rows.length,
+        hits_dense: denseRows.rows.length,
+        hits_unioned: 0,
+        hits_after_rerank: 0,
+        top_chunk_ids: [],
+        rerank_scores: [],
+      },
+    };
   }
 
   // 4. Cohere Rerank
@@ -113,7 +151,7 @@ export async function runEvidenceRetriever(
   const rerankResults = (rerankResponse as { results?: ReadonlyArray<{ index: number; relevanceScore: number }> }).results ?? [];
 
   // 5. Build citation envelopes for each surviving chunk.
-  return rerankResults
+  const chunks: EvidenceChunk[] = rerankResults
     .filter((r): r is { index: number; relevanceScore: number } => typeof r.index === 'number' && r.index >= 0 && r.index < candidates.length)
     .map((r) => {
       const chunk = candidates[r.index];
@@ -137,4 +175,16 @@ export async function runEvidenceRetriever(
         } satisfies SourceCitation,
       };
     });
+
+  return {
+    chunks,
+    stats: {
+      hits_sparse: sparseRows.rows.length,
+      hits_dense: denseRows.rows.length,
+      hits_unioned: candidates.length,
+      hits_after_rerank: chunks.length,
+      top_chunk_ids: chunks.map((c) => c.chunk_id),
+      rerank_scores: chunks.map((c) => c.rerank_score),
+    },
+  };
 }
