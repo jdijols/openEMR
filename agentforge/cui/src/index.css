@@ -167,6 +167,13 @@ body {
   min-height: 0;
   box-sizing: border-box;
   background: var(--af-surface);
+  /* Clip any child overflow at the panel boundary so a tall messages
+   * list (user attachment thumbnail + typing indicator + prior turns)
+   * never propagates to the iframe body and lets the user scroll the
+   * composer footer up out of its locked position. The internal
+   * `.agentforge-messages` overflow:auto still handles scrolling
+   * inside the feed. */
+  overflow: hidden;
 }
 
 .agentforge-cui__header {
@@ -387,7 +394,11 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--af-s4);
-  min-height: 120px;
+  /* min-height:0 lets the feed shrink fully when the iframe is short
+   * (e.g. with a user attachment thumbnail growing the form-natural
+   * size), so the composer footer can stay locked at the bottom of
+   * the panel instead of being pushed below the visible area. */
+  min-height: 0;
   padding: var(--af-s4);
   background: var(--af-surface);
 }
