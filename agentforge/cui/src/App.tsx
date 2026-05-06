@@ -1,14 +1,16 @@
-import type { FormEvent, ReactElement } from 'react';
+import type { ChangeEvent, DragEvent, FormEvent, ReactElement } from 'react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { AgentForgeDeliveryError, postChat, postPresentPatient } from './api/client.js';
+import { AgentForgeDeliveryError, postChat, postPresentPatient, postUploadDocument } from './api/client.js';
 import { readCachedBrief, writeCachedBrief } from './chat/brief_cache.js';
 import { readCachedConversation, writeCachedConversation } from './chat/conversation_cache.js';
 import { MessageList, type ChatMessage, type ProposalApiEnv } from './chat/MessageList.js';
+import { AttachmentPreview } from './chat/AttachmentPreview.js';
+import { validateFileBasic } from './chat/useFileValidation.js';
 import { findLatestOpenProposalId } from './chat/proposal_lookup.js';
 import { tryConfirmProposalFromDictation } from './chat/voice_confirm_proposal.js';
 import { useHandshake } from './chat/useHandshake.js';
 import MicControl from './recording/MicControl.js';
-import { readApiBase } from './config.js';
+import { readApiBase, readModuleBase } from './config.js';
 import type { ProposalResolution } from './types/chat.js';
 
 function readDocumentHints(): {
@@ -200,6 +202,30 @@ function IconVisitHistory(): ReactElement {
   );
 }
 
+/**
+ * Plus glyph for the composer's inline attach affordance. Stroked so it
+ * inherits color from `currentColor`, matching the other inline icons in
+ * the panel header (`IconPanelSync`, `IconVisitHistory`).
+ */
+function IconPlus(): ReactElement {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
 const DEFAULT_COPILOT_HEADER = 'Clinical Copilot';
 
 export default function App(): ReactElement {
@@ -214,14 +240,20 @@ export default function App(): ReactElement {
   const [sendFailure, setSendFailure] = useState<AgentForgeDeliveryError | null>(null);
   const [micError, setMicError] = useState<string | null>(null);
   const [voiceCompletedProposalIds, setVoiceCompletedProposalIds] = useState(() => new Set<string>());
+  // G2-MVP-99 — file attachment state for the composer.
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
 
   // Loading hint is a derivation of the state machine, not an independent
   // boolean — the two used to drift apart on transient failures.
   const presenting = briefStatus.kind === 'loading';
 
   const apiBase = useMemo(() => readApiBase(), []);
+  const moduleBase = useMemo(() => readModuleBase(), []);
   const messagesRef = useRef<ChatMessage[]>([]);
   const composeInputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
@@ -508,28 +540,113 @@ export default function App(): ReactElement {
     [apiBase, conversationExternalId, handshake, patientUuid, proposalEnv, onProposalResolved],
   );
 
-  async function onSubmit(e: FormEvent): Promise<void> {
-    e.preventDefault();
+  /**
+   * G2-MVP-99 — handles both text-only and file-attached sends. When a
+   * file is attached: upload to module first → then post to /chat with
+   * `docref_uuid` + `doc_type` so the orchestrator routes through
+   * `attach_and_extract`. The `attachment` ref rides along on the user
+   * ChatMessage so the sent bubble can render the same preview chip.
+   */
+  async function onSubmit(e?: FormEvent): Promise<void> {
+    e?.preventDefault();
+    if (handshake.status !== 'ready') {
+      return;
+    }
     const text = input.trim();
-    if (text === '' || handshake.status !== 'ready') {
+    const file = attachedFile;
+    if (text === '' && file === null) {
       return;
     }
 
     setSending(true);
     setSendFailure(null);
+
+    // Clear composer immediately so the user sees their turn paint
+    // without the still-attached file lingering. Capture the file in
+    // a local for the upload below.
     setInput('');
-    setMessages((prev) => [...prev, { role: 'user', blocks: [{ type: 'text', text }] }]);
+    setAttachedFile(null);
+
+    // Paint user turn immediately. The attachment object rides on the
+    // ChatMessage so the bubble can render the same preview chip used
+    // in the composer (minus the X). MessageList opens DocumentModal
+    // when the chip is clicked.
+    const userMessage: ChatMessage =
+      file !== null ?
+        {
+          role: 'user',
+          blocks: text !== '' ? [{ type: 'text', text }] : [],
+          attachment: { file, mimeType: file.type, name: file.name },
+        }
+      : { role: 'user', blocks: [{ type: 'text', text }] };
+    setMessages((prev) => [...prev, userMessage]);
 
     try {
-      const chatOpts =
-        conversationExternalId !== null && conversationExternalId.trim() !== '' ?
-          { conversation_id: conversationExternalId }
-        : undefined;
+      let docrefUuid: string | undefined;
+      let docType: 'lab_pdf' | 'intake_form' | undefined;
 
-      const { blocks, citation_navigation, conversationId } =
-        chatOpts !== undefined ?
-          await postChat(apiBase, handshake.sessionToken, patientUuid ?? '', text, chatOpts)
-        : await postChat(apiBase, handshake.sessionToken, patientUuid ?? '', text);
+      if (file !== null) {
+        // Heuristic doc-type routing for the MVP demo. Filename hints
+        // ("lab", "lipid", "panel", "cbc", "cmp") mark labs; everything
+        // else routes to intake_form. The brief's MVP is the two doc
+        // types only.
+        const lowerName = file.name.toLowerCase();
+        const looksLikeLab =
+          /\b(lab|lipid|panel|cbc|cmp|hba1c|a1c|glucose|metabolic|chemistry|cholesterol)\b/.test(lowerName);
+        docType = looksLikeLab ? 'lab_pdf' : 'intake_form';
+
+        const upload = await postUploadDocument(
+          moduleBase,
+          handshake.sessionToken,
+          patientUuid ?? '',
+          docType,
+          file,
+        );
+        docrefUuid = upload.docrefUuid;
+
+        // Stamp the docref onto the user message's attachment so the
+        // chip becomes clickable (opens DocumentModal). We match by
+        // File reference identity — the user message we just appended
+        // is the only one carrying this exact File object.
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.role !== 'user' || m.attachment?.file !== file) {
+              return m;
+            }
+            return { ...m, attachment: { ...m.attachment, docrefUuid: upload.docrefUuid } };
+          }),
+        );
+      }
+
+      const chatOpts: {
+        conversation_id?: string;
+        docref_uuid?: string;
+        doc_type?: 'lab_pdf' | 'intake_form';
+      } = {};
+      if (conversationExternalId !== null && conversationExternalId.trim() !== '') {
+        chatOpts.conversation_id = conversationExternalId;
+      }
+      if (docrefUuid !== undefined) {
+        chatOpts.docref_uuid = docrefUuid;
+      }
+      if (docType !== undefined) {
+        chatOpts.doc_type = docType;
+      }
+
+      // For file-only sends, give the orchestrator a sane prompt so the
+      // model has something to act on alongside the docref.
+      const messageForChat =
+        text !== '' ? text
+        : docType === 'lab_pdf' ? 'Please read this lab and tell me what you found.'
+        : 'Please read this intake form and tell me what you found.';
+
+      const { blocks, citation_navigation, conversationId } = await postChat(
+        apiBase,
+        handshake.sessionToken,
+        patientUuid ?? '',
+        messageForChat,
+        Object.keys(chatOpts).length > 0 ? chatOpts : undefined,
+      );
 
       if (conversationId !== null && conversationId !== '') {
         setConversationExternalId(conversationId);
@@ -542,6 +659,67 @@ export default function App(): ReactElement {
       setSending(false);
     }
   }
+
+  /**
+   * G2-Final-31 (parent-overlay variant) — document preview is rendered
+   * by the OpenEMR shell as a top-level overlay, not by the CUI iframe.
+   * Posting `AGENTFORGE_OPEN_DOCUMENT_OVERLAY` to the parent with the
+   * fully-resolved bytes URL lets the host create an overlay that sits
+   * over both the OpenEMR app AND the CUI rail without disturbing
+   * either layout. The host renders the PDF via a nested iframe with
+   * the browser's native PDF viewer (no pdfjs needed in the parent),
+   * which sidesteps the buffer-detach bug we hit when reusing cached
+   * Uint8Array bytes through pdfjs across multiple opens.
+   */
+  const onOpenDocument = useCallback((docrefUuid: string, page?: number): void => {
+    if (typeof window.parent === 'undefined' || window.parent === null) {
+      return;
+    }
+    if (handshake.status !== 'ready' || patientUuid === null || patientUuid === '') {
+      return;
+    }
+    const bytesUrl = new URL(`${moduleBase}/document/bytes.php`, window.location.origin);
+    bytesUrl.searchParams.set('docref_uuid', docrefUuid);
+    bytesUrl.searchParams.set('session_token', handshake.sessionToken);
+    bytesUrl.searchParams.set('patient_uuid', patientUuid);
+    window.parent.postMessage(
+      {
+        type: 'AGENTFORGE_OPEN_DOCUMENT_OVERLAY',
+        bytes_url: bytesUrl.toString(),
+        docref_uuid: docrefUuid,
+        initial_page: page ?? 1,
+      },
+      window.location.origin,
+    );
+  }, [moduleBase, handshake, patientUuid]);
+
+  // G2-MVP-99 — file attachment plumbing. Validation matches the W2
+  // brief: PDF/PNG/JPEG only, 10 MB cap. Errors surface as `attachError`
+  // (auto-cleared on next valid pick).
+  const acceptFile = useCallback((f: File | null): void => {
+    if (f === null) {
+      setAttachedFile(null);
+      return;
+    }
+    const result = validateFileBasic(f);
+    if (!result.ok) {
+      setAttachError(result.errorMessage);
+      return;
+    }
+    setAttachError(null);
+    setAttachedFile(f);
+  }, []);
+
+  const onPickFile = useCallback((e: ChangeEvent<HTMLInputElement>): void => {
+    acceptFile(e.target.files?.[0] ?? null);
+    e.target.value = '';
+  }, [acceptFile]);
+
+  const onComposeDrop = useCallback((e: DragEvent<HTMLDivElement>): void => {
+    e.preventDefault();
+    setDragOver(false);
+    acceptFile(e.dataTransfer.files?.[0] ?? null);
+  }, [acceptFile]);
 
   function refreshChartBinding(): void {
     // P3 fix: a plain `window.location.reload()` re-mounts the iframe but does
@@ -712,6 +890,8 @@ export default function App(): ReactElement {
         {...(proposalEnv !== undefined ? { proposalEnv } : {})}
         voiceCompletedProposalIds={voiceCompletedProposalIds}
         onProposalResolved={onProposalResolved}
+        onOpenDocument={onOpenDocument}
+        typing={sending}
       />
       {briefStatus.kind === 'failed' ? (
         <div className="agentforge-cui__brief-failed" role="alert">
@@ -722,12 +902,6 @@ export default function App(): ReactElement {
             type="button"
             className="agentforge-cui__retry-brief"
             onClick={() => {
-              // Flip back to idle; the auto-trigger effect re-fires on the
-              // next tick. Going through `idle` (rather than calling
-              // `runPresent` directly) preserves the cache-replay path —
-              // if a previous successful brief was written to
-              // sessionStorage in another mount, this will replay it
-              // instead of forcing a new LLM call.
               setBriefStatus({ kind: 'idle' });
             }}
           >
@@ -745,22 +919,76 @@ export default function App(): ReactElement {
           {micError}
         </p>
       ) : null}
-      <form className="agentforge-cui__form agentforge-cui__compose" onSubmit={(ev) => void onSubmit(ev)}>
+      {attachError !== null ? (
+        <p className="agentforge-cui__error" role="alert">
+          {attachError}
+        </p>
+      ) : null}
+      <form
+        className={`agentforge-cui__form agentforge-cui__compose${dragOver ? ' agentforge-cui__compose--drag' : ''}`}
+        onSubmit={(ev) => void onSubmit(ev)}
+      >
         <label htmlFor="agentforge-message" className="visually-hidden">
           Message
         </label>
-        <textarea
-          ref={composeInputRef}
-          id="agentforge-message"
-          className="agentforge-cui__input"
-          rows={3}
-          value={input}
-          disabled={sending}
-          placeholder="Ask about this patient or dictate clinical updates…"
-          onChange={(ev) => setInput(ev.target.value)}
-        />
+        <div
+          className="agentforge-cui__compose-input-wrap"
+          onDragOver={(ev) => {
+            ev.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={onComposeDrop}
+        >
+          {/* iMessage-style: attachment chip and `+` share the same
+              absolute top-left position inside the textarea wrap and are
+              mutually exclusive. Single-attachment-at-a-time = no
+              affordance to add a second file once one is staged. */}
+          {attachedFile !== null ? (
+            <div className="agentforge-cui__compose-inline-slot">
+              <AttachmentPreview
+                file={attachedFile}
+                onRemove={() => setAttachedFile(null)}
+                compact
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="agentforge-cui__compose-inline-slot agentforge-cui__compose-attach"
+              onClick={() => fileInputRef.current?.click()}
+              aria-label="Attach a lab or intake PDF"
+              title="Attach a lab or intake PDF"
+              disabled={sending}
+            >
+              <IconPlus />
+            </button>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf,image/png,image/jpeg"
+            style={{ display: 'none' }}
+            onChange={onPickFile}
+            data-testid="agentforge-attach-input"
+          />
+          <textarea
+            ref={composeInputRef}
+            id="agentforge-message"
+            className="agentforge-cui__input agentforge-cui__input--with-attach"
+            rows={3}
+            value={input}
+            disabled={sending}
+            placeholder="Ask about this patient, or drop a lab / intake PDF."
+            onChange={(ev) => setInput(ev.target.value)}
+          />
+        </div>
         <div className="agentforge-cui__compose-actions">
-          <button type="submit" className="agentforge-cui__send" disabled={sending || input.trim() === ''}>
+          <button
+            type="submit"
+            className="agentforge-cui__send"
+            disabled={sending || (input.trim() === '' && attachedFile === null)}
+          >
             {sending ? 'Sending…' : 'Send'}
           </button>
           <MicControl

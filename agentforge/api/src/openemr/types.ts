@@ -141,6 +141,44 @@ export const chatBlockSchema = z.union([
     write_target: z.string().min(1),
     preview: z.string().min(1).max(4000),
   }),
+  z.object({
+    type: z.literal('extraction'),
+    doc_type: z.enum(['lab_pdf', 'intake_form']),
+    docref_uuid: z.string().min(1),
+    n_facts: z.number().int().nonnegative(),
+    n_abnormal: z.number().int().nonnegative().optional(),
+    /** G2-Early-27 informational preview — formatted lab summary text shown
+     *  in a no-action ProposalCardShell. The actual chart write is deferred. */
+    lab_summary: z.string().optional(),
+    intake_data: z
+      .object({
+        demographics: z.object({
+          name: z.string().nullable(),
+          dob: z.string().nullable(),
+          sex: z.string().nullable(),
+          contact_phone: z.string().nullable(),
+        }),
+        chief_concern: z.object({
+          text: z.string(),
+          onset: z.string().nullable(),
+        }),
+        current_medications: z.array(z.object({
+          name: z.string(),
+          dose: z.string().nullable(),
+          frequency: z.string().nullable(),
+        })),
+        allergies: z.array(z.object({
+          substance: z.string(),
+          reaction: z.string().nullable(),
+          severity: z.string().nullable(),
+        })),
+        family_history: z.array(z.object({
+          relation: z.string(),
+          condition: z.string(),
+        })),
+      })
+      .optional(),
+  }),
 ]);
 
 export type ChatBlock = z.infer<typeof chatBlockSchema>;

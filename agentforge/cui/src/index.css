@@ -824,6 +824,65 @@ body {
   line-height: 1.5;
 }
 
+/* G2-MVP-99 — body slot used by ProposalCardShell. Replaces the older
+ * single-`<p>` preview pattern so consumers (W1 vitals proposal, W2
+ * intake proposal) can drop in either a paragraph or a list of
+ * structured sections. The default vertical rhythm matches the prior
+ * proposal-preview spacing. */
+.agentforge-msg__proposal-body {
+  margin: 0;
+  color: var(--af-text);
+  font-size: var(--af-text-body);
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: var(--af-s2);
+}
+
+.agentforge-msg__proposal-body > * {
+  margin: 0;
+}
+
+.agentforge-msg__proposal-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--af-s1, 0.25rem);
+}
+
+.agentforge-msg__proposal-section-title {
+  margin: 0;
+  font-size: var(--af-text-small, 0.8125rem);
+  font-weight: 600;
+  color: var(--af-text-muted, var(--af-text));
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.agentforge-msg__proposal-section-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.agentforge-msg__proposal-kv {
+  margin: 0;
+}
+
+.agentforge-msg__proposal-kv-label {
+  color: var(--af-text-muted, var(--af-text));
+  font-weight: 500;
+  margin-right: 0.25rem;
+}
+
+.agentforge-msg__proposal-kv-empty,
+.agentforge-msg__proposal-section-empty {
+  margin: 0;
+  color: var(--af-text-muted, var(--af-text));
+  font-style: italic;
+}
+
 /* Status row — appears once the proposal resolves. Becomes a pill with
    an icon and color matched to the surface state. */
 .agentforge-msg__proposal-status {
@@ -1008,9 +1067,68 @@ body {
   flex: 0 0 auto;
 }
 
+/* G2-MVP-99 — relative wrap that hosts the textarea and the inline
+ * "slot" (either the `+` attach button OR the compact attachment chip,
+ * mutually exclusive) absolutely positioned at the top-left. Drag-drop
+ * handlers attach here so a file dropped anywhere in the input area
+ * accepts. */
+.agentforge-cui__compose-input-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Shared positioning anchor for the `+` button OR the compact
+ * attachment chip — they swap in the same spot, iMessage-style. */
+.agentforge-cui__compose-inline-slot {
+  position: absolute;
+  top: var(--af-s2);
+  left: var(--af-s2);
+  z-index: 1;
+}
+
+/* `+` attach button — visible when no file is staged. Sized to match
+ * the compact chip's footprint so the swap is positionally stable. */
+.agentforge-cui__compose-attach {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  border: 1px solid var(--af-border-strong);
+  background: var(--af-surface);
+  color: var(--af-text-muted, var(--af-text));
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.agentforge-cui__compose-attach:hover:not(:disabled) {
+  background: var(--af-surface-alt);
+  color: var(--af-primary);
+  border-color: var(--af-primary);
+}
+
+.agentforge-cui__compose-attach:focus-visible {
+  outline: none;
+  box-shadow: var(--af-focus-ring);
+}
+
+.agentforge-cui__compose-attach:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.agentforge-cui__compose--drag .agentforge-cui__input {
+  border-color: var(--af-primary);
+  box-shadow: var(--af-focus-ring);
+}
+
 .agentforge-cui__input {
   flex: 1 1 auto;
   min-width: 0;
+  width: 100%;
   font: inherit;
   font-size: var(--af-text-body);
   resize: none;
@@ -1022,6 +1140,227 @@ body {
   background: var(--af-surface);
   color: var(--af-text);
   line-height: 1.45;
+  box-sizing: border-box;
+}
+
+/* Reserve room on the left for the absolute-positioned slot
+ * (`+` button or compact attachment chip). 1.75rem footprint + the
+ * slot's left offset + a single rhythm gap from the slot to the text. */
+.agentforge-cui__input--with-attach {
+  padding-left: calc(var(--af-s2) + 1.75rem + var(--af-s2));
+  /* Reserve a touch of vertical room for the X badge that sits at the
+   * top-right of the chip — the badge protrudes ~0.4rem above the chip
+   * so without this the badge clipped against the textarea border. */
+  padding-top: calc(var(--af-s2) + 0.25rem);
+}
+
+/* G2-MVP-99 — standalone attachment row in the message thread. Sits
+ * above the user's text bubble (if any) as its own object — no blue
+ * background, no border. Right-aligned to match the user side. iMessage
+ * / WhatsApp pattern: the file is its own message-thread entity. */
+.agentforge-msg--attachment-row {
+  align-self: flex-end;
+  background: transparent;
+  border: none;
+  padding: 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* G2-MVP-99 — three-dot "assistant is typing" indicator. Mounted by
+ * App.tsx between the message list and the compose form whenever a
+ * /chat request is in flight. Animation is a sequential opacity pulse
+ * (not a bounce / scale) so it reads as "thinking" rather than
+ * "loading," and stays subtle against the rail's neutral surface. */
+.agentforge-cui__typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: var(--af-s2) var(--af-s3);
+  margin: 0 var(--af-cui-inline-rhythm) var(--af-s2);
+  background: var(--af-surface-alt);
+  border: 1px solid var(--af-border);
+  border-radius: 999px;
+  align-self: flex-start;
+  width: fit-content;
+}
+
+.agentforge-cui__typing-dot {
+  display: inline-block;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--af-text-muted, var(--af-text));
+  opacity: 0.35;
+  animation: agentforge-cui-typing-pulse 1.2s infinite ease-in-out;
+}
+
+.agentforge-cui__typing-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.agentforge-cui__typing-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.agentforge-cui__typing-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@keyframes agentforge-cui-typing-pulse {
+  0%, 80%, 100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-1px);
+  }
+}
+
+/* G2-MVP-99 — shared attachment-chip styling. Used in two contexts:
+ *   1. Composer (with `onRemove`): user is staging a file to send.
+ *   2. Sent message bubble (with `onClick` after upload resolves a
+ *      docref): clicking opens DocumentModal at page 1.
+ *
+ * Visual: 80×96 thumbnail tile. PDF first-page or image fills the tile;
+ * if pdfjs render fails we fall back to a stacked PDF glyph + filename
+ * placeholder so the chip never reads as broken. */
+.agentforge-cui__attachment {
+  position: relative;
+  display: inline-block;
+  /* Default (large card) variant — used in the sent-message bubble. */
+}
+
+/* Compact variant — used inside the composer textarea where the chip
+ * shares positional real-estate with the `+` button. Sized to roughly
+ * match the `+` button's footprint so the swap reads as a state
+ * change, not a layout shift. */
+.agentforge-cui__attachment--compact .agentforge-cui__attachment-tile {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--af-radius-control);
+}
+
+.agentforge-cui__attachment--compact .agentforge-cui__attachment-remove {
+  top: -0.35rem;
+  right: -0.35rem;
+  width: 1rem;
+  height: 1rem;
+  font-size: 0.7rem;
+}
+
+.agentforge-cui__attachment--compact .agentforge-cui__attachment-placeholder {
+  padding: 0;
+  background: var(--af-surface-alt);
+}
+
+.agentforge-cui__attachment-glyph {
+  width: 28px;
+  height: 28px;
+}
+
+.agentforge-cui__attachment--compact .agentforge-cui__attachment-glyph {
+  /* Sized to fit the 1.75rem tile with breathing room. */
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.agentforge-cui__attachment-tile {
+  all: unset;
+  display: block;
+  /* G2-MVP-99 — 10×12rem (was 5×6) so the in-thread chip reads as a
+   * real preview thumbnail. The compact variant (composer) is smaller
+   * via its own override below. */
+  width: 10rem;
+  height: 12rem;
+  border: 1px solid var(--af-border);
+  border-radius: var(--af-radius-control);
+  background: var(--af-surface);
+  overflow: hidden;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.agentforge-cui__attachment-tile:disabled {
+  cursor: default;
+}
+
+.agentforge-cui__attachment-tile:hover:not(:disabled),
+.agentforge-cui__attachment-tile:focus-visible:not(:disabled) {
+  border-color: var(--af-primary);
+}
+
+.agentforge-cui__attachment-tile:focus-visible:not(:disabled) {
+  outline: none;
+  box-shadow: var(--af-focus-ring);
+}
+
+.agentforge-cui__attachment-canvas,
+.agentforge-cui__attachment-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.agentforge-cui__attachment-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  width: 100%;
+  height: 100%;
+  padding: 0.25rem;
+  background: var(--af-surface-alt);
+  color: var(--af-text-muted, var(--af-text));
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.agentforge-cui__attachment-filename {
+  font-size: 0.7rem;
+  line-height: 1.2;
+  max-width: 100%;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  word-break: break-all;
+}
+
+.agentforge-cui__attachment-remove {
+  position: absolute;
+  top: -0.4rem;
+  right: -0.4rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  border: 1px solid var(--af-border-strong);
+  background: var(--af-surface);
+  color: var(--af-text);
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.agentforge-cui__attachment-remove:hover {
+  background: var(--af-surface-alt);
+}
+
+.agentforge-cui__attachment-remove:focus-visible {
+  outline: none;
+  box-shadow: var(--af-focus-ring);
 }
 
 .agentforge-cui__input:focus {

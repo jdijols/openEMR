@@ -35,11 +35,17 @@ export function useDocumentBytes(args: UseDocumentBytesArgs): {
       }
       setState({ status: 'loading' });
       try {
-        const url = new URL(args.bytesEndpoint);
+        // bytesEndpoint is webroot-relative (e.g.
+        // `/interface/modules/.../document/bytes.php`) — `new URL(rel)`
+        // alone throws because the URL constructor requires an
+        // absolute URL. Anchor it to the iframe's own origin so the
+        // module endpoint resolves on the same OpenEMR host.
+        const url = new URL(args.bytesEndpoint, window.location.origin);
         url.searchParams.set('docref_uuid', docrefUuid);
         url.searchParams.set('session_token', args.sessionToken);
         url.searchParams.set('patient_uuid', args.patientUuid);
-        const resp = await fetch(url, { method: 'GET', credentials: 'omit' });
+        // Include OpenEMR session cookies — ChartContextGate (browser-flow) requires them.
+        const resp = await fetch(url, { method: 'GET', credentials: 'same-origin' });
         if (resp.status === 403) {
           setState({ status: 'error', errorMessage: 'Access denied for this document.' });
           return;

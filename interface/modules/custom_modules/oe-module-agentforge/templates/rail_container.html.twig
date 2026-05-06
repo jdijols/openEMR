@@ -12,7 +12,7 @@
             title="{{ 'Clinical Copilot panel'|xl }}"
             src="about:blank"
             data-panel-src="{{ panel_src|e('html_attr') }}"
-            sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>
 </div>
 <div id="agentforge-rail-splitter"
      class="agentforge-rail-splitter"
@@ -43,6 +43,101 @@
     .agentforge-rail--collapsed,
     .agentforge-rail-splitter--hidden {
         display: none !important;
+    }
+
+    /* G2-Final-31 — top-level document preview overlay. Rendered by the
+     * host (not inside the CUI iframe) so it sits OVER both the OpenEMR
+     * app and the CUI rail without disturbing either layout. The PDF
+     * itself renders inside a nested iframe with our pdfjs-driven
+     * document-viewer.html.
+     *
+     * Sizing uses explicit viewport units (`100vw` / `100vh`) instead
+     * of the `inset: 0` shorthand because OpenEMR's main.php body
+     * stack contains transforms / containment that intermittently
+     * collapsed the overlay to its content size. Viewport units are
+     * resolved against the layout viewport regardless of containing
+     * block, so this is bulletproof. */
+    .agentforge-document-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.85);
+        z-index: 99999;
+    }
+
+    /* Close × — dark-mode variant tuned to the modal's dim backdrop.
+     * Mirrors the *shape* and corner-radius of the CUI rail's icon
+     * buttons (`.agentforge-cui__refresh`) so the affordance still
+     * reads as a button, but inverts the surface treatment so it
+     * blends with the lightbox aesthetic instead of fighting it.
+     * Slightly larger (2.75rem vs 2.25rem) and a beefier × glyph
+     * (28px) for visibility against the busy PDF preview behind it.
+     * Soft frosted-glass feel via low-alpha white surface + border. */
+    .agentforge-document-overlay__close {
+        box-sizing: border-box;
+        position: absolute;
+        top: 32px;
+        left: 32px;
+        z-index: 1;
+        cursor: pointer;
+        width: 2.75rem;
+        height: 2.75rem;
+        padding: 0;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.92);
+        line-height: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
+    }
+
+    /* Sized via CSS so the icon scales with the button if the button
+     * size ever changes. 20px gives the glyph generous breathing room
+     * inside the 44px square — about 45% of the button width, which is
+     * the proportion most close-icon designs use. */
+    .agentforge-document-overlay__close-icon {
+        width: 20px;
+        height: 20px;
+        display: block;
+    }
+
+    .agentforge-document-overlay__close:hover {
+        background: rgba(255, 255, 255, 0.16);
+        border-color: rgba(255, 255, 255, 0.32);
+    }
+
+    .agentforge-document-overlay__close:active {
+        transform: scale(0.96);
+    }
+
+    .agentforge-document-overlay__close:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.35);
+    }
+
+    /* Iframe sized via explicit width/height with `calc()` rather than
+     * `inset: 24px` — replaced elements (iframes) don't always honor
+     * the inset shorthand when the parent's containing-block geometry
+     * is contested. `display: block` removes the inline-baseline gap
+     * an iframe would otherwise leave. */
+    .agentforge-document-overlay__frame {
+        position: absolute;
+        top: 24px;
+        left: 24px;
+        width: calc(100% - 48px);
+        height: calc(100% - 48px);
+        display: block;
+        border: 0;
+        background: #fff;
+        border-radius: 6px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
     }
 
     .agentforge-rail__iframe {
@@ -488,6 +583,100 @@
         // iframe lifecycle: blank on chart change, mount on un-collapse.
         // See Documentation/AgentForge/process/journal/week-1/0501-T1500-brief-consistency-cache.md.
 
+        // G2-Final-31 — host-side document preview overlay. Lives at the
+        // top of the OpenEMR DOM so it covers both the main app and the
+        // CUI rail. Uses the browser's native PDF viewer in a nested
+        // iframe — no pdfjs in the host, and same-origin cookies flow
+        // through the bytes endpoint so ChartContextGate authorizes
+        // exactly as it does for any other module HTTP call.
+        var documentOverlay = null;
+        var documentOverlayKeyHandler = null;
+        function openDocumentOverlay(bytesUrl, initialPage) {
+            closeDocumentOverlay();
+
+            var overlay = document.createElement('div');
+            overlay.className = 'agentforge-document-overlay';
+            overlay.setAttribute('role', 'dialog');
+            overlay.setAttribute('aria-modal', 'true');
+            overlay.setAttribute('aria-label', 'Document preview');
+
+            var closeBtn = document.createElement('button');
+            closeBtn.type = 'button';
+            closeBtn.className = 'agentforge-document-overlay__close';
+            closeBtn.setAttribute('aria-label', 'Close document preview');
+            // Stroked SVG × instead of the unicode multiplication sign:
+            // the unicode glyph has font-baseline quirks that nudge it
+            // off optical center inside flex layouts, while a viewBox-
+            // geometric × is perfectly centered. Same stroked-currentColor
+            // pattern the CUI rail uses for its other inline icons.
+            closeBtn.innerHTML =
+                '<svg class="agentforge-document-overlay__close-icon" ' +
+                'viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+                'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ' +
+                'aria-hidden="true" focusable="false">' +
+                '<path d="M6 6 18 18M18 6 6 18"></path>' +
+                '</svg>';
+            closeBtn.addEventListener('click', closeDocumentOverlay);
+
+            var pdfFrame = document.createElement('iframe');
+            pdfFrame.className = 'agentforge-document-overlay__frame';
+            pdfFrame.title = 'Document preview';
+            // Render through our pdfjs-driven viewer.html (stacked-canvas
+            // scroll) instead of pointing the iframe at the raw bytes URL.
+            // Chrome's embedded PDF plugin scrolls jankily inside nested
+            // iframes; HTML-native scroll on stacked canvases is smooth
+            // and consistent across browsers.
+            var page = (typeof initialPage === 'number' && initialPage > 0) ? initialPage : 1;
+            var viewerUrl =
+                webRoot +
+                '/interface/modules/custom_modules/oe-module-agentforge/public/cui/document-viewer.html' +
+                '?file=' + encodeURIComponent(bytesUrl) +
+                '&page=' + encodeURIComponent(String(page));
+            pdfFrame.src = viewerUrl;
+
+            // Order matters for tab focus: iframe first so the PDF
+            // is the primary interactive element; close button second
+            // so Esc / Tab cycle hits it after PDF interaction.
+            overlay.appendChild(pdfFrame);
+            overlay.appendChild(closeBtn);
+
+            // Click on the dim backdrop (not the iframe) closes; clicks
+            // inside the PDF frame are passed through to the viewer.
+            overlay.addEventListener('click', function (ev) {
+                if (ev.target === overlay) {
+                    closeDocumentOverlay();
+                }
+            });
+
+            documentOverlayKeyHandler = function (ev) {
+                if (ev.key === 'Escape') {
+                    closeDocumentOverlay();
+                }
+            };
+            window.addEventListener('keydown', documentOverlayKeyHandler);
+
+            document.body.appendChild(overlay);
+            documentOverlay = overlay;
+
+            // Move focus into the overlay so Esc + tab navigation work.
+            try {
+                closeBtn.focus({ preventScroll: true });
+            } catch (ignored) {
+                // older browsers without focus options — fall through silently
+            }
+        }
+
+        function closeDocumentOverlay() {
+            if (documentOverlayKeyHandler !== null) {
+                window.removeEventListener('keydown', documentOverlayKeyHandler);
+                documentOverlayKeyHandler = null;
+            }
+            if (documentOverlay !== null) {
+                documentOverlay.remove();
+                documentOverlay = null;
+            }
+        }
+
         function blankPanelIframe() {
             panelLoaded = false;
             if (frame) {
@@ -525,6 +714,23 @@
             }
             var data = ev.data;
             if (!data || typeof data !== 'object') {
+                return;
+            }
+
+            // G2-Final-31 — open a top-level document preview overlay. The CUI iframe is
+            // sandboxed and constrained to the rail's panel area, so the modal cannot escape
+            // it. We render the overlay in the OpenEMR shell DOM instead — it sits over both
+            // the app and the rail without expanding the iframe. The PDF renders inside a
+            // nested iframe with the browser's native PDF viewer (no pdfjs in the host),
+            // which also avoids the buffer-detach bug we hit when reusing cached Uint8Array
+            // bytes through pdfjs across multiple opens.
+            if (data.type === 'AGENTFORGE_OPEN_DOCUMENT_OVERLAY') {
+                var bytesUrl = typeof data.bytes_url === 'string' ? data.bytes_url : '';
+                if (bytesUrl === '') {
+                    return;
+                }
+                var initialPage = typeof data.initial_page === 'number' ? data.initial_page : 1;
+                openDocumentOverlay(bytesUrl, initialPage);
                 return;
             }
 

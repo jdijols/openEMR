@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
 import { useEffect, useRef } from 'react';
+import { loadPdfDocument } from './pdfjs.js';
 import { useDocumentBytes } from './useDocumentBytes.js';
 
 /**
@@ -44,8 +45,7 @@ export function DocumentModal(props: DocumentModalProps): ReactElement | null {
     }
     void (async (): Promise<void> => {
       try {
-        const pdfjs = await import('pdfjs-dist');
-        const pdf = await pdfjs.getDocument({ data: state.bytes }).promise;
+        const pdf = await loadPdfDocument(state.bytes);
         const targetPage = Math.min(Math.max(1, props.initialPage ?? 1), pdf.numPages);
         const page = await pdf.getPage(targetPage);
         const viewport = page.getViewport({ scale: 1.5 });
@@ -59,7 +59,8 @@ export function DocumentModal(props: DocumentModalProps): ReactElement | null {
         if (!ctx) {
           return;
         }
-        await page.render({ canvasContext: ctx, viewport }).promise;
+        // pdfjs-dist 5.x render API requires both `canvas` and `canvasContext`.
+        await page.render({ canvas, canvasContext: ctx, viewport }).promise;
       } catch {
         // Render failure — surfaced via the empty canvas; user can close + retry.
       }
@@ -82,6 +83,14 @@ export function DocumentModal(props: DocumentModalProps): ReactElement | null {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [props.isOpen, props.onClose]);
+
+  // G2-Final-31 — the in-CUI DocumentModal is no longer the production
+  // overlay path. App.tsx posts AGENTFORGE_OPEN_DOCUMENT_OVERLAY to the
+  // parent shell, which renders a top-level overlay that sits over both
+  // the OpenEMR app and the CUI rail without disturbing either layout.
+  // This component is preserved for the standalone test path (Vitest)
+  // and as a defensive in-CUI fallback if the host listener is ever
+  // unavailable.
 
   if (!props.isOpen) {
     return null;

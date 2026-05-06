@@ -291,13 +291,14 @@ final class AppointmentEncounterBinder
 
     private function requireEncounterEvents(): void
     {
-        if (\function_exists('todaysEncounterCheck') && \function_exists('manage_tracker_status')) {
+        if (\function_exists('todaysEncounterCheck') && \function_exists('manage_tracker_status') && \function_exists('addForm')) {
             return;
         }
 
         $srcdir = $GLOBALS['srcdir'] ?? '';
         if (\is_string($srcdir) && $srcdir !== '') {
             require_once $srcdir . '/encounter_events.inc.php';
+            require_once $srcdir . '/forms.inc.php';
         }
     }
 

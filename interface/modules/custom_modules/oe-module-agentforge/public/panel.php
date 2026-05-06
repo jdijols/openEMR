@@ -74,6 +74,12 @@ $apiPublicJson = \json_encode($apiPublicStr, \JSON_THROW_ON_ERROR);
 $globals = OEGlobalsBag::getInstance();
 $webroot = $globals->getWebRoot();
 
+// G2-MVP-99 — base URL the CUI uses for module-side endpoints (document
+// upload, document bytes). Webroot already accounts for any OpenEMR path
+// prefix, so this works whether OpenEMR is at "/" or "/openemr".
+$moduleBase = $webroot . '/interface/modules/custom_modules/oe-module-agentforge/public';
+$moduleBaseJson = \json_encode($moduleBase, \JSON_THROW_ON_ERROR);
+
 /*
  * Cache-bust the CUI bundle by content hash (G6-16). Without this, the
  * browser caches `agentforge-cui.js` the first time it loads and never
@@ -106,7 +112,7 @@ $html = '<!DOCTYPE html><html lang="en" data-launch-code="' . $attr . '" data-pa
     . '" data-bound-encounter-date="' . $encounterDateAttr . '" data-bound-encounter-category="' . $encounterCategoryAttr
     . '" data-bound-encounter-created="' . $encounterCreatedAttr . '"><head><meta charset="utf-8"><title>Clinical Copilot panel</title>'
     . '<link rel="stylesheet" href="' . $styleHref . '">'
-    . '<script>window.__AGENTFORGE_CUI__={apiBase:' . $apiPublicJson . '};</script>'
+    . '<script>window.__AGENTFORGE_CUI__={apiBase:' . $apiPublicJson . ',moduleBase:' . $moduleBaseJson . '};</script>'
     . '</head><body><div id="agentforge-panel-root"></div>'
     . '<script type="module" src="' . $scriptSrc . '"></script></body></html>';
 

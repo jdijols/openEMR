@@ -45,7 +45,9 @@ function buildHeadline(s: Extract<ExtractionStatus, { status: 'resolved' }>): st
 
 function buildInvitation(docType: 'lab_pdf' | 'intake_form'): string {
   if (docType === 'lab_pdf') {
-    return 'Click any value below to see it on the source PDF, or ask me what stands out.';
+    // Per-value inline rendering with click-to-source is G2-Early-30b; until
+    // then point the operator at the source PDF + invite a follow-up question.
+    return 'Open the source PDF, or ask me what stands out about these results.';
   }
   return 'Review and confirm the proposal below to bring this into the chart.';
 }

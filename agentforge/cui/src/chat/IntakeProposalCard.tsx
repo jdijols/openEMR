@@ -1,12 +1,20 @@
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { useState } from 'react';
+import {
+  ProposalCardShell,
+  type ProposalCardActionsConfig,
+  type ProposalCardState,
+} from './ProposalCardShell.js';
 
 /**
- * §9 / G2-MVP-69 — read-only intake-proposal card at MVP. Displays the
- * extracted intake form across 5 sections (Demographics, Chief concern,
- * Current medications, Allergies, Family history). Confirm fires an
- * intent dispatch (stub at MVP — real per-section write tools land at
- * G2-Early-25 + 26). Reject discards the card.
+ * §9 / G2-MVP-69 — read-only intake-proposal card. Renders through the
+ * shared `ProposalCardShell` so the visual identity (header chrome,
+ * accent border, status pill, button row) matches the W1 vitals /
+ * chief-complaint proposal cards exactly. The intake-specific bits
+ * are the structured sections inside the body slot.
+ *
+ * Confirm fires an intent dispatch (stub at MVP — real per-section
+ * write tools land at G2-Early-25 + 26). Reject discards the card.
  */
 
 export type IntakeProposalData = {
@@ -23,11 +31,45 @@ export type IntakeProposalCardProps = {
   readonly onReject: () => void;
 };
 
+type IntakeUiState = 'idle' | 'pending' | 'confirmed' | 'rejected';
+
+function shellStateFor(ui: IntakeUiState): ProposalCardState {
+  switch (ui) {
+    case 'idle':
+      return 'idle';
+    case 'pending':
+      return 'submitting';
+    case 'confirmed':
+      return 'accepted';
+    case 'rejected':
+      return 'declined';
+  }
+}
+
+function statusFor(ui: IntakeUiState): string | undefined {
+  switch (ui) {
+    case 'pending':
+      return 'Capturing…';
+    case 'confirmed':
+      // MVP scope: per-section dispatch (propose_allergy_write,
+      // propose_chief_complaint_write, propose_clinical_note_write,
+      // propose_medication_add, propose_family_history_add) lands at
+      // G2-Early-26. The honest read is "captured for chart write,"
+      // not "confirmed" — the latter promises persistence we don't
+      // do yet.
+      return 'Captured. Chart writes scheduled for next iteration (G2-Early-26).';
+    case 'rejected':
+      return 'Rejected.';
+    case 'idle':
+      return undefined;
+  }
+}
+
 export function IntakeProposalCard(props: IntakeProposalCardProps): ReactElement {
-  const [state, setState] = useState<'idle' | 'pending' | 'confirmed' | 'rejected'>('idle');
+  const [ui, setUi] = useState<IntakeUiState>('idle');
 
   const fireConfirm = (): void => {
-    setState('pending');
+    setUi('pending');
     // MVP: just log intent; real per-section dispatch lands at G2-Early-26.
     console.info('agentforge_intake_proposal_confirm_intent', {
       sections: ['demographics', 'chief_concern', 'current_medications', 'allergies', 'family_history'],
@@ -36,98 +78,119 @@ export function IntakeProposalCard(props: IntakeProposalCardProps): ReactElement
       n_family: props.data.family_history.length,
     });
     props.onConfirm();
-    setState('confirmed');
+    setUi('confirmed');
   };
 
   const fireReject = (): void => {
-    setState('rejected');
+    setUi('rejected');
     props.onReject();
   };
 
-  if (state === 'rejected') {
-    return <div data-testid="intake-proposal-card-rejected" style={{ color: '#666', fontStyle: 'italic' }}>Proposal dismissed.</div>;
-  }
+  const showActions = ui === 'idle' || ui === 'pending';
+  const actions: ProposalCardActionsConfig | undefined = showActions ?
+    {
+      onConfirm: fireConfirm,
+      onReject: fireReject,
+      confirmLabel: 'Confirm',
+      rejectLabel: 'Reject',
+      disabled: ui !== 'idle',
+    }
+  : undefined;
+
+  const status = statusFor(ui);
 
   return (
-    <div data-testid="intake-proposal-card" className="agentforge-cui__intake-proposal" style={{ border: '1px solid #d4d4d8', borderRadius: 8, padding: '1rem', margin: '0.5rem 0', background: '#fafafa' }}>
-      <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '1rem' }}>New patient intake — confirm to bring into the chart</h3>
-
-      <Section title="Demographics" testid="intake-section-demographics">
-        <KV k="Name" v={props.data.demographics.name} />
-        <KV k="DOB" v={props.data.demographics.dob} />
-        <KV k="Sex" v={props.data.demographics.sex} />
-        <KV k="Phone" v={props.data.demographics.contact_phone} />
+    <ProposalCardShell
+      state={shellStateFor(ui)}
+      title="New patient intake"
+      targetLabel="intake form"
+      ariaLabel="Proposed new patient intake"
+      {...(status !== undefined ? { statusMessage: status } : {})}
+      {...(actions !== undefined ? { actions } : {})}
+    >
+      <Section title="Demographics">
+        <KV k="Name" v={props.data.demographics.name ?? null} />
+        <KV k="DOB" v={props.data.demographics.dob ?? null} />
+        <KV k="Sex" v={props.data.demographics.sex ?? null} />
+        <KV k="Phone" v={props.data.demographics.contact_phone ?? null} />
       </Section>
 
-      <Section title="Chief concern" testid="intake-section-chief-concern">
-        <p style={{ margin: 0 }}>{props.data.chief_concern.text}</p>
-        {props.data.chief_concern.onset != null && <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: '#666' }}>Onset: {props.data.chief_concern.onset}</p>}
+      <Section title="Chief concern">
+        <p className="agentforge-msg__proposal-kv">{props.data.chief_concern.text}</p>
+        {props.data.chief_concern.onset != null && props.data.chief_concern.onset !== '' ? (
+          <p className="agentforge-msg__proposal-kv">
+            <span className="agentforge-msg__proposal-kv-label">Onset:</span>
+            {props.data.chief_concern.onset}
+          </p>
+        ) : null}
       </Section>
 
-      <Section title={`Current medications (${props.data.current_medications.length})`} testid="intake-section-medications">
+      <Section title={`Current medications (${props.data.current_medications.length})`}>
         {props.data.current_medications.length === 0 ? (
-          <p style={{ margin: 0, color: '#666', fontStyle: 'italic' }}>None on file.</p>
+          <p className="agentforge-msg__proposal-section-empty">None on file.</p>
         ) : (
-          <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+          <ul className="agentforge-msg__proposal-section-list">
             {props.data.current_medications.map((m, i) => (
-              <li key={`${m.name}-${i}`}>{m.name}{m.dose != null && m.dose !== '' ? ` ${m.dose}` : ''}{m.frequency != null && m.frequency !== '' ? ` · ${m.frequency}` : ''}</li>
+              <li key={`${m.name}-${i}`}>
+                {m.name}
+                {m.dose != null && m.dose !== '' ? ` ${m.dose}` : ''}
+                {m.frequency != null && m.frequency !== '' ? ` · ${m.frequency}` : ''}
+              </li>
             ))}
           </ul>
         )}
       </Section>
 
-      <Section title={`Allergies (${props.data.allergies.length})`} testid="intake-section-allergies">
+      <Section title={`Allergies (${props.data.allergies.length})`}>
         {props.data.allergies.length === 0 ? (
-          <p style={{ margin: 0, color: '#666', fontStyle: 'italic' }}>None on file.</p>
+          <p className="agentforge-msg__proposal-section-empty">None on file.</p>
         ) : (
-          <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+          <ul className="agentforge-msg__proposal-section-list">
             {props.data.allergies.map((a, i) => (
-              <li key={`${a.substance}-${i}`}>{a.substance}{a.reaction != null && a.reaction !== '' ? ` — ${a.reaction}` : ''}{a.severity != null && a.severity !== '' ? ` (${a.severity})` : ''}</li>
+              <li key={`${a.substance}-${i}`}>
+                {a.substance}
+                {a.reaction != null && a.reaction !== '' ? ` — ${a.reaction}` : ''}
+                {a.severity != null && a.severity !== '' ? ` (${a.severity})` : ''}
+              </li>
             ))}
           </ul>
         )}
       </Section>
 
-      <Section title={`Family history (${props.data.family_history.length})`} testid="intake-section-family">
+      <Section title={`Family history (${props.data.family_history.length})`}>
         {props.data.family_history.length === 0 ? (
-          <p style={{ margin: 0, color: '#666', fontStyle: 'italic' }}>None on file.</p>
+          <p className="agentforge-msg__proposal-section-empty">None on file.</p>
         ) : (
-          <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+          <ul className="agentforge-msg__proposal-section-list">
             {props.data.family_history.map((f, i) => (
-              <li key={`${f.relation}-${i}`}>{f.relation}: {f.condition}</li>
+              <li key={`${f.relation}-${i}`}>
+                {f.relation}: {f.condition}
+              </li>
             ))}
           </ul>
         )}
       </Section>
-
-      <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem' }}>
-        <button type="button" data-testid="intake-proposal-confirm" onClick={fireConfirm} disabled={state !== 'idle'} style={{ padding: '0.5rem 1rem', background: state === 'confirmed' ? '#16a34a' : '#2563eb', color: '#fff', border: 'none', borderRadius: 4, cursor: state === 'idle' ? 'pointer' : 'default' }}>
-          {state === 'confirmed' ? 'Confirmed' : state === 'pending' ? 'Confirming…' : 'Confirm'}
-        </button>
-        <button type="button" data-testid="intake-proposal-reject" onClick={fireReject} disabled={state !== 'idle'} style={{ padding: '0.5rem 1rem', background: 'transparent', color: '#444', border: '1px solid #ccc', borderRadius: 4, cursor: state === 'idle' ? 'pointer' : 'default' }}>
-          Reject
-        </button>
-      </div>
-    </div>
+    </ProposalCardShell>
   );
 }
 
-function Section(props: { title: string; testid?: string; children: React.ReactNode }): ReactElement {
+function Section(props: { title: string; children: ReactNode }): ReactElement {
   return (
-    <section data-testid={props.testid} style={{ marginBottom: '0.75rem' }}>
-      <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '0.875rem', color: '#444' }}>{props.title}</h4>
-      <div style={{ fontSize: '0.875rem' }}>{props.children}</div>
+    <section className="agentforge-msg__proposal-section">
+      <h4 className="agentforge-msg__proposal-section-title">{props.title}</h4>
+      {props.children}
     </section>
   );
 }
 
-function KV(props: { k: string; v?: string | null }): ReactElement | null {
-  if (props.v == null || props.v === '') {
+function KV(props: { k: string; v: string | null }): ReactElement | null {
+  if (props.v === null || props.v === '') {
     return null;
   }
   return (
-    <p style={{ margin: '0.125rem 0' }}>
-      <strong style={{ color: '#666' }}>{props.k}:</strong> {props.v}
+    <p className="agentforge-msg__proposal-kv">
+      <span className="agentforge-msg__proposal-kv-label">{props.k}:</span>
+      {props.v}
     </p>
   );
 }

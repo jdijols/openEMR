@@ -160,7 +160,8 @@ export async function verifyClinicalBlocks(
       x.type === 'text' ||
       x.type === 'tool_call' ||
       x.type === 'tool_result' ||
-      x.type === 'warning',
+      x.type === 'warning' ||
+      x.type === 'extraction',
   );
 
   if (!nonEmptyClinical) {

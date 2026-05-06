@@ -22,6 +22,15 @@ export type ProposalResolution =
   | { readonly phase: 'openemr_denied'; readonly openemrReason?: string }
   | { readonly phase: 'delivery_failed'; readonly deliveryMessage?: string };
 
+/** §9 / G2-MVP-99 — surfaced by orchestrator on successful `attach_and_extract`. */
+export type IntakeProposalData = {
+  readonly demographics: { name: string | null; dob: string | null; sex: string | null; contact_phone: string | null };
+  readonly chief_concern: { text: string; onset: string | null };
+  readonly current_medications: ReadonlyArray<{ name: string; dose: string | null; frequency: string | null }>;
+  readonly allergies: ReadonlyArray<{ substance: string; reaction: string | null; severity: string | null }>;
+  readonly family_history: ReadonlyArray<{ relation: string; condition: string }>;
+};
+
 export type ChatBlock =
   | { type: 'text'; text: string }
   | {
@@ -40,6 +49,16 @@ export type ChatBlock =
       write_target: string;
       preview: string;
       resolved?: ProposalResolution;
+    }
+  | {
+      type: 'extraction';
+      doc_type: 'lab_pdf' | 'intake_form';
+      docref_uuid: string;
+      n_facts: number;
+      n_abnormal?: number;
+      /** G2-Early-27 informational preview (no chart write yet). */
+      lab_summary?: string;
+      intake_data?: IntakeProposalData;
     };
 
 export type RedeemResponse = {
@@ -50,6 +69,22 @@ export type RedeemResponse = {
     encounter_id_present: boolean;
   };
   expires_at: string;
+};
+
+/**
+ * G2-MVP-99 — when the user sends a message with a file attachment, the
+ * file rides along on the ChatMessage so the bubble can render the same
+ * preview chip used in the composer (minus the X). Once the upload
+ * completes, `docrefUuid` is filled in so clicking the chip opens
+ * DocumentModal at page 1.
+ */
+export type ChatAttachment = {
+  /** Original File for inline rendering (PDF first-page thumbnail / image src). */
+  file: File;
+  mimeType: string;
+  name: string;
+  /** Filled in once the upload completes; clickable preview opens DocumentModal. */
+  docrefUuid?: string;
 };
 
 export type ChatMessage = {
@@ -63,6 +98,8 @@ export type ChatMessage = {
    * identical for typed and dictated input.
    */
   source?: 'typed' | 'dictation';
+  /** G2-MVP-99 — present when the user sent a file alongside the message. */
+  attachment?: ChatAttachment;
 };
 
 export type ChatResponse = {

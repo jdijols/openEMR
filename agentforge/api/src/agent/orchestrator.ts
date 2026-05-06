@@ -4,7 +4,7 @@ import type { Pool } from 'pg';
 import { z } from 'zod';
 import type { Env } from '../env.js';
 import type { Observability } from '../observability/index.js';
-import { appendTurn, insertConversationRow } from '../conversations/store.js';
+import { appendTurn, insertConversationRow, insertPendingProposal } from '../conversations/store.js';
 import { verifySessionToken } from '../handshake/sessionToken.js';
 import { chatBlockSchema, type ChatBlock } from '../openemr/types.js';
 import { createChartContextReadTools } from '../tools/chart_context_reads.js';
@@ -670,6 +670,28 @@ export async function runChatTurn(
   let blocks = parseBlocksFromModelText(result.text);
   blocks = [...blocks, ...coerceProposalChatBlocks(mergedToolResults)];
 
+  // §9 / G2-MVP-99 — surface successful attach_and_extract result as an
+  // `extraction` block so the CUI can render the ExtractionAcknowledgment
+  // headline + (for intake_form) the IntakeProposalCard inline. Prepended
+  // so the visual flow is: ack → (lab summary proposal) → LLM commentary
+  // → claims with citations.
+  const extractionBlock = buildExtractionBlock(mergedToolResults);
+  if (extractionBlock !== null) {
+    blocks = [extractionBlock, ...blocks];
+  }
+
+  // §10 / G2-Early-27 — Lab Summary clinical note auto-proposal.
+  // **DISABLED for MVP** (2026-05-05): the synthesized proposal renders
+  // correctly through ProposalCardShell, but Confirm hits a generic
+  // "write failed" in `ClinicalNoteWriteAction.execute()` (the W1 PHP
+  // catch-all that swallows the underlying ClinicalNotesService
+  // exception). Debugging the PHP service in the final hour before
+  // submission was higher risk than rolling back to the bare lab ack.
+  // The helper (`maybeBuildLabSummaryProposal`) and formatter remain
+  // below for the G2-Early restoration; the call is gated off until
+  // the underlying write path is verified end-to-end.
+  void maybeBuildLabSummaryProposal; // silence unused-export lint
+
   const evidence = buildClinicalToolEvidence(input.patientUuid, mergedToolResults);
 
   // Verification gate — runs post-LLM, post-tool, pre-return. The four layers
@@ -717,4 +739,279 @@ export async function runChatTurn(
     citation_navigation,
     conversation_id: convRecord.externalId,
   };
+}
+
+/**
+ * §9 / G2-MVP-99 — find the latest successful `attach_and_extract` tool result
+ * in `mergedToolResults` and convert it into an `extraction` ChatBlock for the
+ * CUI. Returns null when no extraction ran or the extraction errored.
+ */
+function buildExtractionBlock(toolResults: AiToolResultLike[]): ChatBlock | null {
+  for (let i = toolResults.length - 1; i >= 0; i--) {
+    const tr = toolResults[i];
+    if (tr === undefined || tr.toolName !== 'attach_and_extract') {
+      continue;
+    }
+    const out = tr.output;
+    if (out === null || typeof out !== 'object') {
+      continue;
+    }
+    const ok = (out as { ok?: unknown }).ok;
+    if (ok !== true) {
+      continue;
+    }
+    const result = (out as { result?: unknown }).result;
+    if (result === null || typeof result !== 'object') {
+      continue;
+    }
+    const r = result as {
+      metadata?: { docType?: 'lab_pdf' | 'intake_form' };
+      factsTotal?: number;
+      extraction?: unknown;
+    };
+    const docType = r.metadata?.docType;
+    if (docType !== 'lab_pdf' && docType !== 'intake_form') {
+      continue;
+    }
+    const docrefUuid =
+      tr.input !== null && typeof tr.input === 'object' ?
+        ((tr.input as { docref_uuid?: string }).docref_uuid ?? '')
+      : '';
+    if (docrefUuid === '') {
+      continue;
+    }
+
+    if (docType === 'lab_pdf') {
+      const labResults =
+        r.extraction !== null && typeof r.extraction === 'object' ?
+          ((r.extraction as { results?: ReadonlyArray<{ abnormal_flag?: string }> }).results ?? [])
+        : [];
+      const nAbnormal = labResults.filter(
+        (lr) => typeof lr.abnormal_flag === 'string' && lr.abnormal_flag !== 'normal' && lr.abnormal_flag !== 'unknown',
+      ).length;
+      // G2-Early-27 — include the formatted Lab Summary text on the
+      // extraction block so the CUI can render an informational
+      // ProposalCardShell preview (no Confirm/Reject; deferred-scope
+      // status). The actual chart write lands at G2-Early-27.
+      const labSummary =
+        r.extraction !== null && typeof r.extraction === 'object' ?
+          formatLabSummaryNoteBody(r.extraction as Record<string, unknown>)
+        : '';
+      return {
+        type: 'extraction',
+        doc_type: 'lab_pdf',
+        docref_uuid: docrefUuid,
+        n_facts: typeof r.factsTotal === 'number' ? r.factsTotal : labResults.length,
+        n_abnormal: nAbnormal,
+        ...(labSummary !== '' ? { lab_summary: labSummary } : {}),
+      };
+    }
+
+    // intake_form
+    const ext = r.extraction as {
+      demographics?: { name?: string | null; dob?: string | null; sex?: string | null; contact_phone?: string | null };
+      chief_concern?: { text?: string; onset?: string | null };
+      current_medications?: ReadonlyArray<{ name?: string; dose?: string | null; frequency?: string | null }>;
+      allergies?: ReadonlyArray<{ substance?: string; reaction?: string | null; severity?: string | null }>;
+      family_history?: ReadonlyArray<{ relation?: string; condition?: string }>;
+    } | null;
+    if (ext === null || typeof ext !== 'object') {
+      continue;
+    }
+    return {
+      type: 'extraction',
+      doc_type: 'intake_form',
+      docref_uuid: docrefUuid,
+      n_facts: typeof r.factsTotal === 'number' ? r.factsTotal : 0,
+      intake_data: {
+        demographics: {
+          name: ext.demographics?.name ?? null,
+          dob: ext.demographics?.dob ?? null,
+          sex: ext.demographics?.sex ?? null,
+          contact_phone: ext.demographics?.contact_phone ?? null,
+        },
+        chief_concern: {
+          text: ext.chief_concern?.text ?? '',
+          onset: ext.chief_concern?.onset ?? null,
+        },
+        current_medications: (ext.current_medications ?? []).map((m) => ({
+          name: m.name ?? '',
+          dose: m.dose ?? null,
+          frequency: m.frequency ?? null,
+        })),
+        allergies: (ext.allergies ?? []).map((a) => ({
+          substance: a.substance ?? '',
+          reaction: a.reaction ?? null,
+          severity: a.severity ?? null,
+        })),
+        family_history: (ext.family_history ?? []).map((f) => ({
+          relation: f.relation ?? '',
+          condition: f.condition ?? '',
+        })),
+      },
+    };
+  }
+  return null;
+}
+
+/**
+ * §10 / G2-Early-27 — Lab Summary clinical-note auto-proposal.
+ *
+ * When `attach_and_extract` succeeds for a lab PDF, synthesize a
+ * `propose_clinical_note_write`-equivalent pending proposal directly
+ * (no LLM round-trip) and emit a matching `proposal` ChatBlock so the
+ * CUI renders a Confirm/Reject card alongside the lab acknowledgment.
+ * On Confirm, the existing W1 `/conversations/:id/confirm` endpoint
+ * applies the pending row, writing the lab summary into the encounter's
+ * canonical clinical-note row.
+ *
+ * Returns null when:
+ *   - no successful lab extraction in this turn
+ *   - no bound encounter (clinical notes need one)
+ *   - the extraction is missing the `results` array (defensive)
+ */
+async function maybeBuildLabSummaryProposal(
+  toolResults: AiToolResultLike[],
+  ctx: Readonly<{
+    pool: Pool;
+    conversationInternalId: number;
+    patientUuid: string;
+    encounterId: number | null;
+  }>,
+): Promise<ChatBlock | null> {
+  if (ctx.encounterId === null || ctx.encounterId <= 0) {
+    return null;
+  }
+
+  // Find the latest successful lab extraction in the tool results.
+  for (let i = toolResults.length - 1; i >= 0; i--) {
+    const tr = toolResults[i];
+    if (tr === undefined || tr.toolName !== 'attach_and_extract') {
+      continue;
+    }
+    const out = tr.output;
+    if (out === null || typeof out !== 'object' || (out as { ok?: unknown }).ok !== true) {
+      continue;
+    }
+    const r = (out as { result?: unknown }).result;
+    if (r === null || typeof r !== 'object') {
+      continue;
+    }
+    const meta = (r as { metadata?: { docType?: string } }).metadata;
+    if (meta?.docType !== 'lab_pdf') {
+      continue;
+    }
+    const ext = (r as { extraction?: unknown }).extraction;
+    if (ext === null || typeof ext !== 'object') {
+      continue;
+    }
+    const results = (ext as { results?: ReadonlyArray<unknown> }).results;
+    if (!Array.isArray(results) || results.length === 0) {
+      continue;
+    }
+
+    const noteBody = formatLabSummaryNoteBody(ext as Record<string, unknown>);
+    if (noteBody === '') {
+      continue;
+    }
+
+    const proposalId = randomUUID();
+    try {
+      await insertPendingProposal(ctx.pool, {
+        proposalId,
+        conversationInternalId: ctx.conversationInternalId,
+        patientUuid: ctx.patientUuid.toLowerCase(),
+        encounterId: ctx.encounterId,
+        writeTarget: 'clinical_note',
+        payload: { text: noteBody },
+      });
+    } catch (e) {
+      // Don't block the rest of the turn if proposal insertion fails;
+      // log and continue. The user still sees the extraction
+      // acknowledgment and can ask follow-up questions.
+      console.error('lab_summary_proposal_insert_failed', {
+        proposal_id: proposalId,
+        error_message: e instanceof Error ? e.message : String(e),
+      });
+      return null;
+    }
+
+    const previewBody = noteBody.length > 280 ? `${noteBody.slice(0, 277)}…` : noteBody;
+    return {
+      type: 'proposal',
+      proposal_id: proposalId,
+      write_target: 'clinical_note',
+      preview: `Lab Summary clinical note (encounter #${ctx.encounterId}) → ${previewBody}`,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Format a `LabPdfExtraction` (loose-typed because we receive it through
+ * the tool-result envelope) into a clinical-note body. Layout chosen for
+ * physician readability + downstream chart_context_reads parsability:
+ *
+ *   Lab Summary — <performing_lab>, collected <date>
+ *   • LDL: 158 mg/dL (HIGH; ref 0–99)
+ *   • HDL: 48 mg/dL (LOW; ref 40–60)
+ *   • ...
+ *
+ * Uses bullet glyphs + UPPERCASE flags so the abnormal results stand
+ * out when rendered as plaintext in the OpenEMR clinical-note panel.
+ */
+function formatLabSummaryNoteBody(ext: Record<string, unknown>): string {
+  const performingLab = typeof ext['performing_lab'] === 'string' ? (ext['performing_lab'] as string) : null;
+  const orderingProvider = typeof ext['ordering_provider'] === 'string' ? (ext['ordering_provider'] as string) : null;
+  const results = Array.isArray(ext['results']) ? (ext['results'] as ReadonlyArray<Record<string, unknown>>) : [];
+  if (results.length === 0) {
+    return '';
+  }
+
+  // Prefer the first result's collection_date as the panel date — labs
+  // typically have a single collection per panel.
+  const collectionDate = typeof results[0]?.['collection_date'] === 'string' ? (results[0]?.['collection_date'] as string) : null;
+
+  const headerParts: string[] = ['Lab Summary'];
+  if (performingLab !== null && performingLab !== '') {
+    headerParts.push(performingLab);
+  }
+  if (collectionDate !== null && collectionDate !== '') {
+    headerParts.push(`collected ${collectionDate}`);
+  }
+  const header = headerParts.join(' — ');
+
+  const lines: string[] = [header];
+  if (orderingProvider !== null && orderingProvider !== '') {
+    lines.push(`Ordered by ${orderingProvider}`);
+  }
+  lines.push('');
+
+  for (const r of results) {
+    const name = typeof r['test_name'] === 'string' ? (r['test_name'] as string) : '(unnamed test)';
+    const valueRaw = r['value'];
+    const value = typeof valueRaw === 'number' || typeof valueRaw === 'string' ? String(valueRaw) : '?';
+    const unit = typeof r['unit'] === 'string' ? (r['unit'] as string) : '';
+    const flagRaw = typeof r['abnormal_flag'] === 'string' ? (r['abnormal_flag'] as string) : 'unknown';
+    const flag = flagRaw === 'normal' || flagRaw === 'unknown' ? '' : flagRaw.toUpperCase();
+    const refLow = r['reference_range_low'];
+    const refHigh = r['reference_range_high'];
+    const refText = typeof r['reference_range_text'] === 'string' ? (r['reference_range_text'] as string) : '';
+    const refParts: string[] = [];
+    if (typeof refLow === 'number' || typeof refHigh === 'number') {
+      refParts.push(`ref ${refLow ?? '?'}–${refHigh ?? '?'}`);
+    } else if (refText !== '') {
+      refParts.push(`ref ${refText}`);
+    }
+    const flagAndRef =
+      flag !== '' && refParts.length > 0 ? ` (${flag}; ${refParts.join('; ')})`
+      : flag !== '' ? ` (${flag})`
+      : refParts.length > 0 ? ` (${refParts.join('; ')})`
+      : '';
+    const unitSuffix = unit !== '' ? ` ${unit}` : '';
+    lines.push(`• ${name}: ${value}${unitSuffix}${flagAndRef}`);
+  }
+
+  return lines.join('\n');
 }

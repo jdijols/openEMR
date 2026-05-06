@@ -147,7 +147,11 @@ export async function postChat(
   sessionToken: string,
   patientUuid: string,
   message: string,
-  opts?: Readonly<{ conversation_id?: string }>,
+  opts?: Readonly<{
+    conversation_id?: string;
+    docref_uuid?: string;
+    doc_type?: 'lab_pdf' | 'intake_form';
+  }>,
 ): Promise<{
   blocks: ChatBlock[];
   correlationId: string;
@@ -171,6 +175,10 @@ export async function postChat(
         ...(opts?.conversation_id !== undefined && opts.conversation_id !== '' ?
           { conversation_id: opts.conversation_id }
         : {}),
+        ...(opts?.docref_uuid !== undefined && opts.docref_uuid !== '' ?
+          { docref_uuid: opts.docref_uuid }
+        : {}),
+        ...(opts?.doc_type !== undefined ? { doc_type: opts.doc_type } : {}),
       }),
     });
   } catch {
@@ -340,4 +348,72 @@ export async function postPresentPatient(
       body.citation_navigation
     : {};
   return { blocks: body.blocks, correlationId: body.correlation_id ?? correlationId, citation_navigation };
+}
+
+/**
+ * G2-MVP-99 — multipart upload of a clinical document (lab PDF or intake form)
+ * to the OpenEMR module's `/upload/document.php`. Returns the canonical
+ * `docref_uuid` which the caller passes into `/chat` to trigger
+ * `attach_and_extract`.
+ */
+export async function postUploadDocument(
+  moduleBase: string,
+  sessionToken: string,
+  patientUuid: string,
+  docType: 'lab_pdf' | 'intake_form',
+  file: File,
+): Promise<{ docrefUuid: string; mimeType: string; fileSize: number; reUpload: boolean }> {
+  if (moduleBase === '') {
+    throw new AgentForgeDeliveryError('misconfigured_llm', undefined, 'missing_module_base');
+  }
+  const base = stripBase(moduleBase);
+  const correlationId = randomCorrelationId();
+
+  const form = new FormData();
+  form.append('file', file);
+  form.append('session_token', sessionToken);
+  form.append('patient_uuid', patientUuid);
+  form.append('doc_type', docType);
+  form.append('correlation_id', correlationId);
+
+  let res: Response;
+  try {
+    res = await fetch(`${base}/upload/document.php`, {
+      method: 'POST',
+      headers: { 'X-Correlation-Id': correlationId },
+      body: form,
+      // Include the OpenEMR session cookies — ChartContextGate requires them
+      // (browser-flow path; trusted-agent path uses X-Internal-Auth instead).
+      credentials: 'same-origin',
+    });
+  } catch {
+    throw new AgentForgeDeliveryError('network_unreachable', correlationId);
+  }
+
+  const json: unknown = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    throw deliveryErrorFromAgentResponse(res.status, json);
+  }
+
+  if (
+    json === null ||
+    typeof json !== 'object' ||
+    typeof (json as { docref_uuid?: unknown }).docref_uuid !== 'string'
+  ) {
+    throw new AgentForgeDeliveryError('invalid_success_response', correlationId);
+  }
+
+  const body = json as {
+    docref_uuid: string;
+    mime_type?: string;
+    file_size?: number;
+    re_upload?: boolean;
+  };
+  return {
+    docrefUuid: body.docref_uuid,
+    mimeType: typeof body.mime_type === 'string' ? body.mime_type : file.type,
+    fileSize: typeof body.file_size === 'number' ? body.file_size : file.size,
+    reUpload: body.re_upload === true,
+  };
 }

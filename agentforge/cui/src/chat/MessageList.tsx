@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { Fragment, useLayoutEffect, useRef, useState } from 'react';
 import { AgentForgeDeliveryError, postProposalConfirm, postProposalReject } from '../api/client.js';
 import type {
   ChatBlock,
@@ -8,6 +8,11 @@ import type {
   ProposalResolution,
 } from '../types/chat.js';
 import AssistantMarkdown from './AssistantMarkdown.js';
+import { AttachmentPreview } from './AttachmentPreview.js';
+import { ExtractionAcknowledgment } from './ExtractionAcknowledgment.js';
+import { IntakeProposalCard } from './IntakeProposalCard.js';
+import { ProposalCardShell, type ProposalCardActionsConfig, type ProposalCardState } from './ProposalCardShell.js';
+import { TypingIndicator } from './TypingIndicator.js';
 
 /**
  * Format a confirm/reject failure for the rail. Surfaces the literal server
@@ -40,6 +45,21 @@ function requestCitationNavigation(
   hint: CitationNavigationHint,
   expectedPatientUuid: string,
 ): void {
+  // G2-MVP-99 — guideline-chunk citations open their primary source URL
+  // directly in a new tab. The parent OpenEMR shell only handles
+  // intra-chart NAV_REQUEST kinds (chart_section / patient_dashboard /
+  // encounter / visit_history); posting a `guideline_chunk` kind falls
+  // through to the chart-refresh path on the host side, which is the
+  // wrong outcome for an external citation. Mirrors the standalone
+  // CitationLink component's behavior.
+  if (hint.kind === 'guideline_chunk') {
+    const sourceUrl = (hint.params as { source_url?: unknown }).source_url;
+    if (typeof sourceUrl === 'string' && sourceUrl !== '') {
+      window.open(sourceUrl, '_blank', 'noopener');
+    }
+    return;
+  }
+
   if (typeof window.parent === 'undefined' || window.parent === null) {
     return;
   }
@@ -450,7 +470,7 @@ function ProposalBlock(
     }
     if (ui.phase === 'submitting') return 'Submitting…';
     if (ui.phase === 'accepted') return 'Accepted.';
-    if (ui.phase === 'declined') return 'Declined.';
+    if (ui.phase === 'declined') return 'Rejected.';
     if (ui.phase === 'openemr_denied') {
       return ui.openemrReason !== undefined && ui.openemrReason.trim() !== '' ?
           `Rejected by OpenEMR: ${ui.openemrReason}`
@@ -515,67 +535,46 @@ function ProposalBlock(
       await postProposalReject(env.apiBase, env.sessionToken, env.patientUuid, env.conversationId, proposalId);
       setUiAndPersist({ phase: 'declined' });
     } catch (e) {
-      setUiAndPersist({ phase: 'delivery_failed', deliveryMessage: formatDeliveryFailure(isDelete ? 'Cancel' : 'Decline', e) });
+      setUiAndPersist({ phase: 'delivery_failed', deliveryMessage: formatDeliveryFailure(isDelete ? 'Cancel' : 'Reject', e) });
     }
   }
 
   const status = statusText();
   const icon = statusIcon();
 
+  // Map ProposalBlock's surfaceState (which already mirrors the
+  // ProposalCardShell vocabulary 1:1) onto the shell's state prop.
+  const shellState: ProposalCardState = surfaceState;
+
+  const actions: ProposalCardActionsConfig | undefined = showDecisionButtons ?
+    {
+      onConfirm: () => void onConfirm(),
+      onReject: () => void onReject(),
+      confirmLabel: isDelete ? 'Delete' : 'Confirm',
+      rejectLabel: isDelete ? 'Cancel' : 'Reject',
+      confirmIcon: isDelete ? <IconTrash /> : <IconCheck />,
+      rejectIcon: <IconX />,
+      confirmVariant: isDelete ? 'danger' : 'primary',
+      disabled: !canInteract,
+    }
+  : undefined;
+
   return (
-    <div
-      className="agentforge-msg__proposal-card"
-      data-state={surfaceState}
-      aria-label={`Proposed ${props.block.write_target}`}
+    <ProposalCardShell
+      state={shellState}
+      headerIcon={<IconClipboardCheck />}
+      title="Proposed change"
+      targetLabel={formatWriteTarget(props.block.write_target)}
+      ariaLabel={`Proposed ${props.block.write_target}`}
+      {...(status !== '' ? { statusMessage: status } : {})}
+      {...(icon !== null ? { statusIcon: icon } : {})}
+      {...(actions !== undefined ? { actions } : {})}
+      {...(proposalEnv === undefined ?
+        { hint: 'Thread not ready — send a chart message after opening the Assistant.' }
+      : {})}
     >
-      <header className="agentforge-msg__proposal-header">
-        <span className="agentforge-msg__proposal-label">
-          <IconClipboardCheck />
-          <span>Proposed change</span>
-        </span>
-        <span className="agentforge-msg__proposal-target">{formatWriteTarget(props.block.write_target)}</span>
-      </header>
-
       <p className="agentforge-msg__proposal-preview">{props.block.preview}</p>
-
-      {status !== '' ?
-        <p className="agentforge-msg__proposal-status" role="status">
-          {icon}
-          <span>{status}</span>
-        </p>
-      : null}
-
-      {showDecisionButtons ?
-        <div className="agentforge-msg__proposal-actions">
-          <button
-            type="button"
-            className={
-              isDelete ?
-                'agentforge-msg__proposal-btn agentforge-msg__proposal-btn--danger'
-              : 'agentforge-msg__proposal-btn agentforge-msg__proposal-btn--primary'
-            }
-            onClick={() => void onConfirm()}
-            disabled={!canInteract}
-          >
-            {isDelete ? <IconTrash /> : <IconCheck />}
-            <span>{isDelete ? 'Delete' : 'Confirm'}</span>
-          </button>
-          <button
-            type="button"
-            className="agentforge-msg__proposal-btn agentforge-msg__proposal-btn--secondary"
-            onClick={() => void onReject()}
-            disabled={!canInteract}
-          >
-            <IconX />
-            <span>{isDelete ? 'Cancel' : 'Reject'}</span>
-          </button>
-        </div>
-      : null}
-
-      {proposalEnv === undefined ?
-        <p className="agentforge-msg__proposal-hint">Thread not ready — send a chart message after opening the Assistant.</p>
-      : null}
-    </div>
+    </ProposalCardShell>
   );
 }
 
@@ -591,6 +590,7 @@ function renderBlock(
     readonly proposalEnv?: ProposalApiEnv;
     readonly voiceCompletedProposalIds?: ReadonlySet<string>;
     readonly onProposalResolved?: OnProposalResolved;
+    readonly onOpenDocument?: (docrefUuid: string, page?: number) => void;
   },
 ): ReactElement {
   switch (block.type) {
@@ -659,6 +659,28 @@ function renderBlock(
               const hint = nav?.[seg.citation_id];
               const canNav = hint !== undefined && bound !== '';
 
+              // G2-MVP-99 — guideline_chunk citations open the source URL
+              // in a new tab. Render as a native `<a target="_blank">` so
+              // the browser handles the navigation regardless of iframe
+              // context (window.open from inside an iframe was being
+              // silently swallowed in some Chromium configurations).
+              if (canNav && hint.kind === 'guideline_chunk') {
+                const sourceUrl = (hint.params as { source_url?: unknown }).source_url;
+                if (typeof sourceUrl === 'string' && sourceUrl !== '') {
+                  return (
+                    <a
+                      key={i}
+                      href={sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="agentforge-msg__cite-link"
+                    >
+                      {seg.text}
+                    </a>
+                  );
+                }
+              }
+
               if (canNav) {
                 return (
                   <button
@@ -695,6 +717,28 @@ function renderBlock(
         const citeId = citeIds[0]!;
         const hint = nav?.[citeId];
         const canNav = hint !== undefined && bound !== '';
+
+        // G2-MVP-99 — same iframe-safe anchor pattern as the segment
+        // branch above: external guideline URLs render as `<a target="_blank">`
+        // so the browser opens them in a new top-level tab regardless of
+        // iframe context.
+        if (canNav && hint.kind === 'guideline_chunk') {
+          const sourceUrl = (hint.params as { source_url?: unknown }).source_url;
+          if (typeof sourceUrl === 'string' && sourceUrl !== '') {
+            return (
+              <p key={key} className="agentforge-msg__claim">
+                <a
+                  href={sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="agentforge-msg__cite-link"
+                >
+                  {renderedText}
+                </a>
+              </p>
+            );
+          }
+        }
 
         return (
           <p key={key} className="agentforge-msg__claim">
@@ -758,6 +802,69 @@ function renderBlock(
           {block.detail !== undefined && block.detail !== '' ? <pre>{block.detail}</pre> : null}
         </details>
       );
+    case 'extraction': {
+      const fileName = block.doc_type === 'lab_pdf' ? 'lab PDF' : 'intake form';
+      const ackStatus =
+        block.doc_type === 'lab_pdf' ?
+          ({
+            status: 'resolved' as const,
+            docType: 'lab_pdf' as const,
+            fileName,
+            nFacts: block.n_facts,
+            ...(block.n_abnormal !== undefined ? { nAbnormal: block.n_abnormal } : {}),
+          })
+        : ({
+            status: 'resolved' as const,
+            docType: 'intake_form' as const,
+            fileName,
+            nFacts: block.n_facts,
+          });
+      return (
+        <div key={key} className="agentforge-msg__extraction">
+          <ExtractionAcknowledgment status={ackStatus} />
+          {opts.onOpenDocument !== undefined ? (
+            <p style={{ margin: '0.25rem 0 0 0' }}>
+              <button
+                type="button"
+                className="agentforge-msg__cite-link"
+                onClick={() => opts.onOpenDocument?.(block.docref_uuid, 1)}
+              >
+                View source PDF
+              </button>
+            </p>
+          ) : null}
+          {block.doc_type === 'intake_form' && block.intake_data !== undefined ? (
+            <IntakeProposalCard
+              data={block.intake_data}
+              onConfirm={() => {
+                /* MVP: intent is already logged by the card; per-section dispatch lands at G2-Early-26. */
+              }}
+              onReject={() => {
+                /* no-op for MVP */
+              }}
+            />
+          ) : null}
+          {/* G2-Early-27 — informational Lab Summary clinical-note preview.
+              Same ProposalCardShell chrome as W1 vitals / chief-complaint
+              proposals so the lab side feels coherent with the rest of the
+              flow, but no Confirm/Reject actions yet — the underlying
+              ClinicalNoteWriteAction throws "write failed" in the W1 PHP
+              catch-all and we're rolling back the live write to G2-Early-27.
+              The status pill cites the deferred task explicitly. */}
+          {block.doc_type === 'lab_pdf' && block.lab_summary !== undefined && block.lab_summary !== '' ? (
+            <ProposalCardShell
+              state="idle"
+              title="Lab Summary clinical note"
+              targetLabel="clinical note"
+              ariaLabel="Lab Summary clinical-note preview"
+              statusMessage="Captured. Chart writes scheduled for next iteration (G2-Early-27)."
+            >
+              <p className="agentforge-msg__proposal-preview">{block.lab_summary}</p>
+            </ProposalCardShell>
+          ) : null}
+        </div>
+      );
+    }
     default:
       return (
         <p key={key} className="agentforge-msg__unknown">
@@ -782,8 +889,13 @@ function renderBlock(
  * No-op when there are no proposal blocks in the message.
  */
 function suppressDuplicateProposalNarration(blocks: readonly ChatBlock[]): ChatBlock[] {
-  const hasProposal = blocks.some((b) => b.type === 'proposal');
-  if (!hasProposal) {
+  // G2-MVP-99 — extraction blocks behave the same way as proposal blocks
+  // for this purpose: ExtractionAcknowledgment + IntakeProposalCard already
+  // present the headline/invitation/structured fields; any LLM commentary
+  // alongside (e.g. "Intake Form Extracted / Chief Concern / …" headings)
+  // restates the same content and undermines trust.
+  const hasProposalLike = blocks.some((b) => b.type === 'proposal' || b.type === 'extraction');
+  if (!hasProposalLike) {
     return [...blocks];
   }
 
@@ -803,6 +915,18 @@ export function MessageList(props: {
    * `OnProposalResolved` for shape.
    */
   readonly onProposalResolved?: OnProposalResolved;
+  /**
+   * G2-MVP-99 — open the source PDF/image modal at a given page. Plumbed
+   * through to extraction-block "View source PDF" buttons. App owns the
+   * modal state.
+   */
+  readonly onOpenDocument?: (docrefUuid: string, page?: number) => void;
+  /**
+   * G2-MVP-99 — when true, render the assistant typing indicator at the
+   * bottom of the scroll container as if it were the next incoming
+   * message. App.tsx flips this on while a /chat request is in flight.
+   */
+  readonly typing?: boolean;
 }): ReactElement {
   const [notice, setNotice] = useState<string | null>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
@@ -852,49 +976,73 @@ export function MessageList(props: {
       ) : null}
       {props.messages.map((m, i) => {
         const isDictation = m.role === 'user' && m.source === 'dictation';
+        const visibleBlocks = m.role === 'assistant'
+          ? suppressDuplicateProposalNarration(m.blocks)
+          : m.blocks;
+        // For user turns, the text bubble only renders when there's
+        // something to show. A file-only send (no caption) skips the
+        // bubble entirely so the standalone chip stands by itself,
+        // iMessage-style.
+        const hasBubbleContent = m.role !== 'user' || visibleBlocks.length > 0;
         return (
-          <article
-            key={i}
-            className={`agentforge-msg agentforge-msg--${m.role}${isDictation ? ' agentforge-msg--dictation' : ''}`}
-            aria-label={m.role === 'user' ? (isDictation ? 'You (dictation)' : 'You') : 'Assistant'}
-          >
-            {/* Dictation badge sits at the top of the user bubble. The
-                user-side authorship signal is the bubble itself (right-
-                aligned, light-blue); the badge layers on origin
-                ("transcribed from voice, treat odd phrasing as ASR error
-                rather than a typo"). Assistant messages render no header
-                at all — no avatar, no label — so the prose flows on the
-                canvas the way Cursor / Claude / ChatGPT have trained
-                users to expect.
-
-                The article's `aria-label` ("You" / "Assistant" /
-                "You (dictation)") still carries the accessible name for
-                screen readers, so removing the visible label is purely a
-                visual change. */}
-            {isDictation ? (
-              <span className="agentforge-msg__dictation-badge" aria-label="Dictated">
-                Dictation
-              </span>
+          <Fragment key={i}>
+            {/* G2-MVP-99 — standalone attachment row for user sends.
+                Rendered as its own article (no blue bubble, no border),
+                right-aligned to match the user side, so the file reads
+                as its own object in the thread (iMessage / WhatsApp
+                pattern). Click opens DocumentModal once the upload
+                has resolved a docref. */}
+            {m.role === 'user' && m.attachment !== undefined ? (
+              <article
+                className="agentforge-msg agentforge-msg--attachment-row"
+                aria-label="Attached file"
+              >
+                <AttachmentPreview
+                  file={m.attachment.file}
+                  {...(m.attachment.docrefUuid !== undefined && props.onOpenDocument !== undefined
+                    ? { onClick: () => props.onOpenDocument!(m.attachment!.docrefUuid!, 1) }
+                    : {})}
+                />
+              </article>
             ) : null}
-            {(m.role === 'assistant' ? suppressDuplicateProposalNarration(m.blocks) : m.blocks).map((b, j) =>
-              renderBlock(b, `${i}-${j}`, {
-                assistantMessage: m.role === 'assistant',
-                boundPatientUuid: props.boundPatientUuid,
-                ...(props.proposalEnv !== undefined && m.role === 'assistant' ? { proposalEnv: props.proposalEnv } : {}),
-                ...(props.voiceCompletedProposalIds !== undefined ?
-                  { voiceCompletedProposalIds: props.voiceCompletedProposalIds }
-                : {}),
-                ...(props.onProposalResolved !== undefined && m.role === 'assistant' ?
-                  { onProposalResolved: props.onProposalResolved }
-                : {}),
-                ...(m.role === 'assistant' && m.citation_navigation !== undefined ?
-                  { citationNav: m.citation_navigation }
-                : {}),
-              }),
-            )}
-          </article>
+            {hasBubbleContent ? (
+              <article
+                className={`agentforge-msg agentforge-msg--${m.role}${isDictation ? ' agentforge-msg--dictation' : ''}`}
+                aria-label={m.role === 'user' ? (isDictation ? 'You (dictation)' : 'You') : 'Assistant'}
+              >
+                {/* Dictation badge sits at the top of the user bubble. */}
+                {isDictation ? (
+                  <span className="agentforge-msg__dictation-badge" aria-label="Dictated">
+                    Dictation
+                  </span>
+                ) : null}
+                {visibleBlocks.map((b, j) =>
+                  renderBlock(b, `${i}-${j}`, {
+                    assistantMessage: m.role === 'assistant',
+                    boundPatientUuid: props.boundPatientUuid,
+                    ...(props.proposalEnv !== undefined && m.role === 'assistant' ? { proposalEnv: props.proposalEnv } : {}),
+                    ...(props.voiceCompletedProposalIds !== undefined ?
+                      { voiceCompletedProposalIds: props.voiceCompletedProposalIds }
+                    : {}),
+                    ...(props.onProposalResolved !== undefined && m.role === 'assistant' ?
+                      { onProposalResolved: props.onProposalResolved }
+                    : {}),
+                    ...(m.role === 'assistant' && m.citation_navigation !== undefined ?
+                      { citationNav: m.citation_navigation }
+                    : {}),
+                    ...(props.onOpenDocument !== undefined ? { onOpenDocument: props.onOpenDocument } : {}),
+                  }),
+                )}
+              </article>
+            ) : null}
+          </Fragment>
         );
       })}
+      {/* G2-MVP-99 — typing indicator lives inside the scroll container
+          so it appears as the next-message-coming-in (left-aligned,
+          beneath the most recent assistant/user turn) instead of
+          floating above the compose form. */}
+      <TypingIndicator visible={props.typing === true} />
     </div>
   );
 }
