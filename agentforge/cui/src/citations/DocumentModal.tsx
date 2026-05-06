@@ -1,13 +1,26 @@
 import type { ReactElement } from 'react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { bboxToPixels, type BboxNormalized } from './bbox.js';
 import { loadPdfDocument } from './pdfjs.js';
 import { useDocumentBytes } from './useDocumentBytes.js';
 
+export type { BboxNormalized } from './bbox.js';
+
 /**
- * §9 / G2-MVP-64 — full-screen modal for displaying the source document at
- * a cited page. PDF rendering uses pdfjs-dist; PNG/JPEG render inline.
+ * §9 / G2-MVP-64 + G2-Early-30 — full-screen modal for displaying the
+ * source document at a cited page, with optional yellow bbox overlay
+ * highlighting the cited region.
  *
- * Bbox highlight overlay deferred to G2-Early-30 per cut-tier 2.
+ * Bbox is in normalized 0-1 PDF page coordinates per the §6 SourceCitation
+ * schema (`citation.bbox = [x0, y0, x1, y1]`). Position is computed against
+ * the rendered canvas dimensions; the highlight is absolutely positioned
+ * over the canvas so the PDF rendering path is unchanged.
+ *
+ * Production note (G2-Final-31): the in-CUI DocumentModal is the test
+ * + fallback path. The production overlay uses a host-rendered native
+ * iframe (no pdfjs in the host, no buffer-detach bug). The bbox feature
+ * exists in this fallback path so the citation contract's "visual PDF
+ * bounding-box overlay" requirement is demonstrably met.
  */
 
 export type DocumentModalProps = {
@@ -17,6 +30,8 @@ export type DocumentModalProps = {
   readonly sessionToken: string;
   readonly patientUuid: string;
   readonly initialPage?: number;
+  /** Normalized 0-1 bbox `[x0, y0, x1, y1]` from `SourceCitation.bbox`. */
+  readonly bbox?: BboxNormalized;
   readonly onClose: () => void;
 };
 
@@ -27,6 +42,9 @@ export function DocumentModal(props: DocumentModalProps): ReactElement | null {
     patientUuid: props.patientUuid,
   });
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // Track the rendered canvas dimensions so the absolutely-positioned bbox
+  // overlay (G2-Early-30) can be re-pixelized after each PDF page render.
+  const [canvasSize, setCanvasSize] = useState<{ width: number; height: number } | null>(null);
 
   // Fetch bytes when opened.
   useEffect(() => {
@@ -34,6 +52,7 @@ export function DocumentModal(props: DocumentModalProps): ReactElement | null {
       void fetchBytes(props.docrefUuid);
     } else if (!props.isOpen) {
       clear();
+      setCanvasSize(null);
     }
   }, [props.isOpen, props.docrefUuid, fetchBytes, clear]);
 
@@ -61,6 +80,9 @@ export function DocumentModal(props: DocumentModalProps): ReactElement | null {
         }
         // pdfjs-dist 5.x render API requires both `canvas` and `canvasContext`.
         await page.render({ canvas, canvasContext: ctx, viewport }).promise;
+        if (!cancelled) {
+          setCanvasSize({ width: viewport.width, height: viewport.height });
+        }
       } catch {
         // Render failure — surfaced via the empty canvas; user can close + retry.
       }
@@ -115,7 +137,32 @@ export function DocumentModal(props: DocumentModalProps): ReactElement | null {
         {state.status === 'loading' && <div data-testid="document-modal-loading">Loading…</div>}
         {state.status === 'error' && <div data-testid="document-modal-error" style={{ color: '#b00' }}>{state.errorMessage}</div>}
         {state.status === 'ok' && state.mimeType === 'application/pdf' && (
-          <canvas ref={canvasRef} data-testid="document-modal-canvas" />
+          <div style={{ position: 'relative', display: 'inline-block' }}>
+            <canvas ref={canvasRef} data-testid="document-modal-canvas" />
+            {/* G2-Early-30 — yellow bbox highlight overlay. Renders only
+                when bbox + canvas size are known and bbox is well-formed. */}
+            {(() => {
+              if (props.bbox === undefined || canvasSize === null) return null;
+              const px = bboxToPixels(props.bbox, canvasSize);
+              if (px === null) return null;
+              return (
+                <div
+                  data-testid="document-modal-bbox-overlay"
+                  aria-label="Cited region highlight"
+                  style={{
+                    position: 'absolute',
+                    left: `${px.left}px`,
+                    top: `${px.top}px`,
+                    width: `${px.width}px`,
+                    height: `${px.height}px`,
+                    background: 'rgba(255, 235, 59, 0.35)',
+                    border: '2px solid #f9a825',
+                    pointerEvents: 'none',
+                  }}
+                />
+              );
+            })()}
+          </div>
         )}
         {state.status === 'ok' && state.mimeType.startsWith('image/') && (
           <img alt="Source document" data-testid="document-modal-image" src={URL.createObjectURL(new Blob([new Uint8Array(state.bytes)], { type: state.mimeType }))} style={{ maxWidth: '85vw', maxHeight: '80vh' }} />
