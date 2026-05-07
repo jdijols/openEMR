@@ -53,7 +53,7 @@ if (!AclMap::userPassesAgentForgeReadGate($ctx['auth_user'])) {
     agentforge_emit_json(403, ['error' => 'acl_denied', 'correlation_id' => $correlationId]);
 }
 
-$storageRoot = \dirname(__DIR__, 5) . '/sites/default/documents/agentforge_w2';
+$storageRoot = \dirname(__DIR__, 6) . '/sites/default/documents/agentforge_w2';
 $repository = new OpenEmrDocumentRepository($storageRoot);
 $action = new DocumentBytesAction($repository);
 

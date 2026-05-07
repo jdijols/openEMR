@@ -58,6 +58,3 @@ sites/default/documents/certificates/*.key
 sites/default/documents/certificates/*.pem
 sites/default/documents/logs_and_misc/methods/*
 !sites/default/documents/logs_and_misc/methods/README.md
-# AgentForge document storage created at the wrong path by the module's
-# document repository (should be sites/default/documents/, not interface/...)
-interface/sites/

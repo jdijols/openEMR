@@ -26,11 +26,12 @@ final class AgentForgeAppointmentSeedStructureTest extends TestCase
     {
         $src = $this->readFile(self::APPOINTMENT_SEED_PATH);
 
-        self::assertStringContainsString("'2026-05-01'", $src);
-        self::assertStringContainsString("'2026-05-02'", $src);
-        self::assertStringContainsString("'2026-05-03'", $src);
-        self::assertStringContainsString("'2026-05-04'", $src);
-        self::assertStringNotContainsString("'2026-05-05'", $src);
+        // G2-Final-71 migrated the cohort appointment window forward to submission week.
+        self::assertStringContainsString("'2026-05-10'", $src);
+        self::assertStringContainsString("'2026-05-11'", $src);
+        self::assertStringContainsString("'2026-05-12'", $src);
+        self::assertStringContainsString("'2026-05-13'", $src);
+        self::assertStringNotContainsString("'2026-05-14'", $src);
         self::assertStringContainsString("['Donna', 'Lee', 'physician', 'Donna', 'Lee']", $src);
         self::assertStringContainsString("\$keys = ['A'];", $src);
     }

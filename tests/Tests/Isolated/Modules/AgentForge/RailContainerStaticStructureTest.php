@@ -51,9 +51,15 @@ final class RailContainerStaticStructureTest extends TestCase
         self::assertStringContainsString('ensurePanelLoaded', $contents);
 
         // Embedded column: rail lives as a sibling of #framesDisplay inside #mainFrames_div, not as fixed overlay.
+        // (The .agentforge-document-overlay rule legitimately uses position:fixed; assert specifically that
+        // the rail itself does not.)
         self::assertStringContainsString('mainFrames_div', $contents);
         self::assertStringContainsString('framesDisplay', $contents);
-        self::assertStringNotContainsString('position: fixed', $contents);
+        self::assertDoesNotMatchRegularExpression(
+            '/\.agentforge-rail\s*\{[^}]*position:\s*fixed/s',
+            $contents,
+            'The .agentforge-rail rule must not use position: fixed (rail is a flex sibling, not an overlay).',
+        );
 
         // Toggle is a user-driven collapse with sessionStorage persistence (host origin, not the iframe).
         self::assertStringContainsString('setCollapsed', $contents);

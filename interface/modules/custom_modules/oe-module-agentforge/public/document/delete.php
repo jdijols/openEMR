@@ -112,7 +112,7 @@ if (!AclMap::userPassesAgentForgeProposeWriteGate($ctx['auth_user'])) {
 
 $canonicalPatientUuid = strtolower($patientUuid);
 
-$storageRoot = \dirname(__DIR__, 5) . '/sites/default/documents/agentforge_w2';
+$storageRoot = \dirname(__DIR__, 6) . '/sites/default/documents/agentforge_w2';
 $action = new DocumentDeleteAction(
     new OpenEmrDocumentRepository($storageRoot),
     new MysqlCompletedWriteProposalLedger(),

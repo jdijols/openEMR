@@ -83,7 +83,7 @@ if ($pid <= 0) {
     agentforge_emit_json(403, ['error' => 'active_chart_mismatch', 'correlation_id' => $correlationId]);
 }
 
-$storageRoot = \dirname(__DIR__, 5) . '/sites/default/documents/agentforge_w2/_obs';
+$storageRoot = \dirname(__DIR__, 6) . '/sites/default/documents/agentforge_w2/_obs';
 $port = new OpenEmrObservationWriteAdapter($storageRoot);
 $audit = new AgentAuditDocumentSink();
 $writer = new ObservationWriter($port, $audit);

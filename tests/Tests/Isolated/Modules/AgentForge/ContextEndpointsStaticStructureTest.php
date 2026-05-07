@@ -140,13 +140,14 @@ final class ContextEndpointsStaticStructureTest extends TestCase
 
     /**
      * Sanity check on the test itself — if any endpoint is removed or the dir
-     * is empty, all of the above pass vacuously. Lock the floor at the nine
-     * Context Service endpoints listed in PRD §4.4.
+     * is empty, all of the above pass vacuously. Lock the floor at the ten
+     * Context Service endpoints (PRD §4.4 plus clinical_notes added in W2).
      */
-    public function testAllNineContextServiceEndpointsAreStillPresent(): void
+    public function testAllContextServiceEndpointsAreStillPresent(): void
     {
         $expected = [
             'allergies.php',
+            'clinical_notes.php',
             'encounters.php',
             'identity.php',
             'labs.php',
@@ -161,7 +162,7 @@ final class ContextEndpointsStaticStructureTest extends TestCase
         self::assertSame(
             $expected,
             $actual,
-            'Context Service endpoint set drifted from PRD §4.4 (nine endpoints).'
+            'Context Service endpoint set drifted from the expected ten-endpoint list.'
         );
     }
 }
