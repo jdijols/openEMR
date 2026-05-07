@@ -33,13 +33,18 @@ final class AgentForgeAppointmentSeeder
     /**
      * Fixed four-day demo window. Each demo patient is scheduled exactly once across these days; dev/demo only.
      *
+     * G2-Final-71 (2026-05-06): demo window migrated forward from
+     * 2026-05-01..04 to 2026-05-10..13 (Sun-Wed of submission week) so
+     * graders opening the deployed app on submission day see fresh
+     * appointments on the calendar instead of week-old slots.
+     *
      * @var list<string>
      */
     private const DEMO_WEEKDAY_DATES = [
-        '2026-05-01',
-        '2026-05-02',
-        '2026-05-03',
-        '2026-05-04',
+        '2026-05-10',
+        '2026-05-11',
+        '2026-05-12',
+        '2026-05-13',
     ];
 
     private const EXPECTED_DEMO_PATIENT_COUNT = 32;
@@ -927,7 +932,7 @@ final class AgentForgeAppointmentSeeder
             '',
             'All appointments and scheduled-patient records are fabricated synthetic data for demo and evaluation use only.',
             '',
-            '**Demo window:** **Friday 2026-05-01 through Monday 2026-05-04** only. Each of the 28 demo patients appears **exactly once** across the four-day Donna Lee schedule.',
+            '**Demo window:** **Sunday 2026-05-10 through Wednesday 2026-05-13** only. Each of the 32 demo patients appears **exactly once** across the four-day Donna Lee schedule.',
             'Run `contrib/util/agentforge/seed_visit_intake.php` after this script to create same-day intake encounters.',
             '',
             '## Patient Sources',
