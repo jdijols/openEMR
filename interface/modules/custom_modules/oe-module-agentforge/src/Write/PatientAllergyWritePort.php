@@ -22,4 +22,10 @@ interface PatientAllergyWritePort
      * @param array<string, mixed> $patch Non-empty validated patch (e.g. comments, severity_al).
      */
     public function updateAllergy(string $patientUuidCanonical, string $allergyUuidCanonical, array $patch): ConfirmedWriteOutcome;
+
+    /**
+     * G2-Early-22 — soft-delete an allergy `lists` row by setting `activity = 0`. The pid
+     * scope is enforced before the update so cross-patient deletes are rejected.
+     */
+    public function softDeleteAllergyByUuid(int $patientPid, string $allergyUuidString): ConfirmedWriteOutcome;
 }

@@ -13,6 +13,13 @@ const WRITE_TARGETS = [
   'clinical_note',
   'clinical_note_update',
   'clinical_note_delete',
+  // G2-Early-25 / G2-Final-12 — W2 propose-write targets.
+  'medication_add',
+  'medication_discontinue',
+  'allergy_delete',
+  'family_history_add',
+  'document_delete',
+  'demographics_update',
 ] as const;
 export type WriteTarget = (typeof WRITE_TARGETS)[number];
 
@@ -30,6 +37,12 @@ const RELATIVE_PATH: Record<WriteTarget, string> = {
   clinical_note: 'write/clinical_note.php',
   clinical_note_update: 'write/clinical_note_edit.php',
   clinical_note_delete: 'write/clinical_note_edit.php',
+  medication_add: 'write/medication_add.php',
+  medication_discontinue: 'write/medication_discontinue.php',
+  allergy_delete: 'write/allergy_delete.php',
+  family_history_add: 'write/family_history_add.php',
+  document_delete: 'document/delete.php',
+  demographics_update: 'write/demographics_update.php',
 };
 
 const ENCOUNTER_REQUIRED_TARGETS: ReadonlySet<WriteTarget> = new Set([

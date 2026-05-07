@@ -26,7 +26,7 @@ declare(strict_types=1);
 
 namespace OpenEMR\Modules\AgentForge\Documents;
 
-final class OpenEmrDocumentRepository implements DocumentUploadPort, DocumentBytesPort
+final class OpenEmrDocumentRepository implements DocumentUploadPort, DocumentBytesPort, DocumentDeletePort
 {
     public function __construct(private readonly string $storageRoot)
     {
@@ -40,6 +40,9 @@ final class OpenEmrDocumentRepository implements DocumentUploadPort, DocumentByt
         foreach (glob($this->storageRoot . '/*.json') ?: [] as $sidecarPath) {
             $meta = $this->readSidecar($sidecarPath);
             if ($meta === null) {
+                continue;
+            }
+            if (isset($meta['deleted_at'])) {
                 continue;
             }
             if (
@@ -87,6 +90,10 @@ final class OpenEmrDocumentRepository implements DocumentUploadPort, DocumentByt
             return null;
         }
 
+        if (isset($meta['deleted_at'])) {
+            return null;
+        }
+
         if (($meta['patient_uuid_canonical'] ?? '') !== $expectedPatientUuidCanonical) {
             throw new CrossPatientDocumentAccessException();
         }
@@ -107,6 +114,58 @@ final class OpenEmrDocumentRepository implements DocumentUploadPort, DocumentByt
             (int) ($meta['size'] ?? strlen($bytes)),
             (string) ($meta['doc_type'] ?? ''),
         );
+    }
+
+    public function softDeleteDocRefAndCascadeObservations(
+        string $docrefUuid,
+        string $expectedPatientUuidCanonical,
+    ): array {
+        $sidecarPath = $this->sidecarPath($docrefUuid);
+        $meta = $this->readSidecar($sidecarPath);
+        if ($meta === null) {
+            return ['ok' => false, 'observations_deleted' => 0];
+        }
+
+        if (($meta['patient_uuid_canonical'] ?? '') !== $expectedPatientUuidCanonical) {
+            // Cross-patient soft-delete attempt — surface as not-found to avoid leaking the
+            // existence of the other patient's DocRef. The binding check happens at the HTTP
+            // layer too; this is defense-in-depth.
+            return ['ok' => false, 'observations_deleted' => 0];
+        }
+
+        if (isset($meta['deleted_at'])) {
+            // Idempotent — already deleted. Treat as accept.
+            return ['ok' => true, 'observations_deleted' => 0];
+        }
+
+        $meta['deleted_at'] = date(\DATE_ATOM);
+        if (file_put_contents($sidecarPath, json_encode($meta, JSON_THROW_ON_ERROR)) === false) {
+            throw new \RuntimeException('Failed to soft-delete document for ' . $docrefUuid);
+        }
+
+        $obsRoot = $this->storageRoot . '/_obs';
+        $observationsDeleted = 0;
+        if (is_dir($obsRoot)) {
+            foreach (glob($obsRoot . '/*.json') ?: [] as $obsPath) {
+                $obsMeta = $this->readSidecar($obsPath);
+                if ($obsMeta === null) {
+                    continue;
+                }
+                if (($obsMeta['docref_uuid'] ?? '') !== $docrefUuid) {
+                    continue;
+                }
+                if (isset($obsMeta['deleted_at'])) {
+                    continue;
+                }
+
+                $obsMeta['deleted_at'] = $meta['deleted_at'];
+                if (file_put_contents($obsPath, json_encode($obsMeta, JSON_THROW_ON_ERROR)) !== false) {
+                    $observationsDeleted++;
+                }
+            }
+        }
+
+        return ['ok' => true, 'observations_deleted' => $observationsDeleted];
     }
 
     private function bytesPath(string $uuid): string

@@ -223,6 +223,9 @@ function buildPromptForDocType(docType: 'lab_pdf' | 'intake_form'): string {
       '{',
       '  "ordering_provider": "<name>" | null,',
       '  "performing_lab": "<name>" | null,',
+      '  "panel_name": "<panel header text, e.g. \'LIPID PANEL WITH DIRECT LDL\'>" | null,',
+      '  "date_collected": "<ISO 8601 datetime>" | null,',
+      '  "date_reported": "<ISO 8601 datetime>" | null,',
       '  "results": [',
       '    {',
       '      "test_name": "<verbatim test name>",',
@@ -234,6 +237,7 @@ function buildPromptForDocType(docType: 'lab_pdf' | 'intake_form'): string {
       '      "reference_range_text": "<verbatim range text>" | null,',
       '      "collection_date": "<ISO 8601 date>",',
       '      "abnormal_flag": "normal" | "low" | "high" | "critical_low" | "critical_high" | "abnormal" | "unknown",',
+      '      "result_comments": "<per-result note text>" | null,',
       '      "citation": {',
       '        "source_type": "lab_pdf",',
       '        "source_id": "<docref>",',
@@ -243,6 +247,8 @@ function buildPromptForDocType(docType: 'lab_pdf' | 'intake_form'): string {
       '      }',
       '    }',
       '  ],',
+      '  "interpretive_comments": "<verbatim free-text interpretive paragraph if present, e.g. \'Multiple lipid abnormalities consistent with mixed dyslipidemia... consider intensification of statin therapy in patients with diabetes mellitus and ASCVD risk factors.\'>" | null,',
+      '  "interpretive_comments_citation": { ...same shape as result citation, page_or_section: "Interpretive Comments" } | null,',
       '  "extraction_metadata": {',
       '    "pages_processed": <int>,',
       '    "overall_confidence": "high" | "medium" | "low",',
@@ -251,6 +257,7 @@ function buildPromptForDocType(docType: 'lab_pdf' | 'intake_form'): string {
       '}',
       '```',
       'Use EXACTLY these JSON keys — do not rename. Use `null` (not omission) for unknown values. Do NOT invent values: if a result row is unreadable, drop the row and add its name to `fields_uncertain`. quote_or_value MUST be a substring of the source PDF.',
+      '**`interpretive_comments`**: capture the lab\'s free-text clinical guidance paragraph verbatim if present (commonly under "INTERPRETIVE COMMENTS", "Comments", or "Clinical Interpretation" headings). When present, ALSO populate `interpretive_comments_citation` with the same citation shape and a quote_or_value substring of the paragraph. When absent, both fields are `null`. This paragraph is what makes the lab actionable downstream — capture it.',
       'Do NOT include `document_type`, `patient_uuid`, or `source_document_id` — the caller injects those. Emit ONLY the raw JSON object, no markdown fences.',
     ].join('\n');
   }
@@ -259,34 +266,61 @@ function buildPromptForDocType(docType: 'lab_pdf' | 'intake_form'): string {
     '```',
     '{',
     '  "demographics": {',
-    '    "name": "<full name>" | null,',
+    '    "legal_name_first": "<first name>" | null,',
+    '    "legal_name_last": "<last name>" | null,',
+    '    "legal_name_middle": "<middle name or initial>" | null,',
     '    "dob": "<YYYY-MM-DD>" | null,',
-    '    "sex": "male" | "female" | "other" | "unknown" | null,',
-    '    "contact_phone": "<phone>" | null,',
+    '    "sex": "Male" | "Female" | "Unknown" | null,',
+    '    "contact_phone": "<phone, verbatim format>" | null,',
+    '    "street": "<street address line>" | null,',
+    '    "city": "<city>" | null,',
+    '    "state": "<state/province>" | null,',
+    '    "postal_code": "<ZIP/postal code>" | null,',
+    '    "email": "<email>" | null,',
+    '    "occupation": "<job/occupation text>" | null,',
     '    "citation": {',
     '      "source_type": "intake_form",',
     '      "source_id": "<docref>",',
     '      "page_or_section": "Demographics",',
     '      "field_or_chunk_id": "demographics",',
-    '      "quote_or_value": "<verbatim quote from form>"',
+    '      "quote_or_value": "<verbatim quote from form spanning the demographics block>"',
     '    }',
     '  },',
     '  "chief_concern": {',
     '    "text": "<verbatim chief concern>",',
-    '    "onset": "<duration>" | null,',
+    '    "onset": "<duration, e.g. \\"~3 weeks\\">" | null,',
     '    "citation": { ...same shape as above, page_or_section: "Chief Concern" }',
     '  },',
     '  "current_medications": [',
-    '    { "name": "<drug>", "dose": "<dose>" | null, "frequency": "<freq>" | null, "citation": { ... } },',
-    '    ...',
+    '    {',
+    '      "name": "<drug name>",',
+    '      "dose": "<strength, e.g. \\"10 mg\\">" | null,',
+    '      "frequency": "<frequency, e.g. \\"PO daily\\">" | null,',
+    '      "sig": "<full dosage instructions if a separate sig field exists>" | null,',
+    '      "indication": "<condition treated, e.g. \\"hypertension\\">" | null,',
+    '      "begdate": "<YYYY-MM-DD or null if unknown>" | null,',
+    '      "enddate": "<YYYY-MM-DD>" | null,',
+    '      "citation": { ... }',
+    '    }',
     '  ],',
     '  "allergies": [',
-    '    { "substance": "<drug/agent>", "reaction": "<reaction>" | null, "severity": "mild" | "moderate" | "severe" | "unknown" | null, "citation": { ... } },',
-    '    ...',
+    '    {',
+    '      "substance": "<drug/agent>",',
+    '      "reaction": "<reaction text, e.g. \\"hives\\">" | null,',
+    '      "severity": "mild" | "moderate" | "severe" | "life_threatening" | "unknown" | null,',
+    '      "onset_date": "<YYYY-MM-DD>" | null,',
+    '      "comments": "<extra notes separate from reaction>" | null,',
+    '      "citation": { ... }',
+    '    }',
     '  ],',
     '  "family_history": [',
-    '    { "relation": "<father/mother/sibling/...>", "condition": "<condition>", "citation": { ... } },',
-    '    ...',
+    '    {',
+    '      "relation": "mother" | "father" | "sibling" | "brother" | "sister" | "offspring" | "son" | "daughter" | "child" | "spouse" | "partner",',
+    '      "condition": "<condition text>",',
+    '      "age_of_onset": "<verbatim age, e.g. \\"52\\" or \\"early 60s\\">" | null,',
+    '      "deceased": true | false | null,',
+    '      "citation": { ... }',
+    '    }',
     '  ],',
     '  "extraction_metadata": {',
     '    "pages_processed": <int>,',
@@ -296,7 +330,11 @@ function buildPromptForDocType(docType: 'lab_pdf' | 'intake_form'): string {
     '  }',
     '}',
     '```',
-    'Use EXACTLY these JSON keys — do not rename, do not nest under additional wrappers like `personal_details`, `legal_name`, `date_of_birth`, `phone`. Use `null` (not omission) for unknown values. Every leaf observation MUST include `citation` with `quote_or_value` as a verbatim substring of the form. Empty arrays (`[]`) are fine when a section has no entries.',
+    'Use EXACTLY these JSON keys — do not rename, do not nest under additional wrappers like `personal_details`, `legal_name`, `date_of_birth`, `phone`. Use `null` (not omission) for unknown values; an explicit `null` tells the dispatcher "field not in source," whereas an empty string would clobber existing chart data on a re-run. Every leaf observation MUST include `citation` with `quote_or_value` as a verbatim substring of the form. Empty arrays (`[]`) are fine when a section has no entries.',
+    '**Comprehensive extraction rule (CRITICAL):** for each row in `current_medications`, `allergies`, and `family_history`, populate EVERY listed field if any hint is visible in the source. Do not skip optional fields just because a stronger field is present. Examples: a medication line "Lisinopril 10 mg PO daily for hypertension since 2020" should populate `name`, `dose`, `frequency`, `indication`, AND `begdate`. An allergy line "Penicillin — hives, moderate, since childhood" should populate `substance`, `reaction`, `severity`, AND `onset_date` (if extractable as a date) plus `comments` if extra notes exist. A family history line "Father — MI age 52, deceased" should populate `relation`, `condition`, `age_of_onset`, AND `deceased: true`. The chart write only persists what you extract — partial extraction loses fields the physician would otherwise have to enter manually.',
+    '**Sex enum**: capitalize first letter — `"Male"`, `"Female"`, or `"Unknown"`. Do not use `"male"` or `"other"`.',
+    '**Severity enum**: `"life_threatening"` (with underscore) is valid for anaphylaxis-grade allergies; reserve `"severe"` for grades that did not require emergency intervention.',
+    '**Date fields**: emit ISO `YYYY-MM-DD` only. If the form says "since 2020" or "5 years ago," set the date field to `null` and capture the verbatim phrase in `comments` (allergies) or as part of the citation `quote_or_value`. Do NOT compute relative dates.',
     'Do NOT include `document_type`, `patient_uuid`, or `source_document_id` — the caller injects those. Do NOT include extra top-level keys like `emergency_contact`, `health_insurance`, `treating_physicians`, `past_medical_surgical_history`, `social_history` — they are out of scope. Emit ONLY the raw JSON object, no markdown fences.',
   ].join('\n');
 }
@@ -318,7 +356,15 @@ function injectDocRefIntoCitations(value: unknown, docrefUuid: string, docType: 
   }
   const o = value as Record<string, unknown>;
   for (const [k, v] of Object.entries(o)) {
-    if (k === 'citation' && v !== null && typeof v === 'object' && !Array.isArray(v)) {
+    // §6 schema citation keys: `citation` everywhere + `interpretive_comments_citation`
+    // on lab extractions (the only top-level non-row citation we've added). Match both
+    // by suffix so future schema additions auto-pick up.
+    if (
+      (k === 'citation' || k.endsWith('_citation'))
+      && v !== null
+      && typeof v === 'object'
+      && !Array.isArray(v)
+    ) {
       const c = v as Record<string, unknown>;
       c['source_id'] = docrefUuid;
       c['source_type'] = docType;
@@ -402,6 +448,9 @@ export function countQuoteMatches(
   if (extraction.document_type === 'lab_pdf') {
     for (const result of extraction.results) {
       visit(result.citation);
+    }
+    if (extraction.interpretive_comments_citation !== null) {
+      visit(extraction.interpretive_comments_citation);
     }
   } else {
     visit(extraction.demographics.citation);

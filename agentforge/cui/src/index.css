@@ -732,7 +732,8 @@ body {
   opacity: 0.7;
 }
 
-.agentforge-msg__cite-link:hover .agentforge-msg__cite-marker {
+.agentforge-msg__cite-link:hover .agentforge-msg__cite-marker,
+.agentforge-msg__md a:hover .agentforge-msg__cite-marker {
   opacity: 1;
 }
 
@@ -879,6 +880,140 @@ body {
   color: var(--af-text-muted, var(--af-text));
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+/* G2-Early-26 — per-section header row holds the title + an optional outcome
+   pill that appears after Confirm fans out to /write/* endpoints. */
+.agentforge-msg__proposal-section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--af-s2, 0.5rem);
+  flex-wrap: wrap;
+}
+
+.agentforge-msg__proposal-section-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px var(--af-s2, 0.5rem);
+  border-radius: var(--af-radius-pill, 999px);
+  font-size: var(--af-text-xs, 0.75rem);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.agentforge-msg__proposal-section-pill--ok {
+  background: var(--af-success-bg, #e6f4ea);
+  color: var(--af-success-text, #137333);
+}
+
+.agentforge-msg__proposal-section-pill--partial {
+  background: var(--af-warning-bg, #fef7e0);
+  color: var(--af-warning-text, #b06000);
+}
+
+.agentforge-msg__proposal-section-pill--fail {
+  background: var(--af-danger-bg, #fce8e6);
+  color: var(--af-danger-text, #c5221f);
+}
+
+.agentforge-msg__proposal-section-pill--neutral {
+  background: var(--af-surface-muted, #f0f0f5);
+  color: var(--af-text-muted, #666);
+}
+
+/* Schema-expansion supplemental detail (dose source, indication, onset, deceased,
+   age-of-onset, etc.). Slightly muted so the primary row content (drug name,
+   substance, condition) reads first. */
+.agentforge-msg__proposal-row-detail {
+  color: var(--af-text-muted, #666);
+  font-size: 0.95em;
+}
+
+/* G2-Final-10 — per-row layout with inline pencil edit affordance. */
+.agentforge-msg__proposal-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--af-s2, 0.5rem);
+}
+
+.agentforge-msg__proposal-edit-button {
+  background: transparent;
+  border: 0;
+  padding: 2px var(--af-s1, 0.25rem);
+  border-radius: var(--af-radius-sm, 4px);
+  color: var(--af-text-muted, #666);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.5;
+  transition: opacity 120ms ease, background 120ms ease;
+}
+
+.agentforge-msg__proposal-edit-button:hover {
+  opacity: 1;
+  background: var(--af-surface-muted, #f0f0f5);
+}
+
+.agentforge-msg__proposal-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--af-s1, 0.25rem);
+  padding: var(--af-s2, 0.5rem);
+  background: var(--af-surface-muted, #f6f6fa);
+  border-radius: var(--af-radius-sm, 4px);
+  width: 100%;
+}
+
+.agentforge-msg__proposal-input {
+  font: inherit;
+  padding: 4px 8px;
+  border: 1px solid var(--af-border, #d0d0d8);
+  border-radius: var(--af-radius-sm, 4px);
+  background: var(--af-surface, #fff);
+  min-width: 0;
+  flex: 1 1 8ch;
+}
+
+.agentforge-msg__proposal-input:focus {
+  outline: 2px solid var(--af-accent, #2563eb);
+  outline-offset: -1px;
+  border-color: transparent;
+}
+
+.agentforge-msg__proposal-editor-actions {
+  display: flex;
+  gap: var(--af-s1, 0.25rem);
+  flex: 0 0 auto;
+}
+
+.agentforge-msg__proposal-edit-save,
+.agentforge-msg__proposal-edit-cancel {
+  font: inherit;
+  font-size: var(--af-text-small, 0.8125rem);
+  padding: 3px var(--af-s2, 0.5rem);
+  border-radius: var(--af-radius-sm, 4px);
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.agentforge-msg__proposal-edit-save {
+  background: var(--af-accent, #2563eb);
+  color: var(--af-on-accent, #fff);
+}
+
+.agentforge-msg__proposal-edit-save:disabled {
+  background: var(--af-surface-muted, #d0d0d8);
+  color: var(--af-text-muted, #888);
+  cursor: not-allowed;
+}
+
+.agentforge-msg__proposal-edit-cancel {
+  background: transparent;
+  border-color: var(--af-border, #d0d0d8);
+  color: var(--af-text, inherit);
 }
 
 .agentforge-msg__proposal-section-list {

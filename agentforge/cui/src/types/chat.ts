@@ -59,6 +59,22 @@ export type ChatBlock =
       /** G2-Early-27 informational preview (no chart write yet). */
       lab_summary?: string;
       intake_data?: IntakeProposalData;
+    }
+  | {
+      /**
+       * G2-Final-FB-A-03 — supervisor handoff strip. Synthesized server-side
+       * by `synthesizeAgentSteps` so the CUI can render an inline one-line
+       * summary (worker · duration · key stat) with click-to-expand detail
+       * (reason, input_summary, full stats). Strictly additive; existing
+       * blocks are unchanged.
+       */
+      type: 'agent_step';
+      worker: 'intake_extractor' | 'evidence_retriever';
+      reason: string;
+      input_summary: Readonly<Record<string, unknown>>;
+      duration_ms: number;
+      outcome: 'ok' | 'no_results' | 'error';
+      stats?: Readonly<Record<string, unknown>>;
     };
 
 export type RedeemResponse = {

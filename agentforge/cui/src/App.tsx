@@ -11,6 +11,8 @@ import { tryConfirmProposalFromDictation } from './chat/voice_confirm_proposal.j
 import { useHandshake } from './chat/useHandshake.js';
 import MicControl from './recording/MicControl.js';
 import { readApiBase, readModuleBase } from './config.js';
+import { EvalGateBadge } from './footer/EvalGateBadge.js';
+import { PhiRedactionBadge } from './footer/PhiRedactionBadge.js';
 import type { ProposalResolution } from './types/chat.js';
 
 function readDocumentHints(): {
@@ -303,6 +305,25 @@ export default function App(): ReactElement {
       conversationId: conversationExternalId,
     };
   }, [apiBase, handshake, conversationExternalId, patientUuid]);
+
+  // G2-Early-26 — IntakeProposalCard Confirm dispatches to module write endpoints directly,
+  // not via the agentforge API. So this env is shaped around `moduleBase` (the OpenEMR module
+  // public path) plus the same auth context the upload uses.
+  const intakeDispatchEnv = useMemo(() => {
+    if (
+      handshake.status !== 'ready' ||
+      patientUuid === null ||
+      patientUuid.trim() === ''
+    ) {
+      return undefined;
+    }
+    return {
+      moduleBase: readModuleBase(),
+      sessionToken: handshake.sessionToken,
+      patientUuid,
+      boundEncounterId,
+    };
+  }, [handshake, patientUuid, boundEncounterId]);
 
   /**
    * Synchronous in-flight guard. State updates from `setBriefStatus` are
@@ -888,6 +909,7 @@ export default function App(): ReactElement {
         messages={messages}
         boundPatientUuid={patientUuid}
         {...(proposalEnv !== undefined ? { proposalEnv } : {})}
+        {...(intakeDispatchEnv !== undefined ? { intakeDispatchEnv } : {})}
         voiceCompletedProposalIds={voiceCompletedProposalIds}
         onProposalResolved={onProposalResolved}
         onOpenDocument={onOpenDocument}
@@ -1002,6 +1024,23 @@ export default function App(): ReactElement {
           />
         </div>
       </form>
+      {/* G2-Final-FB-A-05 / FB-A-06 — health-check footer pills. New
+          render slot, does not displace any existing CUI affordance. */}
+      <div
+        className="agentforge-cui__footer"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: 8,
+          padding: '0.4rem 0.6rem',
+          borderTop: '1px solid rgba(0,0,0,0.06)',
+          position: 'relative',
+        }}
+      >
+        <PhiRedactionBadge apiBase={apiBase} />
+        <EvalGateBadge apiBase={apiBase} />
+      </div>
     </main>
   );
 }

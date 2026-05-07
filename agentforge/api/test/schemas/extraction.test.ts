@@ -36,6 +36,7 @@ const validLabResult = {
   reference_range_text: 'Optimal <100',
   collection_date: '2026-04-22',
   abnormal_flag: 'high' as const,
+  result_comments: null,
   citation: validCitation,
 };
 
@@ -45,7 +46,12 @@ const validLabExtraction: LabPdfExtraction = {
   source_document_id: 'docref-uuid-001',
   ordering_provider: 'RAO, ANJALI MD',
   performing_lab: 'Pacific Diagnostics Lab',
+  panel_name: 'LIPID PANEL WITH DIRECT LDL',
+  date_collected: '2026-04-22',
+  date_reported: '2026-04-22',
   results: [validLabResult],
+  interpretive_comments: null,
+  interpretive_comments_citation: null,
   extraction_metadata: {
     pages_processed: 1,
     overall_confidence: 'high',
@@ -100,10 +106,18 @@ describe('§6 IntakeFormSchema (smoke)', () => {
       patient_uuid: '00000000-0000-0000-0000-000000000001',
       source_document_id: 'docref-uuid-002',
       demographics: {
-        name: 'Chen, Margaret L.',
+        legal_name_first: 'Margaret',
+        legal_name_last: 'Chen',
+        legal_name_middle: 'L.',
         dob: '1967-08-14',
-        sex: 'female' as const,
+        sex: 'Female' as const,
         contact_phone: '(510) 555-0148',
+        street: null,
+        city: null,
+        state: null,
+        postal_code: null,
+        email: null,
+        occupation: null,
         citation: intakeCitation,
       },
       chief_concern: {

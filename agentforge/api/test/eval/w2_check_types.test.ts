@@ -26,6 +26,9 @@ function makeValidLabExtraction() {
     source_document_id: 'docref-1',
     ordering_provider: 'Dr. Lee',
     performing_lab: 'LabCorp',
+    panel_name: 'LIPID PANEL',
+    date_collected: '2026-04-30',
+    date_reported: '2026-04-30',
     results: [
       {
         test_name: 'LDL',
@@ -37,9 +40,12 @@ function makeValidLabExtraction() {
         reference_range_text: '<100',
         collection_date: '2026-04-30',
         abnormal_flag: 'high',
+        result_comments: null,
         citation: makeCitation(),
       },
     ],
+    interpretive_comments: null,
+    interpretive_comments_citation: null,
     extraction_metadata: {
       pages_processed: 1,
       overall_confidence: 'high',
@@ -54,10 +60,18 @@ function makeValidIntakeExtraction() {
     patient_uuid: '22222222-2222-2222-2222-222222222222',
     source_document_id: 'docref-2',
     demographics: {
-      name: null,
+      legal_name_first: null,
+      legal_name_last: null,
+      legal_name_middle: null,
       dob: null,
       sex: null,
       contact_phone: null,
+      street: null,
+      city: null,
+      state: null,
+      postal_code: null,
+      email: null,
+      occupation: null,
       citation: makeCitation({ source_type: 'intake_form', source_id: 'docref-2', field_or_chunk_id: 'demographics', quote_or_value: 'header' }),
     },
     chief_concern: {

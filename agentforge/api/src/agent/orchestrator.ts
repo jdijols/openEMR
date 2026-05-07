@@ -19,6 +19,7 @@ import { getChatModel, getProviderModelId } from './model.js';
 import { buildCitationNavigationIndex, buildClinicalToolEvidence, type CitationNavigationHint } from './toolEvidence.js';
 import { verifyClinicalBlocks } from './verification.js';
 import { type AiToolResultLike, isToolResultLike } from './tool_results.js';
+import { HANDOFF_REASONS } from './handoff.js';
 
 const blocksEnvelopeSchema = z.object({
   blocks: z.array(chatBlockSchema),
@@ -491,6 +492,191 @@ export function collectToolResultsFromGenerateTextResult(result: unknown): AiToo
 }
 
 /**
+ * G2-Final-FB-A-02 — synthesize one `agent_step` chat block per
+ * `attach_and_extract` / `evidence_retrieve` invocation found in the
+ * merged tool-results stream. Surfaces supervisor routing inline in the
+ * CUI so the reviewer can see which worker fired, why (one-sentence
+ * rationale from `HANDOFF_REASONS`), and the funnel / extraction stats —
+ * without opening Langfuse.
+ *
+ * PHI-safe by construction: `input_summary` carries only the same
+ * structural metadata that the handoff event recorded (size, prefix,
+ * counts), and `stats` carries `RetrievalStats` (counts + chunk_ids +
+ * scores) or extraction-confidence buckets.
+ *
+ * Tool-results that aren't one of the two W2 workers are skipped — only
+ * the supervisor's worker dispatches surface as `agent_step` blocks.
+ */
+export function synthesizeAgentSteps(toolResults: AiToolResultLike[]): ChatBlock[] {
+  const out: ChatBlock[] = [];
+
+  for (const tr of toolResults) {
+    if (tr.toolName === 'evidence_retrieve') {
+      const block = buildEvidenceRetrieveAgentStep(tr);
+      if (block !== null) {
+        out.push(block);
+      }
+      continue;
+    }
+    if (tr.toolName === 'attach_and_extract') {
+      const block = buildAttachAndExtractAgentStep(tr);
+      if (block !== null) {
+        out.push(block);
+      }
+    }
+  }
+
+  return out;
+}
+
+function asPlainObject(v: unknown): Record<string, unknown> | null {
+  return v !== null && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+}
+
+function readNonNegativeInt(v: unknown): number {
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.trunc(v) : 0;
+}
+
+function buildEvidenceRetrieveAgentStep(tr: AiToolResultLike): ChatBlock | null {
+  const input = asPlainObject(tr.input);
+  const output = asPlainObject(tr.output);
+  if (output === null) {
+    return null;
+  }
+
+  const queryChars = readNonNegativeInt(output['query_chars'] ?? input?.['query']?.toString().length);
+  const maxChunks = readNonNegativeInt(output['max_chunks'] ?? input?.['max_chunks']);
+  const durationMs = readNonNegativeInt(output['duration_ms']);
+  const inputSummary = { query_chars: queryChars, max_chunks: maxChunks };
+
+  if (output['ok'] !== true) {
+    return {
+      type: 'agent_step',
+      worker: 'evidence_retriever',
+      reason: HANDOFF_REASONS.evidence_retriever,
+      input_summary: inputSummary,
+      duration_ms: durationMs,
+      outcome: 'error',
+    };
+  }
+
+  const stats = asPlainObject(output['stats']);
+  const hitsAfterRerank = stats !== null ? readNonNegativeInt(stats['hits_after_rerank']) : 0;
+  return {
+    type: 'agent_step',
+    worker: 'evidence_retriever',
+    reason: HANDOFF_REASONS.evidence_retriever,
+    input_summary: inputSummary,
+    duration_ms: durationMs,
+    outcome: hitsAfterRerank > 0 ? 'ok' : 'no_results',
+    ...(stats !== null ? { stats } : {}),
+  };
+}
+
+function buildAttachAndExtractAgentStep(tr: AiToolResultLike): ChatBlock | null {
+  const input = asPlainObject(tr.input);
+  const output = asPlainObject(tr.output);
+  if (output === null) {
+    return null;
+  }
+
+  const docrefRaw = typeof input?.['docref_uuid'] === 'string' ? (input['docref_uuid'] as string) : '';
+  const docTypeRaw = typeof input?.['doc_type'] === 'string' ? (input['doc_type'] as string) : 'unknown';
+  const inputSummary = {
+    docref_uuid_prefix: docrefRaw.slice(0, 8),
+    doc_type: docTypeRaw,
+  };
+  const durationMs = readNonNegativeInt(output['duration_ms']);
+
+  if (output['ok'] !== true) {
+    return {
+      type: 'agent_step',
+      worker: 'intake_extractor',
+      reason: HANDOFF_REASONS.intake_extractor,
+      input_summary: inputSummary,
+      duration_ms: durationMs,
+      outcome: 'error',
+    };
+  }
+
+  const result = asPlainObject(output['result']);
+  if (result === null) {
+    return null;
+  }
+  const schemaValid = result['schemaValid'] === true;
+  const factsTotal = readNonNegativeInt(result['factsTotal']);
+  const factsVerified = readNonNegativeInt(result['factsVerified']);
+  const crossCheckStatus =
+    typeof result['crossCheckStatus'] === 'string' ? (result['crossCheckStatus'] as string) : 'unknown';
+  const stats: Record<string, unknown> = {
+    schema_valid: schemaValid,
+    cross_check_status: crossCheckStatus,
+    facts_total: factsTotal,
+    facts_verified: factsVerified,
+  };
+
+  let outcome: 'ok' | 'no_results' | 'error';
+  if (!schemaValid) {
+    outcome = 'error';
+  } else if (factsTotal === 0) {
+    outcome = 'no_results';
+  } else {
+    outcome = 'ok';
+  }
+
+  return {
+    type: 'agent_step',
+    worker: 'intake_extractor',
+    reason: HANDOFF_REASONS.intake_extractor,
+    input_summary: inputSummary,
+    duration_ms: durationMs,
+    outcome,
+    stats,
+  };
+}
+
+/**
+ * G2-Final-FB-B-02 — synthesize a refusal block when an `attach_and_extract`
+ * tool result reports `persistence.skipped_reason === 'cross_check_failed'`.
+ *
+ * Per S14, facts whose `quote_or_value` was not present in the source PDF
+ * MUST NOT persist. The worker already skipped persistence; this helper
+ * surfaces a user-facing refusal so the reviewer sees the failure mode
+ * instead of an empty success banner. Only the latest such failure is
+ * surfaced (avoids cascading refusals across consecutive uploads).
+ */
+export function synthesizeCrossCheckFailRefusal(toolResults: AiToolResultLike[]): ChatBlock | null {
+  // Walk newest → oldest. Stop at the FIRST attach_and_extract result we
+  // see — only the latest extraction on this turn determines whether the
+  // refusal surfaces. A later success suppresses an earlier failure.
+  for (let i = toolResults.length - 1; i >= 0; i--) {
+    const tr = toolResults[i];
+    if (tr === undefined || tr.toolName !== 'attach_and_extract') {
+      continue;
+    }
+    const out = asPlainObject(tr.output);
+    if (out === null || out['ok'] !== true) {
+      // Latest extraction errored at the tool boundary — refusal not
+      // appropriate here (the agent_step error block already surfaces it).
+      return null;
+    }
+    const persistence = asPlainObject(out['persistence']);
+    if (persistence === null) {
+      return null;
+    }
+    if (persistence['skipped_reason'] === 'cross_check_failed') {
+      return {
+        type: 'refusal',
+        reason:
+          "Some values in this lab couldn't be verified against the source PDF — not writing to the chart. Open the source to review.",
+      };
+    }
+    return null;
+  }
+  return null;
+}
+
+/**
  * Emit one proposal block per *unique* proposal_id. Belt-and-suspenders against
  * S2 ("no silent write"): if the same proposal_id ever shows up twice in the
  * collected tool results, we still render exactly one Confirm/Reject card so a
@@ -680,17 +866,47 @@ export async function runChatTurn(
     blocks = [extractionBlock, ...blocks];
   }
 
+  // G2-Final-FB-A-02 — surface supervisor routing inline. One `agent_step`
+  // block per worker invocation, prepended so the visual flow becomes:
+  // routing → extraction ack → claims with citations. Reviewer can see the
+  // funnel + duration without opening Langfuse.
+  const agentStepBlocks = synthesizeAgentSteps(mergedToolResults);
+  if (agentStepBlocks.length > 0) {
+    blocks = [...agentStepBlocks, ...blocks];
+  }
+
+  // G2-Final-FB-B-02 — when a lab extraction failed PDF cross-check (S14),
+  // the worker already skipped persistence; surface a refusal so the
+  // reviewer sees why no rows landed.
+  const crossCheckRefusal = synthesizeCrossCheckFailRefusal(mergedToolResults);
+  if (crossCheckRefusal !== null) {
+    blocks = [...blocks, crossCheckRefusal];
+  }
+
   // §10 / G2-Early-27 — Lab Summary clinical note auto-proposal.
-  // **DISABLED for MVP** (2026-05-05): the synthesized proposal renders
-  // correctly through ProposalCardShell, but Confirm hits a generic
-  // "write failed" in `ClinicalNoteWriteAction.execute()` (the W1 PHP
-  // catch-all that swallows the underlying ClinicalNotesService
-  // exception). Debugging the PHP service in the final hour before
-  // submission was higher risk than rolling back to the bare lab ack.
-  // The helper (`maybeBuildLabSummaryProposal`) and formatter remain
-  // below for the G2-Early restoration; the call is gated off until
-  // the underlying write path is verified end-to-end.
-  void maybeBuildLabSummaryProposal; // silence unused-export lint
+  // Re-enabled 2026-05-06 after debugging the swallowed-exception path:
+  // `OpenEmrClinicalNoteAdapter` now requires `library/forms.inc.php`
+  // in its constructor (so `addForm()` is defined when ClinicalNotesService
+  // creates the parent `clinical_notes` form on a fresh new-patient
+  // encounter), and `ClinicalNoteWriteAction` now `error_log()`s the
+  // caught exception detail so future failures surface in `php-log`.
+  const labSummaryProposal = await maybeBuildLabSummaryProposal(mergedToolResults, {
+    pool: deps.pool,
+    conversationInternalId: convRecord.internalId,
+    patientUuid: input.patientUuid,
+    encounterId: boundEncounterId,
+  });
+  if (labSummaryProposal !== null) {
+    // Insert the lab summary proposal directly after the extraction block so the
+    // Confirm/Reject card renders below the lab acknowledgment, mirroring the intake
+    // form's IntakeProposalCard placement.
+    const insertAt = blocks.findIndex((b) => b.type === 'extraction') + 1;
+    blocks = [
+      ...blocks.slice(0, insertAt),
+      labSummaryProposal,
+      ...blocks.slice(insertAt),
+    ];
+  }
 
   const evidence = buildClinicalToolEvidence(input.patientUuid, mergedToolResults);
 
@@ -964,17 +1180,25 @@ async function maybeBuildLabSummaryProposal(
 function formatLabSummaryNoteBody(ext: Record<string, unknown>): string {
   const performingLab = typeof ext['performing_lab'] === 'string' ? (ext['performing_lab'] as string) : null;
   const orderingProvider = typeof ext['ordering_provider'] === 'string' ? (ext['ordering_provider'] as string) : null;
+  const panelName = typeof ext['panel_name'] === 'string' ? (ext['panel_name'] as string) : null;
+  const interpretiveComments = typeof ext['interpretive_comments'] === 'string' ? (ext['interpretive_comments'] as string) : null;
   const results = Array.isArray(ext['results']) ? (ext['results'] as ReadonlyArray<Record<string, unknown>>) : [];
   if (results.length === 0) {
     return '';
   }
 
-  // Prefer the first result's collection_date as the panel date — labs
-  // typically have a single collection per panel.
-  const collectionDate = typeof results[0]?.['collection_date'] === 'string' ? (results[0]?.['collection_date'] as string) : null;
+  // Prefer the top-level date_collected; fall back to the first result's
+  // collection_date — labs typically have a single collection per panel.
+  const topLevelCollectedRaw = typeof ext['date_collected'] === 'string' ? (ext['date_collected'] as string) : null;
+  const collectionDate =
+    topLevelCollectedRaw !== null && topLevelCollectedRaw !== ''
+      ? topLevelCollectedRaw
+      : (typeof results[0]?.['collection_date'] === 'string' ? (results[0]?.['collection_date'] as string) : null);
 
   const headerParts: string[] = ['Lab Summary'];
-  if (performingLab !== null && performingLab !== '') {
+  if (panelName !== null && panelName !== '') {
+    headerParts.push(panelName);
+  } else if (performingLab !== null && performingLab !== '') {
     headerParts.push(performingLab);
   }
   if (collectionDate !== null && collectionDate !== '') {
@@ -983,6 +1207,11 @@ function formatLabSummaryNoteBody(ext: Record<string, unknown>): string {
   const header = headerParts.join(' — ');
 
   const lines: string[] = [header];
+  // Performing lab is shown on its own line when the panel_name is what made
+  // it into the header — keeps the lab provenance visible without crowding the title.
+  if (panelName !== null && panelName !== '' && performingLab !== null && performingLab !== '') {
+    lines.push(performingLab);
+  }
   if (orderingProvider !== null && orderingProvider !== '') {
     lines.push(`Ordered by ${orderingProvider}`);
   }
@@ -1010,7 +1239,22 @@ function formatLabSummaryNoteBody(ext: Record<string, unknown>): string {
       : refParts.length > 0 ? ` (${refParts.join('; ')})`
       : '';
     const unitSuffix = unit !== '' ? ` ${unit}` : '';
-    lines.push(`• ${name}: ${value}${unitSuffix}${flagAndRef}`);
+    let resultLine = `• ${name}: ${value}${unitSuffix}${flagAndRef}`;
+    // Per-result comment on a continuation line (rare but valuable when present).
+    const resultComments = typeof r['result_comments'] === 'string' ? (r['result_comments'] as string) : null;
+    if (resultComments !== null && resultComments.trim() !== '') {
+      resultLine += `\n    ${resultComments.trim()}`;
+    }
+    lines.push(resultLine);
+  }
+
+  // Free-text interpretive paragraph from the lab — what makes this note actionable.
+  // Without it, the bullets are just numbers; with it, the note tells the physician
+  // what the lab thinks the numbers mean and what guideline action to consider.
+  if (interpretiveComments !== null && interpretiveComments.trim() !== '') {
+    lines.push('');
+    lines.push('Interpretive Comments:');
+    lines.push(interpretiveComments.trim());
   }
 
   return lines.join('\n');

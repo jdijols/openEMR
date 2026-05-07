@@ -3,7 +3,13 @@ import { CohereClient } from 'cohere-ai';
 import type { Pool } from 'pg';
 import type { Env } from '../env.js';
 import type { Observability } from '../observability/index.js';
-import { createAttachAndExtractTool, type AttachAndExtractDeps, type DocumentBytesFetcher } from '../tools/attach_and_extract.js';
+import {
+  createAttachAndExtractTool,
+  type AttachAndExtractDeps,
+  type DocumentBytesFetcher,
+  type ObservationPersister,
+} from '../tools/attach_and_extract.js';
+import { postModuleJson } from '../openemr/client.js';
 import { createEvidenceRetrieveTool, type EvidenceRetrieveDeps } from '../tools/evidence_retrieve.js';
 import type { IntakeExtractorDeps } from '../workers/intake_extractor.js';
 
@@ -132,6 +138,7 @@ export async function createW2Tools(deps: W2ToolsDeps) {
       client: clients.anthropic,
       pdfParseFn: clients.pdfParseFn,
     },
+    persistObservations: makeObservationPersister(deps.env, deps.sessionToken, deps.correlationId),
   };
 
   const evidenceDeps: EvidenceRetrieveDeps = {
@@ -145,6 +152,34 @@ export async function createW2Tools(deps: W2ToolsDeps) {
   return {
     attach_and_extract: createAttachAndExtractTool(attachExtractDeps),
     evidence_retrieve: createEvidenceRetrieveTool(evidenceDeps),
+  };
+}
+
+/**
+ * G2-Final-FB-B-01 — production observation-persister adapter. POSTs to
+ * `write/observation_from_extraction.php` with the same auth headers the
+ * other write endpoints use. Per-row failures come back in the `failed`
+ * field; transport-layer errors propagate to the caller (which logs +
+ * marks the persistence as failed without surfacing the exception body).
+ */
+function makeObservationPersister(env: Env, sessionToken: string, correlationId: string): ObservationPersister {
+  return async ({ patientUuidCanonical, docrefUuid, results }) => {
+    const body = await postModuleJson(
+      env,
+      'write/observation_from_extraction.php',
+      { sessionToken, correlationId },
+      {
+        session_token: sessionToken,
+        patient_uuid: patientUuidCanonical,
+        docref_uuid: docrefUuid,
+        results,
+      },
+    );
+    const o = body as Record<string, unknown>;
+    const inserted = typeof o['inserted'] === 'number' ? (o['inserted'] as number) : 0;
+    const updated = typeof o['updated'] === 'number' ? (o['updated'] as number) : 0;
+    const failed = Array.isArray(o['failed']) ? (o['failed'] as readonly unknown[]).length : 0;
+    return { inserted, updated, failed };
   };
 }
 

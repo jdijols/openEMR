@@ -142,6 +142,18 @@ export async function verifyClinicalBlocks(
       continue;
     }
 
+    // G2-Final-FB-D-05 — quote-drift check. For every cited chunk that
+    // we have a (quote, sourceText) snapshot for, the quote MUST be a
+    // substring of the full chunk text. Catches truncation regressions
+    // and post-rerank quote drift. Claims that fail are dropped (not
+    // warning-tagged) — drifted quotes are an evidence-integrity failure,
+    // not a hint.
+    if (hasQuoteDrift(citationIds, evidence)) {
+      strippedUncited++;
+      await emitCategory(obs, correlationId, 'quote_drift_removed');
+      continue;
+    }
+
     if (medConflict !== null) {
       await emitCategory(obs, correlationId, 'verification.med_status_conflict_warning');
       out.push({ type: 'warning', text: medConflict });
@@ -175,6 +187,32 @@ export async function verifyClinicalBlocks(
   }
 
   return out;
+}
+
+/**
+ * G2-Final-FB-D-05 — true if any of the claim's cited chunks shows
+ * `quote_or_value` NOT contained in the chunk's full source text. Cited
+ * chunks the evidence layer doesn't have a snapshot for (non-retrieval
+ * citations: lab_pdf rows, openemr_record rows, etc.) are skipped — they
+ * have their own verification surface (S14 PDF cross-check for lab_pdf).
+ */
+function hasQuoteDrift(citationIds: readonly string[], evidence: ClinicalToolEvidence): boolean {
+  // Older test fixtures construct ClinicalToolEvidence without the new
+  // map; treat absent as "no snapshots to verify against."
+  const map = evidence.citationQuoteSourceMap;
+  if (citationIds.length === 0 || map === undefined) {
+    return false;
+  }
+  for (const id of citationIds) {
+    const snapshot = map.get(id);
+    if (snapshot === undefined) {
+      continue;
+    }
+    if (!snapshot.sourceText.includes(snapshot.quote)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function evaluateMedInactiveConflict(

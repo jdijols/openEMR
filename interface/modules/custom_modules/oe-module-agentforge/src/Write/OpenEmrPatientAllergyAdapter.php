@@ -11,6 +11,8 @@ declare(strict_types=1);
 
 namespace OpenEMR\Modules\AgentForge\Write;
 
+use OpenEMR\Common\Database\QueryUtils;
+use OpenEMR\Common\Uuid\UuidRegistry;
 use OpenEMR\Services\AllergyIntoleranceService;
 
 final class OpenEmrPatientAllergyAdapter implements PatientAllergyWritePort
@@ -54,6 +56,49 @@ final class OpenEmrPatientAllergyAdapter implements PatientAllergyWritePort
         }
 
         return self::mapResult($pr);
+    }
+
+    public function softDeleteAllergyByUuid(int $patientPid, string $allergyUuidString): ConfirmedWriteOutcome
+    {
+        if ($patientPid <= 0) {
+            return ConfirmedWriteOutcome::openemrRejected('patient invalid');
+        }
+
+        try {
+            $hexUuid = UuidRegistry::uuidToBytes($allergyUuidString);
+        } catch (\Throwable) {
+            return ConfirmedWriteOutcome::openemrRejected('allergy not found');
+        }
+
+        if ($hexUuid === '') {
+            return ConfirmedWriteOutcome::openemrRejected('allergy not found');
+        }
+
+        $rows = QueryUtils::fetchRecords(
+            "SELECT `id` FROM `lists` WHERE `uuid` = ? AND `pid` = ? AND `type` = 'allergy' LIMIT 1",
+            [$hexUuid, $patientPid],
+        );
+        if (!\is_array($rows) || \count($rows) === 0) {
+            return ConfirmedWriteOutcome::openemrRejected('allergy not found');
+        }
+
+        try {
+            QueryUtils::sqlStatementThrowException(
+                "UPDATE `lists` SET `activity` = 0, `enddate` = NOW() "
+                . "WHERE `uuid` = ? AND `pid` = ? AND `type` = 'allergy' LIMIT 1",
+                [$hexUuid, $patientPid],
+            );
+        } catch (\Throwable $e) {
+            error_log(sprintf(
+                'agentforge.allergy_delete_failed pid=%d exception=%s message=%s',
+                $patientPid,
+                $e::class,
+                $e->getMessage(),
+            ));
+            return ConfirmedWriteOutcome::openemrRejected('write failed');
+        }
+
+        return ConfirmedWriteOutcome::accepted(0);
     }
 
     private static function mapResult(\OpenEMR\Validators\ProcessingResult $pr): ConfirmedWriteOutcome

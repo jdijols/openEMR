@@ -101,6 +101,82 @@ const tobaccoSchema = z.object({
 
 const allergyActionSchema = z.enum(['add', 'update_reaction', 'update_severity']);
 
+// G2-Early-25 — W2 propose-write schemas. Each mirrors the PHP payload parser; an out-of-enum
+// value is rejected at the type system level before the propose tool ever fires.
+const medicationAddSchema = z
+  .object({
+    patient_uuid: z.string().min(1),
+    name: z.string().min(2).max(255),
+    dose: z.string().min(1).max(1024).optional(),
+    frequency: z.string().min(1).max(1024).optional(),
+    sig: z.string().min(1).max(1024).optional(),
+  })
+  .strict();
+
+const medicationDiscontinueSchema = z
+  .object({
+    patient_uuid: z.string().min(1),
+    medication_uuid: z.string().uuid(),
+  })
+  .strict();
+
+const allergyDeleteSchema = z
+  .object({
+    patient_uuid: z.string().min(1),
+    allergy_uuid: z.string().uuid(),
+  })
+  .strict();
+
+const familyHistoryRelationSchema = z.enum([
+  'mother',
+  'father',
+  'sibling',
+  'brother',
+  'sister',
+  'offspring',
+  'son',
+  'daughter',
+  'child',
+  'spouse',
+  'partner',
+]);
+
+const familyHistoryAddSchema = z
+  .object({
+    patient_uuid: z.string().min(1),
+    relation: familyHistoryRelationSchema,
+    condition: z.string().min(2).max(4000),
+  })
+  .strict();
+
+const documentDeleteSchema = z
+  .object({
+    patient_uuid: z.string().min(1),
+    docref_uuid: z.string().uuid(),
+  })
+  .strict();
+
+// G2-Final-12 — propose-demographics-update Zod. All fields optional, but at least one
+// non-patient_uuid key must be present (enforced via `superRefine` so the at-least-one rule
+// surfaces as a Zod issue rather than mysteriously empty downstream).
+const demographicsUpdateSchema = z
+  .object({
+    patient_uuid: z.string().min(1),
+    first_name: z.string().min(1).max(255).optional(),
+    last_name: z.string().min(1).max(255).optional(),
+    middle_name: z.string().min(1).max(255).optional(),
+    dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    sex: z.enum(['Male', 'Female', 'Unknown']).optional(),
+    contact_phone: z.string().min(1).max(255).optional(),
+  })
+  .strict()
+  .superRefine((val, ctx) => {
+    const fieldKeys = Object.keys(val).filter((k) => k !== 'patient_uuid');
+    if (fieldKeys.length === 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'at least one demographic field must be present' });
+    }
+  });
+
 const allergySchema = z
   .object({
     patient_uuid: z.string().min(1),
@@ -554,6 +630,325 @@ export function createProposeWriteTools(
         }
       },
     }),
+
+    // G2-Early-25 — propose adding a new active medication. Goes to lists.type='medication'
+    // on confirm (write_target='medication_add'). Patient-scoped (no encounter binding) since
+    // medications are problem-list-shaped data, not encounter-shaped.
+    propose_medication_add: tool({
+      description:
+        'Propose adding a new active medication to the patient\'s med list. Use for any new prescription mentioned by the physician (e.g. "start Lisinopril 10 mg PO daily"). On confirm, lands as a new lists row with type=medication and activity=1; the dose / frequency / sig are captured in the row\'s comments field as a free-text composite. To stop an existing medication, use propose_medication_discontinue instead.',
+      inputSchema: medicationAddSchema,
+      execute: async (input) => {
+        const bound = assertBoundPatient(env, sessionToken, input.patient_uuid);
+        if (!bound.ok) {
+          return { ok: false as const, error: bound.error };
+        }
+
+        const span = await obs.recordToolCall({
+          correlationId,
+          toolName: 'propose_medication_add',
+          meta: {},
+        });
+        try {
+          const proposalId = randomUUID();
+          const payload: Record<string, unknown> = { name: input.name.trim() };
+          if (input.dose !== undefined) {
+            payload['dose'] = input.dose.trim();
+          }
+          if (input.frequency !== undefined) {
+            payload['frequency'] = input.frequency.trim();
+          }
+          if (input.sig !== undefined) {
+            payload['sig'] = input.sig.trim();
+          }
+
+          await insertPendingProposal(pool, {
+            proposalId,
+            conversationInternalId: ctx.conversationInternalId,
+            patientUuid: input.patient_uuid.toLowerCase(),
+            encounterId: null,
+            writeTarget: 'medication_add',
+            payload,
+          });
+
+          const previewParts = [input.name.trim()];
+          if (input.dose !== undefined) {
+            previewParts.push(input.dose.trim());
+          }
+          if (input.frequency !== undefined) {
+            previewParts.push(input.frequency.trim());
+          }
+          const preview = `Medication → ${previewParts.join(' · ')}`;
+
+          await span.end({ meta: { proposal_id: proposalId, write_target: 'medication_add' } });
+          return {
+            ok: true as const,
+            proposal_id: proposalId,
+            write_target: 'medication_add',
+            preview,
+            patient_uuid: input.patient_uuid.toLowerCase(),
+            payload,
+          };
+        } catch (e) {
+          await span.end({ error: e });
+          throw e;
+        }
+      },
+    }),
+
+    // G2-Early-25 — propose discontinuing an existing medication (soft-delete). The lists row
+    // is preserved with activity=0 + enddate=NOW() for HIPAA audit. Get the medication_uuid
+    // from a prior get_medications call.
+    propose_medication_discontinue: tool({
+      description:
+        'Propose discontinuing an existing active medication (soft-delete on the lists row). Use this when the physician asks to stop a medication ("d/c Lisinopril, replacing with Losartan"). The row is hidden from the active med list but preserved with audit (activity=0, enddate=NOW()) — never hard-deleted. Get medication_uuid from a prior get_medications call.',
+      inputSchema: medicationDiscontinueSchema,
+      execute: async (input) => {
+        const bound = assertBoundPatient(env, sessionToken, input.patient_uuid);
+        if (!bound.ok) {
+          return { ok: false as const, error: bound.error };
+        }
+
+        const span = await obs.recordToolCall({
+          correlationId,
+          toolName: 'propose_medication_discontinue',
+          meta: {},
+        });
+        try {
+          const proposalId = randomUUID();
+          const medicationUuid = input.medication_uuid.toLowerCase();
+
+          await insertPendingProposal(pool, {
+            proposalId,
+            conversationInternalId: ctx.conversationInternalId,
+            patientUuid: input.patient_uuid.toLowerCase(),
+            encounterId: null,
+            writeTarget: 'medication_discontinue',
+            payload: { medication_uuid: medicationUuid },
+          });
+
+          const preview = `Discontinue medication → row ${medicationUuid.slice(0, 8)}…`;
+
+          await span.end({ meta: { proposal_id: proposalId, write_target: 'medication_discontinue' } });
+          return {
+            ok: true as const,
+            proposal_id: proposalId,
+            write_target: 'medication_discontinue',
+            preview,
+            patient_uuid: input.patient_uuid.toLowerCase(),
+            payload: { medication_uuid: medicationUuid },
+          };
+        } catch (e) {
+          await span.end({ error: e });
+          throw e;
+        }
+      },
+    }),
+
+    // G2-Early-25 — propose soft-deleting an existing allergy row. Mirrors the medication
+    // discontinue shape since allergies live on the same lists table.
+    propose_allergy_delete: tool({
+      description:
+        'Propose soft-deleting an existing allergy row from the patient\'s allergy list. Use this only when the physician explicitly asks to remove an allergy (e.g. "she\'s no longer allergic to penicillin, take it off the list"). For allergy add or update use propose_allergy_write. The row is hidden via activity=0 but preserved for audit. Get allergy_uuid from a prior get_allergies call.',
+      inputSchema: allergyDeleteSchema,
+      execute: async (input) => {
+        const bound = assertBoundPatient(env, sessionToken, input.patient_uuid);
+        if (!bound.ok) {
+          return { ok: false as const, error: bound.error };
+        }
+
+        const span = await obs.recordToolCall({
+          correlationId,
+          toolName: 'propose_allergy_delete',
+          meta: {},
+        });
+        try {
+          const proposalId = randomUUID();
+          const allergyUuid = input.allergy_uuid.toLowerCase();
+
+          await insertPendingProposal(pool, {
+            proposalId,
+            conversationInternalId: ctx.conversationInternalId,
+            patientUuid: input.patient_uuid.toLowerCase(),
+            encounterId: null,
+            writeTarget: 'allergy_delete',
+            payload: { allergy_uuid: allergyUuid },
+          });
+
+          const preview = `Remove allergy → row ${allergyUuid.slice(0, 8)}…`;
+
+          await span.end({ meta: { proposal_id: proposalId, write_target: 'allergy_delete' } });
+          return {
+            ok: true as const,
+            proposal_id: proposalId,
+            write_target: 'allergy_delete',
+            preview,
+            patient_uuid: input.patient_uuid.toLowerCase(),
+            payload: { allergy_uuid: allergyUuid },
+          };
+        } catch (e) {
+          await span.end({ error: e });
+          throw e;
+        }
+      },
+    }),
+
+    // G2-Early-25 — propose appending a family-history entry (e.g. "mother — T2DM"). Idempotent
+    // on the backend: if the same condition already appears in the relative's history column,
+    // the apply step is a no-op accept.
+    propose_family_history_add: tool({
+      description:
+        'Propose adding a family-history entry to the patient\'s history form (e.g. "mother had Type 2 Diabetes"). The relation must be one of: mother / father / sibling (or brother / sister) / offspring (or son / daughter / child) / spouse (or partner). Conditions are appended as free text; idempotent — adding the same condition twice for the same relation is a no-op accept.',
+      inputSchema: familyHistoryAddSchema,
+      execute: async (input) => {
+        const bound = assertBoundPatient(env, sessionToken, input.patient_uuid);
+        if (!bound.ok) {
+          return { ok: false as const, error: bound.error };
+        }
+
+        const span = await obs.recordToolCall({
+          correlationId,
+          toolName: 'propose_family_history_add',
+          meta: { relation: input.relation },
+        });
+        try {
+          const proposalId = randomUUID();
+          const payload = {
+            relation: input.relation,
+            condition: input.condition.trim(),
+          };
+
+          await insertPendingProposal(pool, {
+            proposalId,
+            conversationInternalId: ctx.conversationInternalId,
+            patientUuid: input.patient_uuid.toLowerCase(),
+            encounterId: null,
+            writeTarget: 'family_history_add',
+            payload,
+          });
+
+          const preview = `Family history → ${input.relation}: ${input.condition.trim().slice(0, 200)}`;
+
+          await span.end({ meta: { proposal_id: proposalId, write_target: 'family_history_add' } });
+          return {
+            ok: true as const,
+            proposal_id: proposalId,
+            write_target: 'family_history_add',
+            preview,
+            patient_uuid: input.patient_uuid.toLowerCase(),
+            payload,
+          };
+        } catch (e) {
+          await span.end({ error: e });
+          throw e;
+        }
+      },
+    }),
+
+    // G2-Final-12 — propose updating partial demographics fields on patient_data. Use only
+    // when the physician explicitly asks to correct a name / DOB / sex / contact phone.
+    propose_demographics_update: tool({
+      description:
+        'Propose a partial-update to the patient\'s demographics row (`patient_data`). Use only when the physician explicitly corrects a name, DOB, sex, or contact phone — never to fill empty fields silently. At least one demographic field must be supplied; unknown fields are rejected. `dob` must be in `YYYY-MM-DD` form. `sex` must be one of `Male` / `Female` / `Unknown` (OpenEMR option list).',
+      inputSchema: demographicsUpdateSchema,
+      execute: async (input) => {
+        const bound = assertBoundPatient(env, sessionToken, input.patient_uuid);
+        if (!bound.ok) {
+          return { ok: false as const, error: bound.error };
+        }
+
+        const span = await obs.recordToolCall({
+          correlationId,
+          toolName: 'propose_demographics_update',
+          meta: {},
+        });
+        try {
+          const proposalId = randomUUID();
+
+          const payload: Record<string, unknown> = {};
+          for (const [key, value] of Object.entries(input)) {
+            if (key === 'patient_uuid' || value === undefined) {
+              continue;
+            }
+            payload[key] = typeof value === 'string' ? value.trim() : value;
+          }
+
+          await insertPendingProposal(pool, {
+            proposalId,
+            conversationInternalId: ctx.conversationInternalId,
+            patientUuid: input.patient_uuid.toLowerCase(),
+            encounterId: null,
+            writeTarget: 'demographics_update',
+            payload,
+          });
+
+          const fields = Object.keys(payload);
+          const preview = `Demographics update → ${fields.join(', ')}`;
+
+          await span.end({ meta: { proposal_id: proposalId, write_target: 'demographics_update', fields } });
+          return {
+            ok: true as const,
+            proposal_id: proposalId,
+            write_target: 'demographics_update',
+            preview,
+            patient_uuid: input.patient_uuid.toLowerCase(),
+            payload,
+          };
+        } catch (e) {
+          await span.end({ error: e });
+          throw e;
+        }
+      },
+    }),
+
+    // G2-Early-25 — propose soft-deleting a previously-uploaded document (with cascade to its
+    // extracted observations). Use this when the physician realizes they uploaded the wrong
+    // file (wrong patient, mis-scanned page) and wants to start over.
+    delete_uploaded_document: tool({
+      description:
+        'Propose soft-deleting a previously-uploaded document (e.g. mis-uploaded intake form, wrong-patient lab). Cascades to every Observation extracted from that document — they are also soft-deleted, not orphaned. Get docref_uuid from the upload acknowledgment or a prior list. The bytes + sidecar metadata are preserved for HIPAA audit; reads after delete return 404. To re-upload, repeat the original upload — a fresh DocRef will be minted (the deleted one is not resurrected).',
+      inputSchema: documentDeleteSchema,
+      execute: async (input) => {
+        const bound = assertBoundPatient(env, sessionToken, input.patient_uuid);
+        if (!bound.ok) {
+          return { ok: false as const, error: bound.error };
+        }
+
+        const span = await obs.recordToolCall({
+          correlationId,
+          toolName: 'delete_uploaded_document',
+          meta: {},
+        });
+        try {
+          const proposalId = randomUUID();
+          const docrefUuid = input.docref_uuid.toLowerCase();
+
+          await insertPendingProposal(pool, {
+            proposalId,
+            conversationInternalId: ctx.conversationInternalId,
+            patientUuid: input.patient_uuid.toLowerCase(),
+            encounterId: null,
+            writeTarget: 'document_delete',
+            payload: { docref_uuid: docrefUuid },
+          });
+
+          const preview = `Delete uploaded document → ${docrefUuid.slice(0, 8)}…`;
+
+          await span.end({ meta: { proposal_id: proposalId, write_target: 'document_delete' } });
+          return {
+            ok: true as const,
+            proposal_id: proposalId,
+            write_target: 'document_delete',
+            preview,
+            patient_uuid: input.patient_uuid.toLowerCase(),
+            payload: { docref_uuid: docrefUuid },
+          };
+        } catch (e) {
+          await span.end({ error: e });
+          throw e;
+        }
+      },
+    }),
   };
 }
 
@@ -566,4 +961,10 @@ export const exportedSchemasGate4 = {
   vitalsDeleteSchema,
   tobaccoSchema,
   allergySchema,
+  medicationAddSchema,
+  medicationDiscontinueSchema,
+  allergyDeleteSchema,
+  familyHistoryAddSchema,
+  documentDeleteSchema,
+  demographicsUpdateSchema,
 };

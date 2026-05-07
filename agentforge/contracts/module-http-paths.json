@@ -13,7 +13,14 @@
     "write/vitals.php",
     "write/tobacco.php",
     "write/allergy.php",
+    "write/allergy_delete.php",
+    "write/medication_add.php",
+    "write/medication_discontinue.php",
+    "write/family_history_add.php",
+    "write/demographics_update.php",
+    "write/observation_from_extraction.php",
     "upload/document.php",
-    "document/bytes.php"
+    "document/bytes.php",
+    "document/delete.php"
   ]
 }

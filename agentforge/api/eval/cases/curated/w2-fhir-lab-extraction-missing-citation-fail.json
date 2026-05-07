@@ -1,0 +1,36 @@
+{
+  "case_id": "w2-fhir-lab-extraction-missing-citation-fail",
+  "check": "schema_valid",
+  "category": "schema_valid",
+  "expect_pass_for_eval_report": false,
+  "correlation_id": "eval-w2-fhir-lab-extraction-missing-citation-fail",
+  "use_case": "FB-B-01 / S14 — a lab result without a citation MUST NOT persist. The §6 schema enforces this by making LabResult.citation required; a malformed extraction stripped of citations rejects at parse time, so attach_and_extract returns schemaValid=false and observation_from_extraction.php is never called. Regression that loosened the schema would let unverifiable lab values reach the FHIR table. expect_pass_for_eval_report:false because we expect the rule to REJECT (rule.pass=false); the harness passes when the rule correctly rejects.",
+  "context": {
+    "schema": "lab_pdf",
+    "extraction": {
+      "document_type": "lab_pdf",
+      "patient_uuid": "11111111-2222-3333-4444-555555555555",
+      "source_document_id": "docref-fb-b-01-no-cite",
+      "ordering_provider": null,
+      "performing_lab": "Quest",
+      "results": [
+        {
+          "test_name": "LDL Cholesterol",
+          "loinc": "13457-7",
+          "value": 158,
+          "unit": "mg/dL",
+          "reference_range_low": 0,
+          "reference_range_high": 99,
+          "reference_range_text": null,
+          "collection_date": "2026-04-15",
+          "abnormal_flag": "high"
+        }
+      ],
+      "extraction_metadata": {
+        "pages_processed": 1,
+        "overall_confidence": "high",
+        "fields_uncertain": []
+      }
+    }
+  }
+}

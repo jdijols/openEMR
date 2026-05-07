@@ -1,0 +1,43 @@
+{
+  "case_id": "w2-fhir-lab-extraction-shape-pass",
+  "check": "schema_valid",
+  "category": "schema_valid",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-w2-fhir-lab-extraction-shape-pass",
+  "use_case": "FB-B-01 — schema_valid is the precondition for FHIR Observation persistence. A §6-shaped lab_pdf extraction parses cleanly; the worker can hand the results array to ObservationWriter::upsert. Regression in §6 schema strictness (e.g. dropping a required field) would silently break this preflight.",
+  "context": {
+    "schema": "lab_pdf",
+    "extraction": {
+      "document_type": "lab_pdf",
+      "patient_uuid": "11111111-2222-3333-4444-555555555555",
+      "source_document_id": "docref-fb-b-01-pass",
+      "ordering_provider": null,
+      "performing_lab": "Quest",
+      "results": [
+        {
+          "test_name": "LDL Cholesterol",
+          "loinc": "13457-7",
+          "value": 158,
+          "unit": "mg/dL",
+          "reference_range_low": 0,
+          "reference_range_high": 99,
+          "reference_range_text": null,
+          "collection_date": "2026-04-15",
+          "abnormal_flag": "high",
+          "citation": {
+            "source_type": "lab_pdf",
+            "source_id": "docref-fb-b-01-pass",
+            "page_or_section": "page:1",
+            "field_or_chunk_id": "results[0]",
+            "quote_or_value": "LDL Cholesterol 158 mg/dL"
+          }
+        }
+      ],
+      "extraction_metadata": {
+        "pages_processed": 1,
+        "overall_confidence": "high",
+        "fields_uncertain": []
+      }
+    }
+  }
+}

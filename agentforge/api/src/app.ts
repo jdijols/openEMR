@@ -15,6 +15,8 @@ import type { Env } from './env.js';
 import { normalizeErrorHandler } from './errors/normalize.js';
 import { redeemBodySchema, redeemLaunchCode } from './handshake/redeem.js';
 import { verifySessionToken } from './handshake/sessionToken.js';
+import { loadEvalStatus } from './observability/eval_status.js';
+import { runPhiRedactionProbe } from './observability/phi_redaction_probe.js';
 import type { Observability } from './observability/index.js';
 
 export type { AgentForgeVariables };
@@ -170,6 +172,81 @@ export function buildApp(
   });
 
   app.use('*', corsAllowlistMiddleware(env));
+
+  // G2-Final-FB-A-04 — eval-gate badge endpoint. Reads the most-recent
+  // file from `agentforge/api/eval/reports/` and returns a PHI-safe
+  // summary (counts + per-category pass rates + breach count). Returns
+  // 503 when no reports exist (CUI badge falls back to "unknown").
+  const evalReportsDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'eval', 'reports');
+  app.get('/health/eval-status', async (c) => {
+    const status = loadEvalStatus(evalReportsDir);
+    if (!status.ok) {
+      return c.json(status, 503);
+    }
+    return c.json(status);
+  });
+
+  // G2-Final-FB-A-06 — PHI-redaction probe. Runs the live `redactPhi`
+  // against a synthetic-PHI fixture and returns side-by-side input vs
+  // redacted output + per-pattern caught/missed bookkeeping. Endpoint
+  // can never drift from production behavior because it IS production
+  // behavior. Synthetic fixture only — no real patient data ever flows
+  // through this route.
+  app.get('/health/phi-redaction', async (c) => {
+    return c.json(runPhiRedactionProbe());
+  });
+
+  // G2-Final-FB-C-02 — public status pill payload. First thing a reviewer
+  // can hit after a deploy lands to verify the API is reachable + Postgres
+  // is up + Langfuse is configured. PHI-safe (no patient identifiers, no
+  // auth required). Differs from /health in shape (pills vs. detailed
+  // probes) and stability (the status page is cacheable and bookmarkable).
+  app.get('/status', async (c) => {
+    const [postgres_probe, openemr_module_probe, langfuse_probe] = await Promise.all([
+      probePostgres(pgPool),
+      probeOpenEmrModule(env),
+      probeLangfuse(env),
+    ]);
+    const apiVariant: 'green' = 'green'; // we got this far → API is up
+    let postgresVariant: 'green' | 'yellow' | 'red';
+    if (postgres_probe === 'ok') {
+      postgresVariant = 'green';
+    } else {
+      postgresVariant = 'red';
+    }
+    let openemrVariant: 'green' | 'yellow' | 'red';
+    switch (openemr_module_probe) {
+      case 'ok':
+        openemrVariant = 'green';
+        break;
+      case 'secret_mismatch':
+        openemrVariant = 'yellow';
+        break;
+      default:
+        openemrVariant = 'red';
+        break;
+    }
+    let langfuseVariant: 'green' | 'unconfigured' | 'red';
+    switch (langfuse_probe) {
+      case 'ok':
+        langfuseVariant = 'green';
+        break;
+      case 'not_configured':
+        langfuseVariant = 'unconfigured';
+        break;
+      default:
+        langfuseVariant = 'red';
+        break;
+    }
+    return c.json({
+      api: apiVariant,
+      postgres: postgresVariant,
+      openemr_module: openemrVariant,
+      langfuse: langfuseVariant,
+      last_seen: new Date().toISOString(),
+      version: readPackageVersion(),
+    });
+  });
 
   app.get('/health', async (c) => {
     const [postgres_probe, openemr_module_probe, langfuse_probe] = await Promise.all([

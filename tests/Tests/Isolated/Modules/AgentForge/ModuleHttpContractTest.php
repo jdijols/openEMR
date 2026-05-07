@@ -25,6 +25,9 @@ foreach (glob($httpDir . 'Write*.php') ?: [] as $file) {
 foreach (glob($httpDir . 'Upload*.php') ?: [] as $file) {
     require_once $file;
 }
+foreach (glob($httpDir . 'Delete*.php') ?: [] as $file) {
+    require_once $file;
+}
 require_once $httpDir . 'ModuleHttpContract.php';
 
 final class ModuleHttpContractTest extends TestCase
@@ -34,6 +37,6 @@ final class ModuleHttpContractTest extends TestCase
         $fromJson = ModuleHttpContract::pathsFromManifest();
         $fromPhp = ModuleHttpContract::pathsFromPhpAnchors();
         $this->assertSame($fromJson, $fromPhp);
-        $this->assertCount(15, $fromPhp);
+        $this->assertCount(22, $fromPhp);
     }
 }

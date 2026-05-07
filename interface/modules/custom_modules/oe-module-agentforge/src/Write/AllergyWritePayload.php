@@ -15,7 +15,7 @@ namespace OpenEMR\Modules\AgentForge\Write;
 
 final class AllergyWritePayload
 {
-    private const KEYS = ['action', 'substance', 'allergy_uuid', 'reaction', 'severity'];
+    private const KEYS = ['action', 'substance', 'allergy_uuid', 'reaction', 'severity', 'onset_date', 'comments'];
 
     /** @var list<string> */
     private const ACTIONS = ['add', 'update_reaction', 'update_severity'];
@@ -35,6 +35,8 @@ final class AllergyWritePayload
         private readonly ?string $allergyUuid,
         private readonly ?string $reaction,
         private readonly ?string $severityOptionId,
+        private readonly ?string $onsetDate,
+        private readonly ?string $comments,
     ) {
     }
 
@@ -123,12 +125,48 @@ final class AllergyWritePayload
             $severityOpt = self::SEVERITY_TO_OPTION_ID[$sev];
         }
 
+        // Schema-expansion fields (G2-Final-13). onset_date → ISO YYYY-MM-DD
+        // (lists.begdate). comments → extra free-text appended after the reaction line.
+        $onsetDate = null;
+        if (array_key_exists('onset_date', $payload)) {
+            $od = $payload['onset_date'];
+            if ($od !== null) {
+                if (!is_string($od)) {
+                    return [null, 'invalid_allergy_payload'];
+                }
+                $odTrim = trim($od);
+                if ($odTrim !== '') {
+                    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $odTrim) !== 1) {
+                        return [null, 'invalid_allergy_payload'];
+                    }
+                    $onsetDate = $odTrim;
+                }
+            }
+        }
+
+        $extraComments = null;
+        if (array_key_exists('comments', $payload)) {
+            $cm = $payload['comments'];
+            if ($cm !== null) {
+                if (!is_string($cm)) {
+                    return [null, 'invalid_allergy_payload'];
+                }
+                $cmTrim = trim($cm);
+                if ($cmTrim !== '') {
+                    if (strlen($cmTrim) > 4000) {
+                        return [null, 'invalid_allergy_payload'];
+                    }
+                    $extraComments = $cmTrim;
+                }
+            }
+        }
+
         if ($action === 'add') {
             if ($substance === null || strlen($substance) < 2 || strlen($substance) > 255) {
                 return [null, 'invalid_allergy_payload'];
             }
 
-            return [new self($action, $substance, null, $reaction, $severityOpt), null];
+            return [new self($action, $substance, null, $reaction, $severityOpt, $onsetDate, $extraComments), null];
         }
 
         if ($action === 'update_reaction') {
@@ -136,7 +174,7 @@ final class AllergyWritePayload
                 return [null, 'invalid_allergy_payload'];
             }
 
-            return [new self($action, null, $allergyUuid, $reaction, null), null];
+            return [new self($action, null, $allergyUuid, $reaction, null, null, null), null];
         }
 
         if ($severityOpt === null) {
@@ -147,7 +185,7 @@ final class AllergyWritePayload
             return [null, 'invalid_allergy_payload'];
         }
 
-        return [new self($action, null, $allergyUuid, null, $severityOpt), null];
+        return [new self($action, null, $allergyUuid, null, $severityOpt, null, null), null];
     }
 
     public function action(): string
@@ -176,6 +214,37 @@ final class AllergyWritePayload
     public function severityAlOptionId(): ?string
     {
         return $this->severityOptionId;
+    }
+
+    /** ISO YYYY-MM-DD or null. lists.begdate (allergy onset). */
+    public function onsetDate(): ?string
+    {
+        return $this->onsetDate;
+    }
+
+    /** Extra free-text notes; combined with reaction text into lists.comments by the action. */
+    public function extraComments(): ?string
+    {
+        return $this->comments;
+    }
+
+    /**
+     * Combined comments body that lands in `lists.comments` — reaction text first
+     * (the W1 manifestation field), extra comments appended below with a separator.
+     * Returns null when neither is present, so the adapter doesn't write an empty
+     * column over an existing value.
+     */
+    public function combinedCommentsBody(): ?string
+    {
+        $rx = $this->reaction !== null && $this->reaction !== '' ? $this->reaction : null;
+        $ex = $this->comments !== null && $this->comments !== '' ? $this->comments : null;
+        if ($rx === null && $ex === null) {
+            return null;
+        }
+        if ($rx !== null && $ex !== null) {
+            return $rx . "\n— " . $ex;
+        }
+        return $rx ?? $ex;
     }
 
     private static function normalizeUuid(string $uuid): ?string

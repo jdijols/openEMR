@@ -1,0 +1,11 @@
+{
+  "case_id": "w2-fhir-no-phi-in-persistence-trace-pass",
+  "check": "no_phi_in_logs",
+  "category": "no_phi_in_logs",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-w2-fhir-no-phi-in-persistence-trace-pass",
+  "use_case": "FB-B-01 / S7 / S11 — the persistence span emits structured metadata only: persistence_attempted (bool), persistence_inserted (count), persistence_updated (count), persistence_failed (count), persistence_skipped_reason (enum) plus the docref_uuid prefix. NO clinical values, NO patient identifiers, NO PDF text. Regression that started embedding lab values (e.g. 'persisted LDL=158') into the trace body would trip every PHI denylist pattern at once.",
+  "context": {
+    "trace_text": "attach_and_extract span end-meta: outcome=ok, schema_valid=true, cross_check_status=verified, facts_total=14, facts_verified=14, persistence_attempted=true, persistence_inserted=14, persistence_updated=0, persistence_failed=0, persistence_skipped_reason=null, docref_uuid_prefix=a1b2c3d4"
+  }
+}

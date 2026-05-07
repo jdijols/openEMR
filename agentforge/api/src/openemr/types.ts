@@ -142,6 +142,28 @@ export const chatBlockSchema = z.union([
     preview: z.string().min(1).max(4000),
   }),
   z.object({
+    /**
+     * G2-Final-FB-A-01 — supervisor handoff visibility block.
+     *
+     * Synthesized in `runChatTurn` from each `attach_and_extract` /
+     * `evidence_retrieve` invocation; renders inline in the CUI as a
+     * collapsed strip the reviewer can expand to see routing rationale +
+     * funnel stats. PHI-safe by construction: `input_summary` carries only
+     * structural metadata (sizes, counts, doc_type prefixes) per
+     * `agent/handoff.ts`'s summarize* helpers; `stats` carries
+     * `RetrievalStats` for retrieval or extraction-confidence buckets for
+     * extraction. Strictly additive — does not displace any existing block
+     * type, feature parity preserved.
+     */
+    type: z.literal('agent_step'),
+    worker: z.enum(['intake_extractor', 'evidence_retriever']),
+    reason: z.string().min(1).max(240),
+    input_summary: z.record(z.string(), z.unknown()),
+    duration_ms: z.number().int().nonnegative(),
+    outcome: z.enum(['ok', 'no_results', 'error']),
+    stats: z.record(z.string(), z.unknown()).optional(),
+  }),
+  z.object({
     type: z.literal('extraction'),
     doc_type: z.enum(['lab_pdf', 'intake_form']),
     docref_uuid: z.string().min(1),

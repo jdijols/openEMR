@@ -11,6 +11,15 @@ export type ClinicalToolEvidence = {
   readonly emptyBacked: ReadonlyMap<string, boolean>;
   readonly medRowsForConflict: ReadonlyArray<{ drugLower: string; statusLower: string; uuid: string }>;
   readonly crossPatientLeak: boolean;
+  /**
+   * G2-Final-FB-D-05 — per-chunk quote vs source-text snapshot for the
+   * evidence-retriever surface. `quote` is the §6 `SourceCitation.quote_or_value`
+   * (truncated to 400 chars before reaching the model); `sourceText` is the
+   * chunk's full untruncated text. The verification gate asserts the quote
+   * is a substring of sourceText so a regression in the truncation logic
+   * (or a model that fabricates a quote off the cited chunk) drops the claim.
+   */
+  readonly citationQuoteSourceMap: ReadonlyMap<string, { quote: string; sourceText: string }>;
 };
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
@@ -62,6 +71,7 @@ export function buildClinicalToolEvidence(
   const emptyBacked = new Map<string, boolean>();
   const medRows: Array<{ drugLower: string; statusLower: string; uuid: string }> = [];
   let crossPatientLeak = false;
+  const citationQuoteSourceMap = new Map<string, { quote: string; sourceText: string }>();
 
   for (const tr of toolResults) {
     if (tr.type !== 'tool-result') {
@@ -79,6 +89,32 @@ export function buildClinicalToolEvidence(
     }
 
     collectSourcePackUuids(output, citationUuids);
+
+    // G2-Final-FB-D-05 — capture per-chunk (quote, full source text)
+    // pairs from evidence_retrieve outputs so the verification layer can
+    // assert the quote is a substring of the chunk's full text.
+    if (
+      typeof name === 'string' &&
+      name === 'evidence_retrieve' &&
+      isPlainObject(output) &&
+      output['ok'] === true &&
+      Array.isArray(output['chunks'])
+    ) {
+      for (const chunk of output['chunks'] as readonly unknown[]) {
+        if (!isPlainObject(chunk)) continue;
+        const chunkId =
+          typeof chunk['chunk_id'] === 'string' ? (chunk['chunk_id'] as string) : '';
+        const fullText = typeof chunk['text'] === 'string' ? (chunk['text'] as string) : '';
+        const citation = chunk['citation'];
+        let quote = '';
+        if (isPlainObject(citation) && typeof citation['quote_or_value'] === 'string') {
+          quote = citation['quote_or_value'] as string;
+        }
+        if (chunkId !== '' && quote !== '' && fullText !== '') {
+          citationQuoteSourceMap.set(chunkId, { quote, sourceText: fullText });
+        }
+      }
+    }
 
     const outOk = isPlainObject(output) ? output['ok'] : undefined;
 
@@ -126,7 +162,13 @@ export function buildClinicalToolEvidence(
 
   }
 
-  return { citationUuids, emptyBacked, medRowsForConflict: medRows, crossPatientLeak };
+  return {
+    citationUuids,
+    emptyBacked,
+    medRowsForConflict: medRows,
+    crossPatientLeak,
+    citationQuoteSourceMap,
+  };
 }
 
 /** Last-write-wins lookup for citation UUID → navigation_hint from tool-result JSON payloads. */

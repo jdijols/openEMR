@@ -76,7 +76,11 @@ type CheckName =
   // W2 brief boolean rubric runners (G2-Early-31..33).
   | 'schema_valid'
   | 'citation_present'
-  | 'no_phi_in_logs';
+  | 'no_phi_in_logs'
+  // G2-Final-FB-D-03 — substring check that `quote_or_value` appears in
+  // the cited chunk's full `text` (not just the truncated 400-char
+  // preview returned to the model). Catches post-rerank quote drift.
+  | 'citation_quote_in_source';
 
 // W2 brief: 5 boolean rubric categories. Every case must carry one as its
 // `category` field (G2-Early-34) so the runner can bucket pass-rates per
@@ -289,6 +293,20 @@ function validateCaseShape(filename: string, c: CuratedCase): void {
       if (typeof ctx['trace_text'] !== 'string') {
         throw new Error(
           `invalid_case_structure:${filename} — '${check}' requires context.trace_text: string`,
+        );
+      }
+      return;
+    }
+    case 'citation_quote_in_source': {
+      const ctx = c.context ?? {};
+      if (!Array.isArray(ctx['citations'])) {
+        throw new Error(
+          `invalid_case_structure:${filename} — '${check}' requires context.citations: array`,
+        );
+      }
+      if (typeof ctx['source_text'] !== 'string') {
+        throw new Error(
+          `invalid_case_structure:${filename} — '${check}' requires context.source_text: string`,
         );
       }
       return;
@@ -745,6 +763,42 @@ const PHI_DENYLIST_PATTERNS: readonly { name: string; pattern: RegExp }[] = [
   { name: 'cohort_full_name', pattern: /\b(?:Margaret\s+Chen|James\s+Whitaker|Sofia\s+Reyes|Robert\s+Kowalski)\b/u },
 ];
 
+/**
+ * G2-Final-FB-D-03 (S8) — quote-in-source substring check.
+ *
+ * For every cited claim, asserts the citation's `quote_or_value` appears
+ * verbatim in the cited chunk's full `text`. Tighter than `citation_present`
+ * (which only validates the envelope shape) and catches post-rerank
+ * quote drift — a regression where the rerank step shuffles chunks but
+ * the LLM's quote points at the pre-rerank chunk's text.
+ */
+export function citationQuoteInSource(ctx: Readonly<Record<string, unknown>>): RuleResult {
+  const citations = Array.isArray(ctx['citations']) ? ctx['citations'] : [];
+  const sourceText = typeof ctx['source_text'] === 'string' ? (ctx['source_text'] as string) : '';
+  if (citations.length === 0) {
+    return { pass: false, reason: 'no citations present in context' };
+  }
+  if (sourceText === '') {
+    return { pass: false, reason: 'context.source_text empty' };
+  }
+  for (const [i, c] of citations.entries()) {
+    if (typeof c !== 'object' || c === null) {
+      return { pass: false, reason: `citations[${i}] is not an object` };
+    }
+    const quote = (c as { quote_or_value?: unknown }).quote_or_value;
+    if (typeof quote !== 'string' || quote === '') {
+      return { pass: false, reason: `citations[${i}].quote_or_value missing or empty` };
+    }
+    if (!sourceText.includes(quote)) {
+      return {
+        pass: false,
+        reason: `citations[${i}].quote_or_value not present in source_text`,
+      };
+    }
+  }
+  return { pass: true };
+}
+
 export function noPhiInLogs(ctx: Readonly<Record<string, unknown>>): RuleResult {
   const text = typeof ctx['trace_text'] === 'string' ? ctx['trace_text'] : '';
   for (const { name, pattern } of PHI_DENYLIST_PATTERNS) {
@@ -784,6 +838,8 @@ function evaluateCase(c: CuratedCase): RuleResult {
       return citationPresent(c.context ?? {});
     case 'no_phi_in_logs':
       return noPhiInLogs(c.context ?? {});
+    case 'citation_quote_in_source':
+      return citationQuoteInSource(c.context ?? {});
   }
 }
 
@@ -801,6 +857,7 @@ function categoryForCase(c: CuratedCase): W2RubricCategory {
     case 'schema_valid':
       return 'schema_valid';
     case 'citation_present':
+    case 'citation_quote_in_source':
       return 'citation_present';
     case 'no_phi_in_logs':
       return 'no_phi_in_logs';

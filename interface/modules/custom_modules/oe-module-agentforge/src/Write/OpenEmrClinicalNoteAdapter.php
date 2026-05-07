@@ -21,6 +21,17 @@ final class OpenEmrClinicalNoteAdapter implements ClinicalNoteWritePort
     public function __construct(
         private readonly ClinicalNotesService $clinicalNotesService,
     ) {
+        // G2-Early-27 — `ClinicalNotesService::createClinicalNotesParentForm()` calls the
+        // global `addForm()` from `library/forms.inc.php`. The module HTTP entry's
+        // `agentforge_require_globals()` does not pull this in by default, so the first
+        // clinical-note write on a fresh new-patient encounter (where no `forms` row exists
+        // yet) used to die with "Call to undefined function addForm()" — caught by
+        // `\Throwable` in the Action layer and surfaced as a generic "write failed". The
+        // require is the same shape used in AppointmentEncounterBinder for the same reason.
+        $srcdir = $GLOBALS['srcdir'] ?? null;
+        if (\is_string($srcdir) && \is_readable($srcdir . '/forms.inc.php')) {
+            require_once $srcdir . '/forms.inc.php';
+        }
     }
 
     public function encounterExists(int $pid, int $numericEncounterId): bool

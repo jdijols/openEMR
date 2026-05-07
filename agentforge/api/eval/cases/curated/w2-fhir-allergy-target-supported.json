@@ -1,0 +1,12 @@
+{
+  "case_id": "w2-fhir-allergy-target-supported",
+  "check": "unsupported_write_target_rejected",
+  "category": "safe_refusal",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-w2-fhir-allergy-target-supported",
+  "use_case": "FB-B-03 (deferred) / S9 — the future intake-confirm fan-out targets W1's `allergy` write, which is in the V1 supported-targets enum. Pinning this no-op here ensures a future regression that quietly removes 'allergy' from `V1_WRITE_TARGETS` would surface as a case failure rather than silently degrading the intake-card persistence path.",
+  "context": {
+    "write_target": "allergy",
+    "rejected": false
+  }
+}

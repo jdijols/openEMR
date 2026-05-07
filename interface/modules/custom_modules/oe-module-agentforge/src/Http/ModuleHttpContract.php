@@ -52,8 +52,15 @@ final class ModuleHttpContract
             WriteVitals::RELATIVE_SCRIPT_PATH,
             WriteTobacco::RELATIVE_SCRIPT_PATH,
             WriteAllergy::RELATIVE_SCRIPT_PATH,
+            WriteAllergyDelete::RELATIVE_SCRIPT_PATH,
+            WriteMedicationAdd::RELATIVE_SCRIPT_PATH,
+            WriteMedicationDiscontinue::RELATIVE_SCRIPT_PATH,
+            WriteFamilyHistoryAdd::RELATIVE_SCRIPT_PATH,
+            WriteDemographicsUpdate::RELATIVE_SCRIPT_PATH,
+            WriteObservationFromExtraction::RELATIVE_SCRIPT_PATH,
             UploadDocument::RELATIVE_SCRIPT_PATH,
             ReadDocumentBytes::RELATIVE_SCRIPT_PATH,
+            DeleteDocument::RELATIVE_SCRIPT_PATH,
         ];
         sort($paths);
 

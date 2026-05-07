@@ -1,0 +1,32 @@
+{
+  "case_id": "w2-fhir-lab-claims-citation-pass",
+  "check": "citation_present",
+  "category": "citation_present",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-w2-fhir-lab-claims-citation-pass",
+  "use_case": "FB-B-01 — claims rendered from a persisted FHIR Observation can cite either the openemr_record (post-persistence read) OR the originating lab_pdf (pre-persistence). Both source_types satisfy the citation_present rubric. This case mixes both kinds in one set so a regression that breaks heterogeneous source types — e.g. a verifier that only validates lab_pdf — slips loudly.",
+  "context": {
+    "claims": [
+      {
+        "text": "LDL 158 mg/dL persisted as Observation row",
+        "citation": {
+          "source_type": "openemr_record",
+          "source_id": "obs-row-uuid-12345",
+          "page_or_section": "procedure_result#42",
+          "field_or_chunk_id": "lab.ldl",
+          "quote_or_value": "LDL Cholesterol 158 mg/dL"
+        }
+      },
+      {
+        "text": "Source PDF page 1, derivedFrom DocumentReference linkage preserved",
+        "citation": {
+          "source_type": "lab_pdf",
+          "source_id": "docref-fb-b-01-pass",
+          "page_or_section": "page:1",
+          "field_or_chunk_id": "results[0]",
+          "quote_or_value": "LDL Cholesterol 158 mg/dL"
+        }
+      }
+    ]
+  }
+}

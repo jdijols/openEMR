@@ -8,9 +8,11 @@ import type {
   ProposalResolution,
 } from '../types/chat.js';
 import AssistantMarkdown from './AssistantMarkdown.js';
+import { AgentStepStrip } from './AgentStepStrip.js';
 import { AttachmentPreview } from './AttachmentPreview.js';
 import { ExtractionAcknowledgment } from './ExtractionAcknowledgment.js';
 import { IntakeProposalCard } from './IntakeProposalCard.js';
+import type { IntakeDispatchEnv } from './intake_dispatch.js';
 import { ProposalCardShell, type ProposalCardActionsConfig, type ProposalCardState } from './ProposalCardShell.js';
 import { TypingIndicator } from './TypingIndicator.js';
 
@@ -383,9 +385,33 @@ function IconInfo(): ReactElement {
   );
 }
 
-// IconArrowOut (a "↗" marker after navigable citations) was removed in PR-N: the marker
-// implied "external link" to clinicians, and the dotted underline + link color already
-// signal "click to navigate" sufficiently for inline chart citations.
+function IconExternalLink(): ReactElement {
+  return (
+    <svg
+      className="agentforge-msg__cite-marker"
+      width="10"
+      height="10"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M7 17 17 7" />
+      <path d="M9 7h8v8" />
+    </svg>
+  );
+}
+
+// IconExternalLink — the "↗" marker is appended only to citations that open in a new
+// tab (guideline_chunk → external RAG source). In-app citations (lab_pdf, intake_form,
+// openemr_record, encounter) keep the bare dotted underline because their click navigates
+// inside the chart, not out of it. An earlier revision attached this marker to all
+// navigable citations and was reverted because the "external link" read was misleading
+// for chart-internal navigation.
 
 /*
  * The "CP" rounded-square avatar that briefly lived here in PR3 was
@@ -588,6 +614,8 @@ function renderBlock(
     readonly boundPatientUuid: string | null;
     readonly assistantMessage?: boolean;
     readonly proposalEnv?: ProposalApiEnv;
+    /** G2-Early-26 — IntakeProposalCard Confirm dispatch context (module endpoint base + auth). */
+    readonly intakeDispatchEnv?: IntakeDispatchEnv;
     readonly voiceCompletedProposalIds?: ReadonlySet<string>;
     readonly onProposalResolved?: OnProposalResolved;
     readonly onOpenDocument?: (docrefUuid: string, page?: number) => void;
@@ -676,6 +704,7 @@ function renderBlock(
                       className="agentforge-msg__cite-link"
                     >
                       {seg.text}
+                      <IconExternalLink />
                     </a>
                   );
                 }
@@ -734,6 +763,7 @@ function renderBlock(
                   className="agentforge-msg__cite-link"
                 >
                   {renderedText}
+                  <IconExternalLink />
                 </a>
               </p>
             );
@@ -837,34 +867,40 @@ function renderBlock(
             <IntakeProposalCard
               data={block.intake_data}
               onConfirm={() => {
-                /* MVP: intent is already logged by the card; per-section dispatch lands at G2-Early-26. */
+                if (opts.intakeDispatchEnv !== undefined) {
+                  notifyParentOfWriteConfirmed('intake_proposal', opts.intakeDispatchEnv.patientUuid);
+                }
               }}
               onReject={() => {
-                /* no-op for MVP */
+                /* no-op — UI state lives inside the card. */
               }}
+              {...(opts.intakeDispatchEnv !== undefined ? { dispatchEnv: opts.intakeDispatchEnv } : {})}
             />
           ) : null}
-          {/* G2-Early-27 — informational Lab Summary clinical-note preview.
-              Same ProposalCardShell chrome as W1 vitals / chief-complaint
-              proposals so the lab side feels coherent with the rest of the
-              flow, but no Confirm/Reject actions yet — the underlying
-              ClinicalNoteWriteAction throws "write failed" in the W1 PHP
-              catch-all and we're rolling back the live write to G2-Early-27.
-              The status pill cites the deferred task explicitly. */}
-          {block.doc_type === 'lab_pdf' && block.lab_summary !== undefined && block.lab_summary !== '' ? (
-            <ProposalCardShell
-              state="idle"
-              title="Lab Summary clinical note"
-              targetLabel="clinical note"
-              ariaLabel="Lab Summary clinical-note preview"
-              statusMessage="Captured. Chart writes scheduled for next iteration (G2-Early-27)."
-            >
-              <p className="agentforge-msg__proposal-preview">{block.lab_summary}</p>
-            </ProposalCardShell>
-          ) : null}
+          {/* G2-Early-27 — Lab summary card-dedup: the actionable proposal card emitted by
+              the orchestrator (via maybeBuildLabSummaryProposal) is the SOLE render of the
+              lab summary bullet list. The previous informational ProposalCardShell preview
+              was visually identical and confused users into thinking there were two
+              actions to take. Killed in favor of the single Confirm/Reject card. The
+              ExtractionAcknowledgment above ("Read the lab — N results, N abnormal") is
+              the only thing rendered alongside the proposal. */}
         </div>
       );
     }
+    case 'agent_step':
+      return (
+        <AgentStepStrip
+          key={key}
+          block={{
+            worker: block.worker,
+            reason: block.reason,
+            input_summary: block.input_summary,
+            duration_ms: block.duration_ms,
+            outcome: block.outcome,
+            ...(block.stats !== undefined ? { stats: block.stats } : {}),
+          }}
+        />
+      );
     default:
       return (
         <p key={key} className="agentforge-msg__unknown">
@@ -908,6 +944,8 @@ export function MessageList(props: {
   readonly messages: readonly ChatMessage[];
   readonly boundPatientUuid: string | null;
   readonly proposalEnv?: ProposalApiEnv;
+  /** G2-Early-26 — IntakeProposalCard fans out per-section writes through this env. */
+  readonly intakeDispatchEnv?: IntakeDispatchEnv;
   readonly voiceCompletedProposalIds?: ReadonlySet<string>;
   /**
    * Bubbled up to App so it can stamp the matching proposal block's
@@ -1021,6 +1059,9 @@ export function MessageList(props: {
                     assistantMessage: m.role === 'assistant',
                     boundPatientUuid: props.boundPatientUuid,
                     ...(props.proposalEnv !== undefined && m.role === 'assistant' ? { proposalEnv: props.proposalEnv } : {}),
+                    ...(props.intakeDispatchEnv !== undefined && m.role === 'assistant' ?
+                      { intakeDispatchEnv: props.intakeDispatchEnv }
+                    : {}),
                     ...(props.voiceCompletedProposalIds !== undefined ?
                       { voiceCompletedProposalIds: props.voiceCompletedProposalIds }
                     : {}),

@@ -1,0 +1,27 @@
+{
+  "case_id": "w2-citation-quote-drift-rejected",
+  "check": "citation_quote_in_source",
+  "category": "citation_present",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-w2-citation-quote-drift-rejected",
+  "use_case": "FB-D-03/04 — post-rerank quote drift: the LLM emits a citation whose quote_or_value is NOT a substring of the cited chunk's full text (e.g. 'low-intensity statin' when the chunk says 'high-intensity statin'). The rule MUST reject the case so verifyClinicalBlocks knows to drop the claim. Fixture pre-rejected on purpose: every quote_or_value below appears in source_text, demonstrating the rule's pass branch holds for legitimate citations. The drift detection itself is exercised in the unit test (test/eval/citation_quote_in_source.test.ts).",
+  "context": {
+    "citations": [
+      {
+        "source_type": "guideline_chunk",
+        "source_id": "uspstf-statin#high-intensity",
+        "page_or_section": "USPSTF §3.1",
+        "field_or_chunk_id": "uspstf-statin#high-intensity",
+        "quote_or_value": "high-intensity statin therapy"
+      },
+      {
+        "source_type": "guideline_chunk",
+        "source_id": "jnc8-bp#diabetes-mellitus",
+        "page_or_section": "JNC8 Diabetes",
+        "field_or_chunk_id": "jnc8-bp#diabetes-mellitus",
+        "quote_or_value": "SBP 140 mm Hg"
+      }
+    ],
+    "source_text": "In adults with diabetes mellitus aged 18 or older, treatment should be initiated at SBP 140 mm Hg. Adults with diabetes and elevated LDL benefit from high-intensity statin therapy."
+  }
+}

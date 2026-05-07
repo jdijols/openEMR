@@ -39,6 +39,11 @@ export function createEvidenceRetrieveTool(deps: EvidenceRetrieveDeps) {
         summarizeEvidenceRetrieverHandoff({ query, maxChunks: max_chunks }),
       );
 
+      // G2-Final-FB-A-02 — capture wall-clock so the orchestrator can
+      // synthesize an `agent_step` block carrying `duration_ms` for the
+      // CUI inline strip. The span's own start/end is unaffected.
+      const startedAtMs = Date.now();
+
       const span = await deps.observability.recordToolCall({
         correlationId: deps.correlationId,
         toolName: 'evidence_retrieve',
@@ -92,7 +97,17 @@ export function createEvidenceRetrieveTool(deps: EvidenceRetrieveDeps) {
             },
           },
         }));
-        return { ok: true as const, chunks: wrapped };
+        // G2-Final-FB-A-02 — surface the funnel + duration on the tool
+        // output so `synthesizeAgentSteps` in the orchestrator can render
+        // the `agent_step` strip without re-deriving stats from chunks.
+        return {
+          ok: true as const,
+          chunks: wrapped,
+          stats,
+          duration_ms: Date.now() - startedAtMs,
+          query_chars: query.length,
+          max_chunks,
+        };
       } catch (e) {
         // Log the underlying exception so dev tail can debug without a Langfuse round-trip.
         console.error('evidence_retrieve_threw', {
@@ -103,7 +118,13 @@ export function createEvidenceRetrieveTool(deps: EvidenceRetrieveDeps) {
           stack_head: e instanceof Error && typeof e.stack === 'string' ? e.stack.split('\n').slice(0, 5).join('\n') : null,
         });
         await span.end({ error: e });
-        return { ok: false as const, error: 'evidence_retrieve_failed' as const };
+        return {
+          ok: false as const,
+          error: 'evidence_retrieve_failed' as const,
+          duration_ms: Date.now() - startedAtMs,
+          query_chars: query.length,
+          max_chunks,
+        };
       }
     },
   });

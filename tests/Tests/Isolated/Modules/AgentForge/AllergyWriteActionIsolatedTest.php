@@ -69,7 +69,7 @@ final class AllergyWriteActionIsolatedTest extends TestCase
 
         $port = $this->getMockBuilder(PatientAllergyWritePort::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['insertAllergy', 'updateAllergy'])
+            ->onlyMethods(['insertAllergy', 'updateAllergy', 'softDeleteAllergyByUuid'])
             ->getMock();
 
         $port->expects(self::once())
@@ -122,7 +122,7 @@ final class AllergyWriteActionIsolatedTest extends TestCase
 
         $port = $this->getMockBuilder(PatientAllergyWritePort::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['insertAllergy', 'updateAllergy'])
+            ->onlyMethods(['insertAllergy', 'updateAllergy', 'softDeleteAllergyByUuid'])
             ->getMock();
         $port->expects(self::never())->method('insertAllergy');
         $port->expects(self::never())->method('updateAllergy');

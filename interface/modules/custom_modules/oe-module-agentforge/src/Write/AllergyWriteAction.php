@@ -58,14 +58,23 @@ final class AllergyWriteAction
         $fields = [
             'title' => $payload->substance(),
         ];
-        $rx = $payload->reactionText();
-        if ($rx !== null && $rx !== '') {
-            $fields['comments'] = $rx;
+
+        // Schema-expansion: combine reaction + extra comments into a single comments body
+        // (preserves both fields when both are present; either alone when only one).
+        $comments = $payload->combinedCommentsBody();
+        if ($comments !== null && $comments !== '') {
+            $fields['comments'] = $comments;
         }
 
         $sev = $payload->severityAlOptionId();
         if ($sev !== null) {
             $fields['severity_al'] = $sev;
+        }
+
+        // onset_date → lists.begdate (AllergyIntoleranceService accepts begdate as a pass-through key).
+        $onset = $payload->onsetDate();
+        if ($onset !== null) {
+            $fields['begdate'] = $onset;
         }
 
         return $this->allergyPort->insertAllergy($patientUuidCanonical, $fields);

@@ -1,0 +1,13 @@
+{
+  "case_id": "w2-fhir-intake-cross-patient-blocked",
+  "check": "cross_patient_blocked",
+  "category": "safe_refusal",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-w2-fhir-intake-cross-patient-blocked",
+  "use_case": "FB-B / S1 — an intake-confirm that targets a different patient than the chart's bound UUID MUST be blocked at the chart-context gate before any write proposal is dispatched. The persistence path (FB-B-01 lab + the deferred FB-B-04..06 intake writers) shares the same ChartContextGate::authorizeFromGlobals guard as W1, so cross-patient defense in depth carries forward without per-target wiring. Regression here means a confirm could persist allergies / labs into the wrong chart.",
+  "context": {
+    "bound_patient_uuid": "11111111-2222-3333-4444-555555555555",
+    "request_patient_uuid": "99999999-8888-7777-6666-555555555555",
+    "tool_result_error": "active_chart_mismatch"
+  }
+}

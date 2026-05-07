@@ -50,7 +50,17 @@ final class ClinicalNoteWriteAction
             );
         } catch (\InvalidArgumentException) {
             return ConfirmedWriteOutcome::openemrRejected('encounter invalid');
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            // G2-Early-27 — emit the underlying exception class + message to PHP error log
+            // so `devtools php-log` shows the root cause without redeploying. Audit row still
+            // surfaces only the generic 'write failed' string to keep PHI out of the audit DB
+            // (service-layer exceptions can echo back failed query parameters).
+            error_log(sprintf(
+                'agentforge.clinical_note_write_failed proposal_id=%s exception=%s message=%s',
+                $proposalId,
+                $e::class,
+                $e->getMessage(),
+            ));
             return ConfirmedWriteOutcome::openemrRejected('write failed');
         }
 

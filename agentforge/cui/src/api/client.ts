@@ -417,3 +417,72 @@ export async function postUploadDocument(
     reUpload: body.re_upload === true,
   };
 }
+
+/**
+ * G2-Early-26 — direct dispatch from the IntakeProposalCard to the OpenEMR module's
+ * write endpoint for one section row. The proposal_id is minted client-side; the module
+ * endpoint records it in the completion ledger to dedupe re-applies. Returns
+ * `{accepted, reason?}` so the card can render per-row status.
+ *
+ * `relativeScriptPath` is one of e.g. `write/medication_add.php`,
+ * `write/family_history_add.php`, `write/allergy.php`, `write/chief_complaint.php` —
+ * canonical paths registered in `agentforge/contracts/module-http-paths.json`.
+ */
+export async function postModuleWrite(
+  moduleBase: string,
+  relativeScriptPath: string,
+  body: {
+    sessionToken: string;
+    patientUuid: string;
+    proposalId: string;
+    encounterId?: number;
+    payload: Record<string, unknown>;
+  },
+): Promise<{ accepted: boolean; reason?: string }> {
+  if (moduleBase === '') {
+    throw new AgentForgeDeliveryError('misconfigured_llm', undefined, 'missing_module_base');
+  }
+  const base = stripBase(moduleBase);
+  const correlationId = randomCorrelationId();
+
+  const reqBody: Record<string, unknown> = {
+    session_token: body.sessionToken,
+    patient_uuid: body.patientUuid,
+    proposal_id: body.proposalId,
+    payload: body.payload,
+  };
+  if (body.encounterId !== undefined) {
+    reqBody['encounter_id'] = body.encounterId;
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${base}/${relativeScriptPath}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Correlation-Id': correlationId,
+      },
+      body: JSON.stringify(reqBody),
+      credentials: 'same-origin',
+    });
+  } catch {
+    throw new AgentForgeDeliveryError('network_unreachable', correlationId);
+  }
+
+  const json: unknown = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw deliveryErrorFromAgentResponse(res.status, json);
+  }
+  if (json === null || typeof json !== 'object') {
+    throw new AgentForgeDeliveryError('invalid_success_response', correlationId);
+  }
+
+  const result = json as { accepted?: unknown; reason?: unknown };
+  const accepted = result.accepted === true;
+  const out: { accepted: boolean; reason?: string } = { accepted };
+  if (typeof result.reason === 'string' && result.reason !== '') {
+    out.reason = result.reason;
+  }
+  return out;
+}

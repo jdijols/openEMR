@@ -25,6 +25,9 @@ const validLabExtractionJson: LabPdfExtraction = {
   source_document_id: DOCREF_UUID,
   ordering_provider: 'RAO, ANJALI MD',
   performing_lab: 'Pacific Diagnostics Lab',
+  panel_name: 'LIPID PANEL WITH DIRECT LDL',
+  date_collected: '2026-04-22',
+  date_reported: '2026-04-22',
   results: [
     {
       test_name: 'LDL Cholesterol, Calculated',
@@ -36,6 +39,7 @@ const validLabExtractionJson: LabPdfExtraction = {
       reference_range_text: 'Optimal <100',
       collection_date: '2026-04-22',
       abnormal_flag: 'high',
+      result_comments: null,
       citation: {
         source_type: 'lab_pdf',
         source_id: DOCREF_UUID,
@@ -54,6 +58,7 @@ const validLabExtractionJson: LabPdfExtraction = {
       reference_range_text: null,
       collection_date: '2026-04-22',
       abnormal_flag: 'low',
+      result_comments: null,
       citation: {
         source_type: 'lab_pdf',
         source_id: DOCREF_UUID,
@@ -63,6 +68,8 @@ const validLabExtractionJson: LabPdfExtraction = {
       },
     },
   ],
+  interpretive_comments: null,
+  interpretive_comments_citation: null,
   extraction_metadata: {
     pages_processed: 1,
     overall_confidence: 'high',
@@ -223,10 +230,18 @@ describe('countQuoteMatches helper (intake form)', () => {
       patient_uuid: PATIENT_UUID,
       source_document_id: DOCREF_UUID,
       demographics: {
-        name: 'Chen, Margaret L.',
+        legal_name_first: 'Margaret',
+        legal_name_last: 'Chen',
+        legal_name_middle: 'L.',
         dob: '1967-08-14',
-        sex: 'female',
+        sex: 'Female',
         contact_phone: '(510) 555-0148',
+        street: null,
+        city: null,
+        state: null,
+        postal_code: null,
+        email: null,
+        occupation: null,
         citation: {
           source_type: 'intake_form',
           source_id: DOCREF_UUID,

@@ -1,12 +1,12 @@
 {
-  "version": "w2-final-rebalance-2026-05-06",
-  "pinned_at": "2026-05-06T22:30:00-05:00",
-  "description": "W2 Final-prep rebalance: 50 -> 75 cases, lifting the three new W2 categories (schema_valid, citation_present, no_phi_in_logs) and factually_consistent to the §11 target depth so the gate has real coverage on the paths a grader's regression-injection is most likely to land in. safe_refusal held at 35 (W1 deterministic refusal rules — trimming would lose existing coverage). Per-category regression > 5pp OR pass rate < 95% absolute still fails the gate (G2-Early-38, S12).",
+  "version": "w2-consolidated-2026-05-07",
+  "pinned_at": "2026-05-07T15:55:00-05:00",
+  "description": "W2 consolidated baseline re-pinned after merging the parallel-session work from main (G2-Early-36 cross-patient W2 write tools — medication_add/discontinue, allergy_delete, family_history_add, delete_uploaded_document) and the G2-Final-FB tracks (FB-A agent-step strip + eval-status/PHI-redaction badges, FB-B FHIR persistence path with ObservationWriter, FB-C deploy preflight + status page, FB-D corpus expansion + citation_quote_in_source rule + named-source pills). Every category at 1.0 across 88 cases (43 safe_refusal, 12 schema_valid, 12 citation_present, 12 factually_consistent, 9 no_phi_in_logs). Per-category regression > 5pp OR pass rate < 95% absolute fails the gate (G2-Early-38, S12). Supersedes w2-early-2026-05-06b and w2-final-fb-2026-05-09.",
   "per_category": {
-    "schema_valid":         { "pass_rate": 1.00, "case_count": 10 },
-    "citation_present":     { "pass_rate": 1.00, "case_count": 10 },
+    "schema_valid":         { "pass_rate": 1.00, "case_count": 12 },
+    "citation_present":     { "pass_rate": 1.00, "case_count": 12 },
     "factually_consistent": { "pass_rate": 1.00, "case_count": 12 },
-    "safe_refusal":         { "pass_rate": 1.00, "case_count": 35 },
-    "no_phi_in_logs":       { "pass_rate": 1.00, "case_count": 8 }
+    "safe_refusal":         { "pass_rate": 1.00, "case_count": 43 },
+    "no_phi_in_logs":       { "pass_rate": 1.00, "case_count": 9 }
   }
 }

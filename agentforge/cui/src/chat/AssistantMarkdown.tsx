@@ -101,12 +101,42 @@ const INLINE_DISALLOWED: ReadonlyArray<string> = [
  *     the OpenEMR shell. `noopener noreferrer` blocks tab-nabbing and
  *     prevents leaking the rail URL via Referer.
  */
+// Inline SVG kept local to avoid an extra import path; mirrors the
+// IconExternalLink in MessageList.tsx so the marker reads identically
+// whether a citation comes from the structured `claim/segments` envelope
+// or from a Markdown link in assistant prose.
+function IconExternalLink(): ReactElement {
+  return (
+    <svg
+      className="agentforge-msg__cite-marker"
+      width="10"
+      height="10"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M7 17 17 7" />
+      <path d="M9 7h8v8" />
+    </svg>
+  );
+}
+
 const blockComponents: Components = {
   h1: ({ children }) => <h3>{children}</h3>,
   h2: ({ children }) => <h4>{children}</h4>,
+  // Every assistant-emitted Markdown link opens in a new tab (see file-level
+  // doc), so the "↗" marker is always appropriate here — no need to branch
+  // on URL kind. The icon sits inside the <a> so click target and focus ring
+  // include it.
   a: ({ href, children }) => (
     <a href={href} target="_blank" rel="noopener noreferrer">
       {children}
+      <IconExternalLink />
     </a>
   ),
 };
