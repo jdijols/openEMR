@@ -1,0 +1,43 @@
+{
+  "case_id": "w2-schema-valid-reyes-hba1c-image-no-bbox-pass",
+  "check": "schema_valid",
+  "category": "schema_valid",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-w2-schema-valid-reyes-hba1c-image-no-bbox",
+  "use_case": "W2 §6 — phone-photo PNG lab (Reyes cohort fixture: Reyes-Sofia-Lab-HbA1c.png). Exercises image-source extraction with bbox absent (PNGs have no PDF page coordinates; bbox is correctly optional in SourceCitationSchema). A regression that makes bbox required would break every PNG cohort fixture (Reyes + Kowalski intake).",
+  "context": {
+    "schema": "lab_pdf",
+    "extraction": {
+      "document_type": "lab_pdf",
+      "patient_uuid": "33333333-3333-3333-3333-333333333333",
+      "source_document_id": "docref-reyes-hba1c",
+      "ordering_provider": "Donna Lee",
+      "performing_lab": "Outside Lab (phone photo)",
+      "results": [
+        {
+          "test_name": "Hemoglobin A1c",
+          "loinc": "4548-4",
+          "value": 8.4,
+          "unit": "%",
+          "reference_range_low": null,
+          "reference_range_high": 5.7,
+          "reference_range_text": "<5.7 normal; 5.7-6.4 prediabetes; >=6.5 diabetes",
+          "collection_date": "2026-04-15",
+          "abnormal_flag": "high",
+          "citation": {
+            "source_type": "lab_pdf",
+            "source_id": "docref-reyes-hba1c",
+            "page_or_section": "image region: result row",
+            "field_or_chunk_id": "results[0]",
+            "quote_or_value": "HbA1c 8.4 %"
+          }
+        }
+      ],
+      "extraction_metadata": {
+        "pages_processed": 1,
+        "overall_confidence": "medium",
+        "fields_uncertain": []
+      }
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "case_id": "w2-citation-present-chen-intake-claims-pass",
+  "check": "citation_present",
+  "category": "citation_present",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-w2-citation-present-chen-intake-claims",
+  "use_case": "W2 §6/§9 — every clinical claim built from the Chen intake form (Chen-Margaret-Intake-Form.pdf) carries a §6-shaped citation with source_type 'intake_form'. Today's citation_present cases only exercise lab_pdf and guideline_chunk source types; this closes the intake-form gap (Gauntlet probe: 'are intake citations exercised?').",
+  "context": {
+    "claims": [
+      {
+        "text": "Chief concern: chest pressure on exertion x 3 weeks",
+        "citation": {
+          "source_type": "intake_form",
+          "source_id": "docref-chen-intake",
+          "page_or_section": "Reason for Visit",
+          "field_or_chunk_id": "chief_concern.text",
+          "quote_or_value": "chest pressure on exertion x 3 weeks"
+        }
+      },
+      {
+        "text": "Current medication: metformin 1000 mg BID",
+        "citation": {
+          "source_type": "intake_form",
+          "source_id": "docref-chen-intake",
+          "page_or_section": "Current Medications",
+          "field_or_chunk_id": "current_medications[0]",
+          "quote_or_value": "metformin 1000 mg BID"
+        }
+      },
+      {
+        "text": "Allergy: penicillin (rash, moderate)",
+        "citation": {
+          "source_type": "intake_form",
+          "source_id": "docref-chen-intake",
+          "page_or_section": "Allergies",
+          "field_or_chunk_id": "allergies[0]",
+          "quote_or_value": "penicillin - rash"
+        }
+      }
+    ]
+  }
+}

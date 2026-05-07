@@ -1,0 +1,52 @@
+{
+  "case_id": "w2-citation-present-chen-statin-mixed-pass",
+  "check": "citation_present",
+  "category": "citation_present",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-w2-citation-present-chen-statin-mixed",
+  "use_case": "W2 §6/§9 — the headline demo scenario: 'should we intensify her statin?' answered with claims that mix patient-record citations (Chen lipid + intake) AND guideline citations (USPSTF + ADA). A regression that breaks heterogeneous claim sets (e.g. only validates the first source_type) would slip past lab_pdf-only and guideline-only cases.",
+  "context": {
+    "claims": [
+      {
+        "text": "LDL 158 mg/dL is above goal (<100) for a patient with T2DM",
+        "citation": {
+          "source_type": "lab_pdf",
+          "source_id": "docref-chen-lipid",
+          "page_or_section": "page 1",
+          "field_or_chunk_id": "results[2]",
+          "quote_or_value": "LDL Cholesterol 158 mg/dL"
+        }
+      },
+      {
+        "text": "Patient self-reports current metformin therapy and T2DM diagnosis",
+        "citation": {
+          "source_type": "intake_form",
+          "source_id": "docref-chen-intake",
+          "page_or_section": "Current Medications",
+          "field_or_chunk_id": "current_medications[0]",
+          "quote_or_value": "metformin 1000 mg BID"
+        }
+      },
+      {
+        "text": "USPSTF recommends statin intensification in adults with T2DM and elevated LDL",
+        "citation": {
+          "source_type": "guideline_chunk",
+          "source_id": "uspstf-statin#statin-intensification-in-diabetes",
+          "page_or_section": "USPSTF §3.1",
+          "field_or_chunk_id": "uspstf-statin#statin-intensification-in-diabetes",
+          "quote_or_value": "Adults with diabetes and elevated LDL benefit from high-intensity statin therapy."
+        }
+      },
+      {
+        "text": "ADA recommends statin therapy in T2DM regardless of baseline LDL",
+        "citation": {
+          "source_type": "guideline_chunk",
+          "source_id": "ada-glycemic#statin-therapy-in-diabetes",
+          "page_or_section": "ADA §10.2",
+          "field_or_chunk_id": "ada-glycemic#statin-therapy-in-diabetes",
+          "quote_or_value": "All patients with type 2 diabetes should be considered for statin therapy."
+        }
+      }
+    ]
+  }
+}

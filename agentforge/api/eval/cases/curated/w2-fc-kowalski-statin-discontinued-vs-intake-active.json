@@ -1,0 +1,37 @@
+{
+  "case_id": "w2-fc-kowalski-statin-discontinued-vs-intake-active",
+  "check": "conflicting_medication_records_warned",
+  "category": "factually_consistent",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-w2-fc-kowalski-statin-discontinued-vs-intake-active",
+  "use_case": "Kowalski HLD reconciliation — chart shows atorvastatin 'discontinued' (after a prior elevated LFT episode); intake form (Kowalski-Robert-Intake-Form.png) lists 'atorvastatin 40 mg' as a current medication. Verification must warn rather than silently pick one — clinician needs to know whether the patient resumed without provider sign-off (RUQ pain raises LFT-relevance now).",
+  "context": {
+    "medication_rows": [
+      {
+        "drug": "atorvastatin",
+        "status": "discontinued",
+        "cite": "openemr_record:rx-atorvastatin-discontinued"
+      },
+      {
+        "drug": "atorvastatin",
+        "status": "active",
+        "cite": "intake_form:current_medications[2]"
+      }
+    ],
+    "blocks": [
+      {
+        "type": "warning",
+        "category": "med_status_conflict",
+        "message": "Atorvastatin is listed as discontinued on the chart but as an active medication on today's intake form. Reconcile with patient before relying on either status."
+      },
+      {
+        "type": "claim",
+        "text": "There is a status disagreement on atorvastatin between the chart and the intake form.",
+        "cite": [
+          "openemr_record:rx-atorvastatin-discontinued",
+          "intake_form:current_medications[2]"
+        ]
+      }
+    ]
+  }
+}

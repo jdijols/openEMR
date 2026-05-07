@@ -1,0 +1,23 @@
+{
+  "case_id": "w2-citation-present-confidence-above-one-rejected",
+  "check": "citation_present",
+  "category": "citation_present",
+  "expect_pass_for_eval_report": false,
+  "correlation_id": "eval-w2-citation-present-confidence-above-one",
+  "use_case": "W2 §6 citation contract — adversarial: SourceCitationSchema.confidence is z.number().min(0).max(1). A VLM that hallucinates 1.5 (overstated certainty, common when the model conflates 'percent' with 'fraction') must be rejected. A regression that loosens the upper bound would let overconfident extraction through.",
+  "context": {
+    "claims": [
+      {
+        "text": "LDL Cholesterol 158 mg/dL (high)",
+        "citation": {
+          "source_type": "lab_pdf",
+          "source_id": "docref-bad-confidence",
+          "page_or_section": "page 1",
+          "field_or_chunk_id": "results[0]",
+          "quote_or_value": "LDL Cholesterol 158 mg/dL",
+          "confidence": 1.5
+        }
+      }
+    ]
+  }
+}

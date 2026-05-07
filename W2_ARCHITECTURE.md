@@ -6,7 +6,7 @@
 >
 > **Working document:** revisable up to MVP submission Tuesday 2026-05-05 11:59 PM CT, then frozen except for risk/narrowing tweaks through Final on Sunday 2026-05-10 12:00 PM CT.
 >
-> **Submission bundle (W2 brief deliverables):** GitLab repo · this `W2_ARCHITECTURE.md` · Zod schemas with validation tests · 50-case eval dataset + judge config + results · CI evidence (Git Hook + GitHub Actions) · 3-5 min demo video · cost & latency report · publicly accessible deployed app.
+> **Submission bundle (W2 brief deliverables):** GitLab repo · this `W2_ARCHITECTURE.md` · Zod schemas with validation tests · 75-case eval dataset (50 brief-target + 25 G2-Final rebalance) + judge config + results · CI evidence (Git Hook + GitHub Actions) · 3-5 min demo video · cost & latency report · publicly accessible deployed app.
 >
 > **Process source of truth:** [Documentation/AgentForge/process/journal/week-2/0504-T1500-w2-architecture-defense-prep.md](Documentation/AgentForge/process/journal/week-2/0504-T1500-w2-architecture-defense-prep.md) (architecture-defense prep + post-meeting probe lockdown). The probe script and live results sit at [agentforge/api/scripts/w2-vlm-probe.mjs](agentforge/api/scripts/w2-vlm-probe.mjs).
 
@@ -22,7 +22,7 @@
 | **Multi-agent orchestration**           | **Vercel AI SDK supervisor + 2 workers as typed tools**, each handoff a Langfuse span                | "Inspectable orchestration framework" satisfied without a mid-week pivot to LangGraph or OpenAI Agents SDK. Preserves W1's observability wiring. Workers: `intake_extractor` (Claude vision + Zod + cross-check) and `evidence_retriever` (FTS5 + dense + Cohere rerank).                                       |
 | **RAG**                                 | **SQLite FTS5 + `bge-small` embeddings + Cohere Rerank** over ~25 chunks                            | Brief explicitly names Cohere Rerank or equivalent; "small guideline corpus" rules out vector DBs. SQLite is already in our container. Three guidelines aligned with our existing UC personas: USPSTF screening, JNC8 BP, ADA glycemic.                                                                          |
 | **FHIR round-trip**                     | Source bytes → OpenEMR `documents` → **`DocumentReference`** UUID; derived facts → **`Observation`** linked via `derivedFrom`; idempotency on `(patient_uuid, sha256(file_bytes))` | Brief requires "round-trip through OpenEMR without creating duplicate or untraceable records." Reuses existing FHIR classes already in this fork ([`src/FHIR/R4/FHIRDomainResource/FHIRDocumentReference.php`](src/FHIR/R4/FHIRDomainResource/FHIRDocumentReference.php)).                                       |
-| **Eval gate**                           | **50 cases × 5 boolean rubrics**, baseline pinned at `agentforge/api/eval/baseline.json`, **two enforcement surfaces** (local Git Hook + GitHub Actions)                          | Brief calls out "Git Hook" precisely. Both surfaces consult the same baseline; the build fails if any category regresses by >5 percentage points OR drops below 95% absolute.                                                                                                                                   |
+| **Eval gate**                           | **75 cases × 5 boolean rubrics** (G2-Final rebalance from the brief's literal 50 — see §11), baseline pinned at `agentforge/api/eval/baseline.json`, **two enforcement surfaces** (local Git Hook + GitHub Actions)                          | Brief calls out "Git Hook" precisely. Both surfaces consult the same baseline; the build fails if any category regresses by >5 percentage points OR drops below 95% absolute. Per-category counts: schema_valid 10, citation_present 10, factually_consistent 12, safe_refusal 35, no_phi_in_logs 8.                                                                                                                                   |
 | **PHI in observability**                | **Trace bodies for ingestion turns log only PHI-safe metadata** (file MIME, page count, tokens, schema-valid bool, abnormal-fact count, cross-check pass/fail)                   | Wire-level redaction is insufficient when raw document bytes and extracted text are now first-class W2 inputs. Raw extracted JSON and `pdf-parse` text live in Postgres only — never in Langfuse spans. New rubric category `no_phi_in_logs` directly tests this.                                              |
 | **Single-provider cost story**          | All extraction + reasoning on **Claude Haiku 4.5**; embeddings local (`bge-small`); rerank via Cohere | Cost envelope ~$0.005-$0.01 per extraction. Total dev spend projected under $5 for the week (W1 spent $3.34 across 550 turns). No per-token surprise from a second LLM provider.                                                                                                                                |
 
@@ -40,7 +40,7 @@ We extend the W1 Clinical Copilot with **document-aware ingestion**: a primary c
 
 2. **Multi-agent supervision.** The W1 single-agent loop is restructured into a supervisor + two workers — `intake_extractor` and `evidence_retriever` — each invocable as a typed tool. Every handoff is a Langfuse span with explicit routing rationale recorded as structured metadata. The supervisor's system prompt encodes branching rules ("document attached → extract; question references guideline / evidence / 'should I' → retrieve; else chart-tools-only").
 
-3. **PR-blocking eval gate.** The W1 eval suite (39 boolean cases, GitHub Actions gate) expands to 50 cases mapped to the brief's five named rubric categories: `schema_valid`, `citation_present`, `factually_consistent`, `safe_refusal`, `no_phi_in_logs`. Baseline pass rates pinned in `agentforge/api/eval/baseline.json`. Two enforcement surfaces — a local pre-commit/pre-push Git Hook and the existing GitHub Actions workflow — both consult the same baseline and fail on category-level regression. We rehearse a self-injection on Saturday before grading day.
+3. **PR-blocking eval gate.** The W1 eval suite (39 boolean cases, GitHub Actions gate) expands to **75 cases** mapped to the brief's five named rubric categories: `schema_valid`, `citation_present`, `factually_consistent`, `safe_refusal`, `no_phi_in_logs`. (Brief's literal target was 50; G2-Early shipped 50, G2-Final rebalanced to 75 to lift the three new W2 categories to the §11 per-category target depth — see [§11](#11-eval-architecture).) Baseline pass rates pinned in `agentforge/api/eval/baseline.json`. Two enforcement surfaces — a local pre-commit/pre-push Git Hook and the existing GitHub Actions workflow — both consult the same baseline and fail on category-level regression. We rehearse a self-injection on Saturday before grading day.
 
 **What persists from W1:**
 - Same Linux VPS + Docker Compose deployment, same Caddy TLS, same self-hosted Langfuse, same Postgres, same MariaDB.
@@ -1140,18 +1140,18 @@ The eval gate is the W2 hard gate. The brief: *"During grading, we will introduc
 
 Three new check implementations to build. The 39 existing W1 cases are re-tagged into the W2 categories without rule-logic changes.
 
-### 50-case composition
+### 75-case composition (Final rebalance, 2026-05-07)
 
-| Category               | Originally targeted | **Actually shipped (2026-05-06)** | Coverage |
-| ---------------------- | ------------------- | --------------------------------- | -------- |
-| `schema_valid`         | 10                  | **4**                             | 2 lab_pdf + 2 intake_form: §6-valid pass + missing-required reject + §6-valid intake pass + empty-quote reject. |
-| `citation_present`     | 10                  | **4**                             | Extraction-claims pass, guideline-claim pass, missing-citation fail, malformed-source-type fail. |
-| `factually_consistent` | 12                  | **4**                             | All existing W1 cases (`vitals_parser_uncertain_not_guess`, `negative_claim_requires_empty_query` ×2, `conflicting_medication_records_warned`). |
-| `safe_refusal`         | 10                  | **35**                            | All remaining 7 W1 deterministic refusal rules (no_write_without_confirm, unsupported_write, cross_patient, internal_disclosure, all_domains_unavailable, provider_timeout, constraint_boundary describes-vs-recommends). W1 over-indexed on this category. |
-| `no_phi_in_logs`       | 8                   | **3**                             | Clean trace pass, MRN-leak fail, cohort-name-leak fail. |
-| **Total**              | **50**              | **50**                            | |
+| Category               | Originally targeted | G2-Early shipped (2026-05-06) | **G2-Final rebalance (2026-05-07)** | Coverage |
+| ---------------------- | ------------------- | ----------------------------- | ----------------------------------- | -------- |
+| `schema_valid`         | 10                  | 4                             | **10**                              | 4 from G2-Early + 6 added in G2-Final: Whitaker CBC multi-result pass, Reyes HbA1c PNG (image-source, no-bbox) pass, qualitative-value ("Negative") pass, pages_processed=0 reject, abnormal_flag out-of-enum reject, intake all-arrays-empty pass. |
+| `citation_present`     | 10                  | 4                             | **10**                              | 4 from G2-Early + 6 added in G2-Final: Chen intake-form claims pass, Chen statin mixed (extraction + guideline) pass, empty-quote reject, confidence-above-1 reject, bbox-3-element reject, openemr_record source pass. |
+| `factually_consistent` | 12                  | 4                             | **12**                              | 4 from G2-Early + 8 added in G2-Final, all cohort-framed: Whitaker BP-only-diastolic uncertain, Reyes temp-unit ambiguous, Kowalski pulse-zero, Chen multi-BP-readings, Whitaker warfarin strength mismatch warned, Kowalski statin discontinued-vs-active warned, Reyes allergies negative-claim, Chen family-history negative-claim. |
+| `safe_refusal`         | 10                  | 35                            | **35**                              | All 7 W1 deterministic refusal rules (no_write_without_confirm, unsupported_write, cross_patient, internal_disclosure, all_domains_unavailable, provider_timeout, constraint_boundary describes-vs-recommends). Held at 35 — trimming would lose existing W1 coverage. |
+| `no_phi_in_logs`       | 8                   | 3                             | **8**                               | 3 from G2-Early + 5 added in G2-Final, each lighting up a distinct deny-list pattern: SSN, DOB-ISO, DOB-US, phone, email. Original 3 covered MRN + cohort-name (Chen) + clean. |
+| **Total**              | **50**              | **50**                        | **75**                              | |
 
-**Note on the composition asymmetry (2026-05-06):** the spec called for an equal-ish split (10/10/12/10/8). What shipped is heavier on `safe_refusal` (35 vs target 10) because all 35 W1 deterministic refusal rules naturally bucket under it; dropping any to hit the target count would have lost coverage. The new W2 categories (`schema_valid`, `citation_present`, `no_phi_in_logs`) came in lean (4/4/3) — small categories are MORE sensitive to single-case regressions, which is the correct shape for a regression-detection gate (one failure = ~25-33pp drop, well past the 5pp regression cap and below the 95% absolute floor). The brief's "boolean rubric categories must include schema_valid, citation_present, factually_consistent, safe_refusal, and no_phi_in_logs" requirement is satisfied — all 5 are present and gateable.
+**Note on the rebalance (2026-05-07):** G2-Early shipped 50 cases satisfying the brief's literal "50-case golden set" requirement, but composition was heavily skewed toward `safe_refusal` (35 vs target 10) because the 7 W1 deterministic refusal rules all naturally bucket there, while the three new W2 categories (`schema_valid`, `citation_present`, `no_phi_in_logs`) came in lean (4/4/3). The threshold logic (5pp regression cap + 95% absolute floor) still fired correctly on the small categories — but coverage thinness was a real risk for the brief's hard-gate regression-injection probe: a regression in a path no case exercised would slip through. G2-Final adds 25 cases targeted at exactly those gaps (multi-result panels, PNG image source, qualitative results, mixed extraction+guideline citations, every distinct PHI deny-list pattern, cohort-grounded factually_consistent scenarios). `safe_refusal` is held at 35 — trimming W1 cases to hit the 10-target would lose existing coverage. Final composition is `10/10/12/35/8` = **75 cases**, hitting the §11 per-category target on 4 of 5 categories. Baseline pinned at `w2-final-rebalance-2026-05-06`.
 
 ### Rubric format
 
@@ -1179,17 +1179,17 @@ Each case is a JSON file at `agentforge/api/eval/cases/curated/<id>.json`:
 
 ### Baseline file
 
-`agentforge/api/eval/baseline.json`:
+`agentforge/api/eval/baseline.json` (G2-Final rebalance, pinned 2026-05-07):
 
 ```json
 {
-  "version": "w2-mvp-2026-05-05",
-  "categories": {
-    "schema_valid":         { "pass_rate": 1.00, "n": 10 },
-    "citation_present":     { "pass_rate": 1.00, "n": 10 },
-    "factually_consistent": { "pass_rate": 1.00, "n": 12 },
-    "safe_refusal":         { "pass_rate": 1.00, "n": 10 },
-    "no_phi_in_logs":       { "pass_rate": 1.00, "n": 8 }
+  "version": "w2-final-rebalance-2026-05-06",
+  "per_category": {
+    "schema_valid":         { "pass_rate": 1.00, "case_count": 10 },
+    "citation_present":     { "pass_rate": 1.00, "case_count": 10 },
+    "factually_consistent": { "pass_rate": 1.00, "case_count": 12 },
+    "safe_refusal":         { "pass_rate": 1.00, "case_count": 35 },
+    "no_phi_in_logs":       { "pass_rate": 1.00, "case_count": 8 }
   }
 }
 ```
@@ -1405,7 +1405,7 @@ Final due **Sunday 2026-05-10 12:00 PM CT**.
 - ✅ Supervisor refactor with explicit handoff Langfuse spans (routing rationale recorded)
 - ~~Four new write tools live: `propose_medication_add`, `propose_medication_discontinue`, `propose_allergy_delete`, `propose_family_history_add` + `delete_uploaded_document` recovery tool~~ — **CUT tier 4 (2026-05-06)** to preserve capacity for incoming Sunday-deadline scope expansion. Brief MUST set is satisfied without these. Existing IntakeProposalCard UX ("Captured. Chart writes scheduled for next iteration.") is an honest deferral. Lab Observation round-trip already works via G2-MVP-25 ObservationWriter. See [`TASKS.md` G2-Early-20..27 cut block](TASKS.md) for full rationale.
 - ~~Intake proposal card dispatches per-section to the new write tools on confirm~~ — **CUT tier 4** (depends on the cut write tools above). Confirm continues to log intent + transition UI state, no chart write.
-- ✅ 50-case eval suite: 39 W1 cases retagged into W2 categories + 11 new (covering extraction validation, citation contracts, PHI-in-logs scans). Final per-category counts: schema_valid 4, citation_present 4, factually_consistent 4, safe_refusal 35, no_phi_in_logs 3 = 50 total.
+- ✅ Eval suite (G2-Early shipped 50 cases: 39 W1 retagged + 11 new, satisfying the brief's literal "50-case golden set"). G2-Final rebalance (2026-05-07) added 25 cohort-grounded cases lifting the three new W2 categories to the §11 target depth → **75 total**. Per-category counts: schema_valid 10, citation_present 10, factually_consistent 12, safe_refusal 35, no_phi_in_logs 8.
 - ✅ PR-blocking CI: pre-push hook (`.pre-commit-config.yaml`) + GitHub Actions (`.github/workflows/agentforge-eval.yml`), both consulting [`agentforge/api/eval/baseline.json`](agentforge/api/eval/baseline.json), fail on >5pp regression or sub-95% absolute. Self-injection dry-run rehearsal verified end-to-end (G2-Early-42).
 - ⏸ VPS deployment refreshed — **operator (post-2026-05-06 session)**
 - ⏸ Demo video v1 (rough cut, ~3-5 min) — **operator**

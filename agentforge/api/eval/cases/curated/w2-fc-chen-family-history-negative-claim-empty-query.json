@@ -1,0 +1,12 @@
+{
+  "case_id": "w2-fc-chen-family-history-negative-claim-empty-query",
+  "check": "negative_claim_requires_empty_query",
+  "category": "factually_consistent",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-w2-fc-chen-family-history-negative-claim",
+  "use_case": "Chen statin-intensification turn — when answering 'any family history relevant to her CV risk?', the agent must back any 'no relevant family history' claim with an actual empty-result lookup against intake.family_history + chart family-history domain. Claiming negation from absence-of-data is the same trap the W1 negative-statement guard was built for; W2 cohort needs explicit coverage.",
+  "context": {
+    "negative_claim": true,
+    "backed_by_empty_query": true
+  }
+}

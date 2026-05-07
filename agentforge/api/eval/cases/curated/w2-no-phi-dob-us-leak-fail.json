@@ -1,0 +1,11 @@
+{
+  "case_id": "w2-no-phi-dob-us-leak-fail",
+  "check": "no_phi_in_logs",
+  "category": "no_phi_in_logs",
+  "expect_pass_for_eval_report": false,
+  "correlation_id": "eval-w2-no-phi-dob-us-leak-fail",
+  "use_case": "W2 §12/§13 (S7+S11) — adversarial: a US-format date of birth (M/D/YYYY) leaked into a span body must trip the gate. US format is the most likely leak when extracted text passes through verbatim from a typed intake form (which renders dates in US format by default). rule_holds=false expected.",
+  "context": {
+    "trace_text": "intake_extract output demographics.dob_text 8/14/1967 chief_concern present"
+  }
+}

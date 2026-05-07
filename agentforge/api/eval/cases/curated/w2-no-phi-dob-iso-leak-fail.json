@@ -1,0 +1,11 @@
+{
+  "case_id": "w2-no-phi-dob-iso-leak-fail",
+  "check": "no_phi_in_logs",
+  "category": "no_phi_in_logs",
+  "expect_pass_for_eval_report": false,
+  "correlation_id": "eval-w2-no-phi-dob-iso-leak-fail",
+  "use_case": "W2 §12/§13 (S7+S11) — adversarial: an ISO-format date of birth (YYYY-MM-DD) leaked into a span body must trip the gate. ISO is the most likely leak format because it's how DOBs serialize from FHIR / Postgres timestamps into log lines. The cohort patient Chen's actual DOB (1967-08-14) is used to make the regression realistic. rule_holds=false expected.",
+  "context": {
+    "trace_text": "intake_extract span input demographics dob 1967-08-14 sex female correlation_id=abc-123"
+  }
+}

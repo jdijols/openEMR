@@ -1,12 +1,12 @@
 {
-  "version": "w2-early-2026-05-06",
-  "pinned_at": "2026-05-06T17:18:00-05:00",
-  "description": "Initial W2 boolean-rubric baseline pinned at G2-Early gate. Every category at 1.0 across 50 cases. The eval runner consults this on every run; per-category regression > 5pp OR pass rate < 95% absolute fails the gate (G2-Early-38, S12).",
+  "version": "w2-final-rebalance-2026-05-06",
+  "pinned_at": "2026-05-06T22:30:00-05:00",
+  "description": "W2 Final-prep rebalance: 50 -> 75 cases, lifting the three new W2 categories (schema_valid, citation_present, no_phi_in_logs) and factually_consistent to the §11 target depth so the gate has real coverage on the paths a grader's regression-injection is most likely to land in. safe_refusal held at 35 (W1 deterministic refusal rules — trimming would lose existing coverage). Per-category regression > 5pp OR pass rate < 95% absolute still fails the gate (G2-Early-38, S12).",
   "per_category": {
-    "schema_valid":         { "pass_rate": 1.00, "case_count": 4 },
-    "citation_present":     { "pass_rate": 1.00, "case_count": 4 },
-    "factually_consistent": { "pass_rate": 1.00, "case_count": 4 },
+    "schema_valid":         { "pass_rate": 1.00, "case_count": 10 },
+    "citation_present":     { "pass_rate": 1.00, "case_count": 10 },
+    "factually_consistent": { "pass_rate": 1.00, "case_count": 12 },
     "safe_refusal":         { "pass_rate": 1.00, "case_count": 35 },
-    "no_phi_in_logs":       { "pass_rate": 1.00, "case_count": 3 }
+    "no_phi_in_logs":       { "pass_rate": 1.00, "case_count": 8 }
   }
 }

@@ -1,0 +1,22 @@
+{
+  "case_id": "w2-citation-present-quote-empty-string-rejected",
+  "check": "citation_present",
+  "category": "citation_present",
+  "expect_pass_for_eval_report": false,
+  "correlation_id": "eval-w2-citation-present-quote-empty-string",
+  "use_case": "W2 §6 citation contract — adversarial: SourceCitationSchema.quote_or_value is z.string().min(1). An empty string is the most direct attack on citation integrity (the agent claims a fact, attaches a citation envelope, but the verbatim source text is missing). A regression that drops the .min(1) constraint would let unbacked claims through.",
+  "context": {
+    "claims": [
+      {
+        "text": "LDL Cholesterol 158 mg/dL (high)",
+        "citation": {
+          "source_type": "lab_pdf",
+          "source_id": "docref-empty-quote",
+          "page_or_section": "page 1",
+          "field_or_chunk_id": "results[0]",
+          "quote_or_value": ""
+        }
+      }
+    ]
+  }
+}

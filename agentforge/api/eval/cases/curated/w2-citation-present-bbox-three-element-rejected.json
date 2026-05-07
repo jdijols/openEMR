@@ -1,0 +1,23 @@
+{
+  "case_id": "w2-citation-present-bbox-three-element-rejected",
+  "check": "citation_present",
+  "category": "citation_present",
+  "expect_pass_for_eval_report": false,
+  "correlation_id": "eval-w2-citation-present-bbox-three-element",
+  "use_case": "W2 §6 citation contract — adversarial: SourceCitationSchema.bbox is z.tuple([z.number(), z.number(), z.number(), z.number()]) (4 numbers, [x0,y0,x1,y1] normalized 0-1). A 3-element array (regression that swaps tuple-of-4 for an array<number>) breaks the click-to-source bbox overlay; this case asserts the schema rejects it.",
+  "context": {
+    "claims": [
+      {
+        "text": "LDL Cholesterol 158 mg/dL (high)",
+        "citation": {
+          "source_type": "lab_pdf",
+          "source_id": "docref-bad-bbox",
+          "page_or_section": "page 1",
+          "field_or_chunk_id": "results[0]",
+          "quote_or_value": "LDL Cholesterol 158 mg/dL",
+          "bbox": [0.12, 0.34, 0.56]
+        }
+      }
+    ]
+  }
+}

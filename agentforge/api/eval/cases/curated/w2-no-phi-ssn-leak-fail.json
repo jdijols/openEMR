@@ -1,0 +1,11 @@
+{
+  "case_id": "w2-no-phi-ssn-leak-fail",
+  "check": "no_phi_in_logs",
+  "category": "no_phi_in_logs",
+  "expect_pass_for_eval_report": false,
+  "correlation_id": "eval-w2-no-phi-ssn-leak-fail",
+  "use_case": "W2 §12/§13 (S7+S11) — adversarial: a US Social Security Number (XXX-XX-XXXX) leaked into a span body must trip the gate. SSN is the highest-stakes Safe Harbor identifier; any regression that disables the ssn deny-list pattern would let the most sensitive PHI through. rule_holds=false expected.",
+  "context": {
+    "trace_text": "patient demographics persist payload included ssn 123-45-6789 in audit row outcome=ok"
+  }
+}

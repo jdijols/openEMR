@@ -1,0 +1,12 @@
+{
+  "case_id": "w2-fc-reyes-allergies-negative-claim-empty-query",
+  "check": "negative_claim_requires_empty_query",
+  "category": "factually_consistent",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-w2-fc-reyes-allergies-negative-claim",
+  "use_case": "Reyes T2DM follow-up — phone-photo intake form shows allergies section blank (could mean 'none' OR 'patient skipped the field'). Agent says 'no known drug allergies on file'; the negative-statement guard requires that claim to be backed by an actual empty-result lookup against the allergies domain (intake.allergies + chart allergies), not by absence-of-data.",
+  "context": {
+    "negative_claim": true,
+    "backed_by_empty_query": true
+  }
+}

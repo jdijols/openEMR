@@ -1,0 +1,49 @@
+{
+  "case_id": "w2-schema-valid-intake-all-arrays-empty-pass",
+  "check": "schema_valid",
+  "category": "schema_valid",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-w2-schema-valid-intake-all-arrays-empty",
+  "use_case": "W2 §6 — synthetic 'healthy new patient' intake: current_medications=[], allergies=[], family_history=[]. IntakeFormSchema does not require any of these arrays to be non-empty. A regression that adds .min(1) to any one would reject every healthy-cohort intake and silently break the 'no known X' workflow.",
+  "context": {
+    "schema": "intake_form",
+    "extraction": {
+      "document_type": "intake_form",
+      "patient_uuid": "77777777-7777-7777-7777-777777777777",
+      "source_document_id": "docref-healthy-new-patient",
+      "demographics": {
+        "name": null,
+        "dob": null,
+        "sex": "female",
+        "contact_phone": null,
+        "citation": {
+          "source_type": "intake_form",
+          "source_id": "docref-healthy-new-patient",
+          "page_or_section": "Demographics",
+          "field_or_chunk_id": "demographics.sex",
+          "quote_or_value": "Sex: F"
+        }
+      },
+      "chief_concern": {
+        "text": "Annual physical, no acute concerns",
+        "onset": null,
+        "citation": {
+          "source_type": "intake_form",
+          "source_id": "docref-healthy-new-patient",
+          "page_or_section": "Reason for Visit",
+          "field_or_chunk_id": "chief_concern.text",
+          "quote_or_value": "Annual physical, no acute concerns"
+        }
+      },
+      "current_medications": [],
+      "allergies": [],
+      "family_history": [],
+      "extraction_metadata": {
+        "pages_processed": 1,
+        "overall_confidence": "high",
+        "fields_uncertain": [],
+        "fields_unsupported": []
+      }
+    }
+  }
+}

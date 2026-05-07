@@ -1,0 +1,133 @@
+{
+  "case_id": "w2-schema-valid-whitaker-cbc-multi-result-pass",
+  "check": "schema_valid",
+  "category": "schema_valid",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-w2-schema-valid-whitaker-cbc-multi-result",
+  "use_case": "W2 §6 — multi-result CBC panel (Whitaker cohort fixture: Whitaker-James-Lab-CBC.pdf). Exercises array iteration over many LabResult entries; a regression that breaks results[] iteration or rejects panels with >1 result would slip through the single-LDL Chen pass case.",
+  "context": {
+    "schema": "lab_pdf",
+    "extraction": {
+      "document_type": "lab_pdf",
+      "patient_uuid": "22222222-2222-2222-2222-222222222222",
+      "source_document_id": "docref-whitaker-cbc",
+      "ordering_provider": "Donna Lee",
+      "performing_lab": "Quest Diagnostics",
+      "results": [
+        {
+          "test_name": "WBC",
+          "loinc": "6690-2",
+          "value": 5.2,
+          "unit": "10*3/uL",
+          "reference_range_low": 4.0,
+          "reference_range_high": 11.0,
+          "reference_range_text": "4.0-11.0",
+          "collection_date": "2026-04-22",
+          "abnormal_flag": "normal",
+          "citation": {
+            "source_type": "lab_pdf",
+            "source_id": "docref-whitaker-cbc",
+            "page_or_section": "page 1",
+            "field_or_chunk_id": "results[0]",
+            "quote_or_value": "WBC 5.2 10*3/uL"
+          }
+        },
+        {
+          "test_name": "RBC",
+          "loinc": "789-8",
+          "value": 4.1,
+          "unit": "10*6/uL",
+          "reference_range_low": 4.5,
+          "reference_range_high": 5.9,
+          "reference_range_text": "4.5-5.9",
+          "collection_date": "2026-04-22",
+          "abnormal_flag": "low",
+          "citation": {
+            "source_type": "lab_pdf",
+            "source_id": "docref-whitaker-cbc",
+            "page_or_section": "page 1",
+            "field_or_chunk_id": "results[1]",
+            "quote_or_value": "RBC 4.1 10*6/uL"
+          }
+        },
+        {
+          "test_name": "Hemoglobin",
+          "loinc": "718-7",
+          "value": 12.4,
+          "unit": "g/dL",
+          "reference_range_low": 13.5,
+          "reference_range_high": 17.5,
+          "reference_range_text": "13.5-17.5",
+          "collection_date": "2026-04-22",
+          "abnormal_flag": "low",
+          "citation": {
+            "source_type": "lab_pdf",
+            "source_id": "docref-whitaker-cbc",
+            "page_or_section": "page 1",
+            "field_or_chunk_id": "results[2]",
+            "quote_or_value": "Hemoglobin 12.4 g/dL"
+          }
+        },
+        {
+          "test_name": "Hematocrit",
+          "loinc": "4544-3",
+          "value": 37.8,
+          "unit": "%",
+          "reference_range_low": 41.0,
+          "reference_range_high": 53.0,
+          "reference_range_text": "41-53",
+          "collection_date": "2026-04-22",
+          "abnormal_flag": "low",
+          "citation": {
+            "source_type": "lab_pdf",
+            "source_id": "docref-whitaker-cbc",
+            "page_or_section": "page 1",
+            "field_or_chunk_id": "results[3]",
+            "quote_or_value": "Hematocrit 37.8 %"
+          }
+        },
+        {
+          "test_name": "Platelet count",
+          "loinc": "777-3",
+          "value": 218,
+          "unit": "10*3/uL",
+          "reference_range_low": 150,
+          "reference_range_high": 400,
+          "reference_range_text": "150-400",
+          "collection_date": "2026-04-22",
+          "abnormal_flag": "normal",
+          "citation": {
+            "source_type": "lab_pdf",
+            "source_id": "docref-whitaker-cbc",
+            "page_or_section": "page 1",
+            "field_or_chunk_id": "results[4]",
+            "quote_or_value": "Platelets 218 10*3/uL"
+          }
+        },
+        {
+          "test_name": "MCV",
+          "loinc": "787-2",
+          "value": 92.0,
+          "unit": "fL",
+          "reference_range_low": 80.0,
+          "reference_range_high": 100.0,
+          "reference_range_text": "80-100",
+          "collection_date": "2026-04-22",
+          "abnormal_flag": "normal",
+          "citation": {
+            "source_type": "lab_pdf",
+            "source_id": "docref-whitaker-cbc",
+            "page_or_section": "page 1",
+            "field_or_chunk_id": "results[5]",
+            "quote_or_value": "MCV 92.0 fL"
+          }
+        }
+      ],
+      "extraction_metadata": {
+        "pages_processed": 1,
+        "overall_confidence": "high",
+        "fields_uncertain": []
+      }
+    }
+  }
+}

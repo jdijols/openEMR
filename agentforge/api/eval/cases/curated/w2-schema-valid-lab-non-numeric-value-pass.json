@@ -1,0 +1,61 @@
+{
+  "case_id": "w2-schema-valid-lab-non-numeric-value-pass",
+  "check": "schema_valid",
+  "category": "schema_valid",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-w2-schema-valid-lab-non-numeric-value",
+  "use_case": "W2 §6 — synthetic urinalysis edge: qualitative result with string value (\"Negative\"). LabResultSchema.value is z.union([number, string]); a regression that narrows to number-only would reject every UA / occult-blood / pregnancy-test style result.",
+  "context": {
+    "schema": "lab_pdf",
+    "extraction": {
+      "document_type": "lab_pdf",
+      "patient_uuid": "44444444-4444-4444-4444-444444444444",
+      "source_document_id": "docref-ua-qualitative",
+      "ordering_provider": "Donna Lee",
+      "performing_lab": "In-Office Lab",
+      "results": [
+        {
+          "test_name": "Urine leukocyte esterase",
+          "loinc": "5799-2",
+          "value": "Negative",
+          "unit": null,
+          "reference_range_low": null,
+          "reference_range_high": null,
+          "reference_range_text": "Negative",
+          "collection_date": "2026-04-30",
+          "abnormal_flag": "normal",
+          "citation": {
+            "source_type": "lab_pdf",
+            "source_id": "docref-ua-qualitative",
+            "page_or_section": "page 1",
+            "field_or_chunk_id": "results[0]",
+            "quote_or_value": "Leukocyte esterase: Negative"
+          }
+        },
+        {
+          "test_name": "Urine nitrites",
+          "loinc": "5802-4",
+          "value": "Negative",
+          "unit": null,
+          "reference_range_low": null,
+          "reference_range_high": null,
+          "reference_range_text": "Negative",
+          "collection_date": "2026-04-30",
+          "abnormal_flag": "normal",
+          "citation": {
+            "source_type": "lab_pdf",
+            "source_id": "docref-ua-qualitative",
+            "page_or_section": "page 1",
+            "field_or_chunk_id": "results[1]",
+            "quote_or_value": "Nitrites: Negative"
+          }
+        }
+      ],
+      "extraction_metadata": {
+        "pages_processed": 1,
+        "overall_confidence": "high",
+        "fields_uncertain": []
+      }
+    }
+  }
+}

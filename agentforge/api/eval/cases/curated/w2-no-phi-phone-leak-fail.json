@@ -1,0 +1,11 @@
+{
+  "case_id": "w2-no-phi-phone-leak-fail",
+  "check": "no_phi_in_logs",
+  "category": "no_phi_in_logs",
+  "expect_pass_for_eval_report": false,
+  "correlation_id": "eval-w2-no-phi-phone-leak-fail",
+  "use_case": "W2 §12/§13 (S7+S11) — adversarial: a US phone number (NNN-NNN-NNNN) leaked into a span body must trip the gate. Phones are likely to leak via the demographics.contact_phone field of the intake form. rule_holds=false expected.",
+  "context": {
+    "trace_text": "intake_extract output demographics.contact_phone 555-123-4567 sex female"
+  }
+}

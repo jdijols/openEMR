@@ -1,0 +1,32 @@
+{
+  "case_id": "w2-citation-present-openemr-record-source-pass",
+  "check": "citation_present",
+  "category": "citation_present",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-w2-citation-present-openemr-record-source",
+  "use_case": "W2 §6 citation contract — claims that cite chart-mode facts use source_type 'openemr_record' (the 4th valid enum, alongside lab_pdf, intake_form, guideline_chunk). Today's citation_present cases exercise lab_pdf and guideline_chunk only; this closes the chart-mode gap. A regression that drops 'openemr_record' from the enum would silently break every W1 chart-fact citation.",
+  "context": {
+    "claims": [
+      {
+        "text": "Patient has an active prescription for lisinopril 20 mg daily",
+        "citation": {
+          "source_type": "openemr_record",
+          "source_id": "uuid-prescription-row-1",
+          "page_or_section": "Medications (active)",
+          "field_or_chunk_id": "prescriptions.row.1",
+          "quote_or_value": "lisinopril 20 mg PO daily — active"
+        }
+      },
+      {
+        "text": "Most recent BP measurement is 142/88 from 2026-04-22",
+        "citation": {
+          "source_type": "openemr_record",
+          "source_id": "uuid-vitals-row-9",
+          "page_or_section": "Vitals (most recent)",
+          "field_or_chunk_id": "vitals.row.9",
+          "quote_or_value": "BP 142/88"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "case_id": "w2-fc-whitaker-warfarin-strength-mismatch-warned",
+  "check": "conflicting_medication_records_warned",
+  "category": "factually_consistent",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-w2-fc-whitaker-warfarin-strength-mismatch",
+  "use_case": "Whitaker AFib — chart shows warfarin 5 mg as the active prescription; intake form (Whitaker-James-Intake-Form.pdf) lists 'warfarin 2.5 mg daily' under current medications. Verification layer must surface a med_status_conflict warning so the clinician reconciles dose before answering 'is his INR appropriately controlled?'.",
+  "context": {
+    "medication_rows": [
+      {
+        "drug": "warfarin",
+        "status": "active",
+        "cite": "openemr_record:rx-warfarin-5mg-active"
+      },
+      {
+        "drug": "warfarin",
+        "status": "discontinued",
+        "cite": "openemr_record:rx-warfarin-prior-discontinued"
+      }
+    ],
+    "blocks": [
+      {
+        "type": "warning",
+        "category": "med_status_conflict",
+        "message": "Warfarin appears in two source rows with different statuses (5 mg active vs prior 2.5 mg discontinued). Verify dose with patient before relying on chronic-use language."
+      },
+      {
+        "type": "claim",
+        "text": "Warfarin 5 mg is the currently active prescription on the chart.",
+        "cite": [
+          "openemr_record:rx-warfarin-5mg-active"
+        ]
+      }
+    ]
+  }
+}

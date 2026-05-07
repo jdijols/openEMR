@@ -1,0 +1,43 @@
+{
+  "case_id": "w2-schema-valid-lab-pages-processed-zero-rejected",
+  "check": "schema_valid",
+  "category": "schema_valid",
+  "expect_pass_for_eval_report": false,
+  "correlation_id": "eval-w2-schema-valid-lab-pages-processed-zero",
+  "use_case": "W2 §6 — adversarial: extraction_metadata.pages_processed must be a positive integer (z.number().int().positive()). A regression that defaults pages_processed to 0 (e.g., the worker forgets to set it) must be caught at the schema layer; rule_holds=false expected.",
+  "context": {
+    "schema": "lab_pdf",
+    "extraction": {
+      "document_type": "lab_pdf",
+      "patient_uuid": "55555555-5555-5555-5555-555555555555",
+      "source_document_id": "docref-zero-pages",
+      "ordering_provider": "Donna Lee",
+      "performing_lab": "LabCorp",
+      "results": [
+        {
+          "test_name": "LDL",
+          "loinc": null,
+          "value": 158,
+          "unit": "mg/dL",
+          "reference_range_low": null,
+          "reference_range_high": 100,
+          "reference_range_text": "<100",
+          "collection_date": "2026-04-30",
+          "abnormal_flag": "high",
+          "citation": {
+            "source_type": "lab_pdf",
+            "source_id": "docref-zero-pages",
+            "page_or_section": "page 1",
+            "field_or_chunk_id": "results[0]",
+            "quote_or_value": "LDL Cholesterol 158 mg/dL"
+          }
+        }
+      ],
+      "extraction_metadata": {
+        "pages_processed": 0,
+        "overall_confidence": "high",
+        "fields_uncertain": []
+      }
+    }
+  }
+}

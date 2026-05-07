@@ -1,0 +1,11 @@
+{
+  "case_id": "w2-fc-whitaker-bp-only-diastolic-uncertain",
+  "check": "vitals_parser_uncertain_not_guess",
+  "category": "factually_consistent",
+  "expect_pass_for_eval_report": true,
+  "correlation_id": "eval-w2-fc-whitaker-bp-only-diastolic",
+  "use_case": "Whitaker AFib follow-up — intake form lists BP as '/82' (systolic illegible / cropped on phone-photo edge). Vitals parser must report 'uncertain' and surface a chart-binding gap rather than silently guess a systolic value. Without this, downstream guideline retrieval ('JNC8 hypertension threshold') would key off a fabricated BP.",
+  "context": {
+    "parser_output": "uncertain"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "case_id": "w2-schema-valid-lab-abnormal-flag-out-of-enum-rejected",
+  "check": "schema_valid",
+  "category": "schema_valid",
+  "expect_pass_for_eval_report": false,
+  "correlation_id": "eval-w2-schema-valid-lab-abnormal-flag-out-of-enum",
+  "use_case": "W2 §6 — adversarial: abnormal_flag is a closed 7-value enum ('normal'|'low'|'high'|'critical_low'|'critical_high'|'abnormal'|'unknown'). A VLM-hallucinated value like 'elevated' (common natural-language drift) must be rejected; a regression that loosens to z.string() would let unbounded VLM output through.",
+  "context": {
+    "schema": "lab_pdf",
+    "extraction": {
+      "document_type": "lab_pdf",
+      "patient_uuid": "66666666-6666-6666-6666-666666666666",
+      "source_document_id": "docref-bad-flag",
+      "ordering_provider": "Donna Lee",
+      "performing_lab": "LabCorp",
+      "results": [
+        {
+          "test_name": "LDL",
+          "loinc": null,
+          "value": 158,
+          "unit": "mg/dL",
+          "reference_range_low": null,
+          "reference_range_high": 100,
+          "reference_range_text": "<100",
+          "collection_date": "2026-04-30",
+          "abnormal_flag": "elevated",
+          "citation": {
+            "source_type": "lab_pdf",
+            "source_id": "docref-bad-flag",
+            "page_or_section": "page 1",
+            "field_or_chunk_id": "results[0]",
+            "quote_or_value": "LDL Cholesterol 158 mg/dL"
+          }
+        }
+      ],
+      "extraction_metadata": {
+        "pages_processed": 1,
+        "overall_confidence": "high",
+        "fields_uncertain": []
+      }
+    }
+  }
+}
