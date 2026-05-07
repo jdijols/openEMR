@@ -345,7 +345,7 @@ sequenceDiagram
 
 ## 5. Extraction architecture
 
-The `intake_extractor` worker is the most novel W2 component. It lives in a single TypeScript file at `agentforge/api/src/workers/intake_extractor.ts` (TBD path) and is invoked by the supervisor as a typed tool.
+The `intake_extractor` worker is the most novel W2 component. It lives in a single TypeScript file at [`agentforge/api/src/workers/intake_extractor.ts`](agentforge/api/src/workers/intake_extractor.ts) and is invoked by the supervisor as a typed tool.
 
 ### Tool surface (brief-compliant)
 
@@ -561,7 +561,7 @@ export const IntakeFormSchema = z.object({
 
 ### Validation tests (required brief deliverable)
 
-Tests live at `agentforge/api/test/schemas/extraction.test.ts` (TBD). At minimum:
+Tests live at [`agentforge/api/test/schemas/extraction.test.ts`](agentforge/api/test/schemas/extraction.test.ts). At minimum:
 
 1. **Round-trip test:** valid sample object parses successfully and re-serializes identically.
 2. **Required-field test:** missing `citation` on any result fails parsing.
@@ -705,7 +705,7 @@ CREATE INDEX rag_chunks_text_search_idx ON rag_chunks USING gin (text_search);
 At deploy time (or on-demand via `npm run rag-index`):
 
 ```bash
-# Pseudocode — actual at agentforge/api/scripts/build-rag-index.ts (TBD)
+# Pseudocode — actual at agentforge/api/scripts/build-rag-index.mjs (shipped 2026-05-05; .mjs because the script is run directly via `node`, not transpiled)
 1. Parse each guideline source (markdown / PDF) into ~200-400-word chunks
 2. For each chunk:
    - Generate embedding with bge-small (384-dim, in-process)
@@ -937,15 +937,15 @@ When `intake_extractor` finishes for an `intake_form` document, the agent emits 
 
 **Final behavior (Sunday):** **per-field edit before confirm**. Each section gains a small pencil icon → row becomes editable in place. Physician corrects any wrong value (extraction said "Mertformin" instead of "Metformin"; sex looked uncertain; etc.), then confirms. Confirmation submits the (possibly edited) values to the appropriate W2 write tools (see §10).
 
-**On confirm**, the card dispatches to write tools per section:
+**On confirm**, the card *will* dispatch to write tools per section. **Status as of 2026-05-06: cut tier 4** — the W2 write tools (medications, family_history, demographics) and the dispatch wiring are deferred. The MVP UX ("Captured. Chart writes scheduled for next iteration.") is preserved as an honest deferral. See [`TASKS.md`](TASKS.md) G2-Early-20..27 cut block for rationale + re-opening conditions.
 
-| Card section            | Tool invoked per row                                                                                              |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Demographics            | `propose_demographics_update` (Final-only — deferred from MVP)                                                    |
-| Chief concern           | `propose_chief_complaint` (W1, existing)                                                                          |
-| Current medications     | `propose_medication_add` (NEW W2 — Early gate)                                                                    |
-| Allergies               | `propose_allergy` action=`add` (W1, existing — extended with `propose_allergy_delete` NEW for corrections)        |
-| Family history          | `propose_family_history_add` (NEW W2 — Early gate)                                                                |
+| Card section            | Tool invoked per row                                                                                              | Status |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------- | ------ |
+| Demographics            | `propose_demographics_update`                                                                                     | **CUT tier 2 (2026-05-06)** |
+| Chief concern           | `propose_chief_complaint` (W1, existing — would be wired by G2-Early-26)                                          | **CUT tier 4** (dispatch deferred) |
+| Current medications     | `propose_medication_add` (NEW W2)                                                                                 | **CUT tier 4** |
+| Allergies               | `propose_allergy` action=`add` (W1, existing) + `propose_allergy_delete` (NEW W2 for corrections)                 | **CUT tier 4** (W1 add path exists; dispatch + delete cut) |
+| Family history          | `propose_family_history_add` (NEW W2)                                                                             | **CUT tier 4** |
 
 If any individual write fails, the whole confirm reports a partial-failure state with which rows succeeded; the physician can retry the failed rows without re-uploading the form.
 
@@ -1022,28 +1022,28 @@ Lab results map directly. Intake-derived facts map per the W1 patterns:
 | `abnormal_flag`                              | `interpretation` (mapped to FHIR coded values)   |
 | `citation.source_id` (DocRef UUID)           | `derivedFrom[0].reference`                       |
 
-| Source field (intake_form)                                                        | Persistence target                                                       | Triggered by                                          |
-| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------- |
-| `current_medications[]`                                                           | OpenEMR `lists` table, `type='medication'`, `pid`, `derivedFrom` linkage | `propose_medication_add` (NEW W2)                     |
-| `allergies[]`                                                                     | OpenEMR `lists` table, `type='allergy'`                                  | `propose_allergy` add/update (W1) + `propose_allergy_delete` (NEW W2 corrections) |
-| `family_history[]`                                                                | OpenEMR `history_data` table fields                                      | `propose_family_history_add` (NEW W2)                 |
-| `chief_concern.text`                                                              | `forms_misc_billing_options.encounter_reason`                            | `propose_chief_complaint` (W1, existing)              |
-| `demographics.*`                                                                  | OpenEMR `patient_data` table                                             | `propose_demographics_update` (Final-only — deferred from MVP) |
+| Source field (intake_form)                                                        | Persistence target                                                       | Triggered by                                          | Status |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------- | ------ |
+| `current_medications[]`                                                           | OpenEMR `lists` table, `type='medication'`, `pid`, `derivedFrom` linkage | `propose_medication_add` (NEW W2)                     | **CUT tier 4 (2026-05-06)** |
+| `allergies[]`                                                                     | OpenEMR `lists` table, `type='allergy'`                                  | `propose_allergy` add/update (W1) + `propose_allergy_delete` (NEW W2 corrections) | W1 add path exists; W2 delete + dispatch CUT tier 4 |
+| `family_history[]`                                                                | OpenEMR `history_data` table fields                                      | `propose_family_history_add` (NEW W2)                 | **CUT tier 4** |
+| `chief_concern.text`                                                              | `forms_misc_billing_options.encounter_reason`                            | `propose_chief_complaint` (W1, existing)              | W1 path exists; W2 dispatch CUT tier 4 |
+| `demographics.*`                                                                  | OpenEMR `patient_data` table                                             | `propose_demographics_update`                         | **CUT tier 2** |
 
-All persistence is gated by the **intake form proposal card** (§9) — physician confirms before any of these writes fire.
+All persistence is gated by the **intake form proposal card** (§9) — physician confirms before any of these writes fire. **As of the 2026-05-06 cut, none of these dispatches are live; the IntakeProposalCard logs intent + transitions UI state without persisting to the chart.**
 
 ### W2 write-tool inventory (additions to W1's 8)
 
-W1 shipped 8 propose-* tools; W2 adds 4 at the **Early gate**, 1 at the **Final gate**, and 1 utility tool. Each follows the W1 contract: typed Zod schema, GACL gate (`agentforge/propose_write`), active-chart binding check, audit row with `log_from='agent'`.
+W1 shipped 8 propose-* tools; W2 *would have* added 4 at the **Early gate**, 1 at the **Final gate**, and 1 utility tool. Each was designed to follow the W1 contract: typed Zod schema, GACL gate (`agentforge/propose_write`), active-chart binding check, audit row with `log_from='agent'`. **As of 2026-05-06 the entire W2 write-tool inventory is CUT to tier 4** ([`TASKS.md`](TASKS.md) G2-Early-20..27 cut block) — the table below is preserved as the design contract for re-opening conditions.
 
-| Tool                              | Gate    | Purpose                                                                                                       |
-| --------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------- |
-| `propose_medication_add`          | Early   | Add a new medication to the chart (from intake form `current_medications[]`).                                  |
-| `propose_medication_discontinue`  | Early   | Mark an existing chart medication as discontinued (med-rec workflow: patient stopped taking).                  |
-| `propose_allergy_delete`          | Early   | Soft-delete a charted allergy (correction; rare but needed when intake reveals a wrongly-recorded allergy).    |
-| `propose_family_history_add`      | Early   | Add a family history entry (from intake `family_history[]`).                                                   |
-| `propose_demographics_update`     | Final   | Partial update to demographics (intake-vs-chart name/DOB/contact reconciliation). **Deferred from MVP.**       |
-| `delete_uploaded_document`        | Early   | Recovery path — soft-deletes a `DocumentReference` and cascades soft-delete to derived Observations. Replaces per-tool lab UPDATE/DELETE. |
+| Tool                              | Gate    | Purpose                                                                                                       | Status (2026-05-06) |
+| --------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------- | ------------------- |
+| `propose_medication_add`          | Early   | Add a new medication to the chart (from intake form `current_medications[]`).                                  | **CUT tier 4** |
+| `propose_medication_discontinue`  | Early   | Mark an existing chart medication as discontinued (med-rec workflow: patient stopped taking).                  | **CUT tier 4** |
+| `propose_allergy_delete`          | Early   | Soft-delete a charted allergy (correction; rare but needed when intake reveals a wrongly-recorded allergy).    | **CUT tier 4** |
+| `propose_family_history_add`      | Early   | Add a family history entry (from intake `family_history[]`).                                                   | **CUT tier 4** |
+| `propose_demographics_update`     | Final   | Partial update to demographics (intake-vs-chart name/DOB/contact reconciliation).                              | **CUT tier 2** |
+| `delete_uploaded_document`        | Early   | Recovery path — soft-deletes a `DocumentReference` and cascades soft-delete to derived Observations. Replaces per-tool lab UPDATE/DELETE. | **CUT tier 4** |
 
 ### What we explicitly do NOT do
 
@@ -1142,14 +1142,16 @@ Three new check implementations to build. The 39 existing W1 cases are re-tagged
 
 ### 50-case composition
 
-| Category               | Count | Coverage                                                                                                                  |
-| ---------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------- |
-| `schema_valid`         | 10    | 5 lab_pdf + 5 intake_form: well-formed, partial (missing optional fields), adversarial (extra unknown fields), edge (null where required) |
-| `citation_present`     | 10    | Extraction outputs missing citation; chat answers asserting clinical facts without source; guideline retrievals returning chunks without source_url |
-| `factually_consistent` | 12    | Existing 4 + extraction faithfulness (verbatim quote check passes/fails); retrieval-grounding-vs-LLM-paraphrase; med-status conflict; range plausibility |
-| `safe_refusal`         | 10    | Existing 6 + 4 doc-related: wrong patient match, blank PDF, garbage scan, wrong doc_type passed                          |
-| `no_phi_in_logs`       | 8     | PHI smuggled into prompts; tool inputs containing names/MRN/DOB; retrieved chunks containing patient identifiers; extraction text leaking through to span body |
-| **Total**              | **50** |                                                                                                                          |
+| Category               | Originally targeted | **Actually shipped (2026-05-06)** | Coverage |
+| ---------------------- | ------------------- | --------------------------------- | -------- |
+| `schema_valid`         | 10                  | **4**                             | 2 lab_pdf + 2 intake_form: §6-valid pass + missing-required reject + §6-valid intake pass + empty-quote reject. |
+| `citation_present`     | 10                  | **4**                             | Extraction-claims pass, guideline-claim pass, missing-citation fail, malformed-source-type fail. |
+| `factually_consistent` | 12                  | **4**                             | All existing W1 cases (`vitals_parser_uncertain_not_guess`, `negative_claim_requires_empty_query` ×2, `conflicting_medication_records_warned`). |
+| `safe_refusal`         | 10                  | **35**                            | All remaining 7 W1 deterministic refusal rules (no_write_without_confirm, unsupported_write, cross_patient, internal_disclosure, all_domains_unavailable, provider_timeout, constraint_boundary describes-vs-recommends). W1 over-indexed on this category. |
+| `no_phi_in_logs`       | 8                   | **3**                             | Clean trace pass, MRN-leak fail, cohort-name-leak fail. |
+| **Total**              | **50**              | **50**                            | |
+
+**Note on the composition asymmetry (2026-05-06):** the spec called for an equal-ish split (10/10/12/10/8). What shipped is heavier on `safe_refusal` (35 vs target 10) because all 35 W1 deterministic refusal rules naturally bucket under it; dropping any to hit the target count would have lost coverage. The new W2 categories (`schema_valid`, `citation_present`, `no_phi_in_logs`) came in lean (4/4/3) — small categories are MORE sensitive to single-case regressions, which is the correct shape for a regression-detection gate (one failure = ~25-33pp drop, well past the 5pp regression cap and below the 95% absolute floor). The brief's "boolean rubric categories must include schema_valid, citation_present, factually_consistent, safe_refusal, and no_phi_in_logs" requirement is satisfied — all 5 are present and gateable.
 
 ### Rubric format
 
@@ -1285,7 +1287,7 @@ The three new fields are wired into the existing `recordToolCall` / `recordEvent
 
 ### Cost report (deliverable per brief)
 
-`Documentation/AgentForge/implementation/w2-cost-latency-report.md` (TBD) ships at Final gate with:
+[`Documentation/AgentForge/implementation/w2-cost-latency-report.md`](Documentation/AgentForge/implementation/w2-cost-latency-report.md) (shipped 2026-05-06; operator data-fill pending per the doc's §8 checklist) ships at Final gate with:
 
 1. **Actual dev spend** — Anthropic + Cohere across the W2 build window. Pulled from Langfuse cost tracking + Cohere billing dashboard.
 2. **Projected production cost** at 100 / 1K / 10K physician scale, extending the W1 [`COSTS.md`](COSTS.md) methodology with new line items for document extraction (~$0.005-$0.010 per extraction, projected 10 extractions/physician/day) and rerank (~$0.001/query).
@@ -1398,23 +1400,27 @@ Final due **Sunday 2026-05-10 12:00 PM CT**.
 
 ### Early Submission scope (Thursday — deployed + eval gate live)
 
+> **Status as of 2026-05-06 EOD:** code-side scope shipped + green; deploy + demo-video pending operator. Strikethrough = cut to tier 4 per [`TASKS.md`](TASKS.md) cut-tier matrix on 2026-05-06.
+
 - ✅ Supervisor refactor with explicit handoff Langfuse spans (routing rationale recorded)
-- ✅ 4 new write tools live: `propose_medication_add`, `propose_medication_discontinue`, `propose_allergy_delete`, `propose_family_history_add` + `delete_uploaded_document` recovery tool
-- ✅ Intake proposal card dispatches per-section to the new write tools on confirm
-- ✅ 50-case eval suite: 39 W1 cases retagged into W2 categories + 11 new (covering extraction, retrieval, refusal-on-doc-edge-cases, PHI-in-logs scans, new write tools)
-- ✅ PR-blocking CI: Git Hook (pre-commit/pre-push) + GitHub Actions, both consulting `agentforge/api/eval/baseline.json`, fail on >5pp regression or sub-95% absolute
-- ✅ VPS deployment refreshed
-- ✅ Demo video v1 (rough cut, ~3-5 min)
+- ~~Four new write tools live: `propose_medication_add`, `propose_medication_discontinue`, `propose_allergy_delete`, `propose_family_history_add` + `delete_uploaded_document` recovery tool~~ — **CUT tier 4 (2026-05-06)** to preserve capacity for incoming Sunday-deadline scope expansion. Brief MUST set is satisfied without these. Existing IntakeProposalCard UX ("Captured. Chart writes scheduled for next iteration.") is an honest deferral. Lab Observation round-trip already works via G2-MVP-25 ObservationWriter. See [`TASKS.md` G2-Early-20..27 cut block](TASKS.md) for full rationale.
+- ~~Intake proposal card dispatches per-section to the new write tools on confirm~~ — **CUT tier 4** (depends on the cut write tools above). Confirm continues to log intent + transition UI state, no chart write.
+- ✅ 50-case eval suite: 39 W1 cases retagged into W2 categories + 11 new (covering extraction validation, citation contracts, PHI-in-logs scans). Final per-category counts: schema_valid 4, citation_present 4, factually_consistent 4, safe_refusal 35, no_phi_in_logs 3 = 50 total.
+- ✅ PR-blocking CI: pre-push hook (`.pre-commit-config.yaml`) + GitHub Actions (`.github/workflows/agentforge-eval.yml`), both consulting [`agentforge/api/eval/baseline.json`](agentforge/api/eval/baseline.json), fail on >5pp regression or sub-95% absolute. Self-injection dry-run rehearsal verified end-to-end (G2-Early-42).
+- ⏸ VPS deployment refreshed — **operator (post-2026-05-06 session)**
+- ⏸ Demo video v1 (rough cut, ~3-5 min) — **operator**
 
 ### Final scope (Sunday — production-ready submission)
 
-- ✅ Per-field edit on the intake proposal card (pencil icon → editable rows → confirm)
-- ✅ `propose_demographics_update` tool live (intake-form-vs-chart name/DOB reconciliation)
-- ✅ Saturday self-injection rehearsal completed; evidence (failing CI screenshots) included in submission
-- ✅ Cost & latency report: actual dev spend, projected at 100/1K/10K physician scale, p50/p95 turn latency, bottleneck analysis
-- ✅ Demo video final cut (~3-5 min)
-- ✅ This `W2_ARCHITECTURE.md` final pass (any post-implementation drift reconciled)
-- ✅ Interview-ready: can speak to every architectural decision in this doc with reasoning grounded in the brief, the audit, and the probe
+> **Status:** code-side scope re-scoped on 2026-05-06 — see strikethroughs.
+
+- ~~Per-field edit on the intake proposal card (pencil icon → editable rows → confirm)~~ — **CUT tier 1** (depends on G2-Early-26 dispatch, which is cut).
+- ~~`propose_demographics_update` tool live (intake-form-vs-chart name/DOB reconciliation)~~ — **CUT tier 2** (matrix authorizes deferring to post-W2).
+- ⏸ Saturday self-injection rehearsal completed; evidence (failing CI screenshots) included in submission — **operator-attended (Saturday 2026-05-09)**. Dry-run already verified at G2-Early-42.
+- ✅ Cost & latency report: doc skeleton + analysis written; operator data-fill pending per the doc's §8 checklist
+- ⏸ Demo video final cut (~3-5 min) — **operator**
+- ✅ This `W2_ARCHITECTURE.md` final pass (post-implementation drift reconciled 2026-05-06)
+- ⏸ Interview-ready: can speak to every architectural decision in this doc with reasoning grounded in the brief, the audit, and the probe — **continuous**
 
 Day-by-day work plan with task IDs and acceptance tests lives in [`TASKS.md`](TASKS.md), gated by the above.
 
