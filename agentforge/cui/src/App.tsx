@@ -775,8 +775,19 @@ export default function App(): ReactElement {
       // Already refreshing — let the in-flight one finish.
       return;
     }
+    // P5 fix (Bug B, fourth pass / 2026-05-07 polish): do NOT set briefStatus
+    // to 'loading' on refresh. That state drives the "Preparing case
+    // presentation…" hint (line 955), which is appropriate for the first-load
+    // path (when there's nothing in messages yet) but reads as
+    // "we're throwing the existing brief away" on a refresh, where the brief
+    // is already visible in the thread. Refresh updates the message in-place
+    // when the fetch resolves; the brief content's change IS the visual
+    // signal. On error we also do NOT flip briefStatus to 'failed' — the
+    // existing brief is still valid and useful, refreshing failed silently
+    // is the correct degradation. briefInFlightRef is the only reentry
+    // guard needed; briefStatus stays in whatever success/cached state it
+    // was already in.
     briefInFlightRef.current = true;
-    setBriefStatus({ kind: 'loading' });
     void (async () => {
       try {
         const out = await postPresentPatient(apiBase, handshake.sessionToken, patientUuid, true);
@@ -797,9 +808,11 @@ export default function App(): ReactElement {
           return [fresh, ...prev];
         });
         writeCachedBrief(patientUuid, { blocks: out.blocks, citation_navigation: out.citation_navigation });
-        setBriefStatus({ kind: 'success' });
-      } catch (err) {
-        setBriefStatus({ kind: 'failed', error: toDeliveryFailure(err) });
+      } catch {
+        // Silent fail — the existing brief in `messages` stays put, so the
+        // user keeps a usable rail. They can click refresh again or check
+        // network. We don't surface a "failed" banner because that would
+        // cover the still-valid brief beneath it.
       } finally {
         briefInFlightRef.current = false;
       }
