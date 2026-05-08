@@ -63,6 +63,13 @@ export type PersistenceOutcome = {
   readonly failed: number;
   /** Set when the verification gate skipped persistence (S14). */
   readonly skipped_reason?: 'cross_check_failed' | 'schema_invalid' | 'not_lab_pdf' | 'no_persister';
+  /**
+   * On a `partial` cross-check the gate persists only the verified
+   * subset. This counter reports how many result rows were dropped on
+   * the floor — used by the chat layer to surface a soft "wrote N of
+   * M; M-N need review" status instead of a hard refusal.
+   */
+  readonly rows_dropped_unverified?: number;
 };
 
 export type AttachAndExtractOutput =
@@ -274,13 +281,20 @@ function summarizeExtractionConfidence(
  *
  *   - Only `lab_pdf` extractions persist (intake_form takes the W1 propose-write path).
  *   - Schema must be valid (otherwise no extraction shape to write).
- *   - PDF cross-check must be `verified` (S14 — facts whose `quote_or_value`
- *     was not present in the source PDF text MUST NOT persist).
+ *   - Cross-check status decides which rows persist:
+ *       - `verified`        — every quote located in the PDF text layer; persist all rows.
+ *       - `not_applicable`  — PNG/JPG upload or image-only PDF (no usable
+ *                             text layer); vision is the only OCR source,
+ *                             persist all rows.
+ *       - `partial`         — some rows verified, some not; persist only
+ *                             the verified rows (S14: rows whose
+ *                             `quote_or_value` was not located in the
+ *                             source PDF text MUST NOT persist). The
+ *                             chat layer surfaces a soft "wrote N of M"
+ *                             status instead of a hard refusal.
+ *       - `unverified`      — text layer present but ZERO matches; the
+ *                             real hallucination case. Refuses.
  *   - Persister must be wired (no-op when absent — keeps test paths simple).
- *
- * Per-row failures are aggregated into the persistence outcome; the worker's
- * span and the chat-side refusal copy use `skipped_reason` to explain to the
- * reviewer why no rows landed.
  */
 async function maybePersistObservations(
   input: AttachAndExtractInput,
@@ -293,19 +307,37 @@ async function maybePersistObservations(
   if (!result.schemaValid || result.extraction === null) {
     return { attempted: false, inserted: 0, updated: 0, failed: 0, skipped_reason: 'schema_invalid' };
   }
-  if (result.crossCheckStatus !== 'verified') {
-    // S14 / FB-B-02 — unverified facts MUST NOT persist. The orchestrator
-    // synthesizes a user-facing refusal block from this signal.
+  if (result.extraction.document_type !== 'lab_pdf') {
+    // Defensive: schema-valid + lab_pdf doc_type should match, but if the
+    // shape disagrees (impossible after Zod parse), treat as schema_invalid.
+    return { attempted: false, inserted: 0, updated: 0, failed: 0, skipped_reason: 'schema_invalid' };
+  }
+  if (result.crossCheckStatus === 'unverified') {
+    // S14 / FB-B-02 — text layer present, zero matches. Most likely a
+    // hallucination — the LLM emitted values that aren't in the source
+    // at all. The orchestrator synthesizes a user-facing refusal from
+    // this signal.
     return { attempted: false, inserted: 0, updated: 0, failed: 0, skipped_reason: 'cross_check_failed' };
   }
   if (deps.persistObservations === undefined) {
     return { attempted: false, inserted: 0, updated: 0, failed: 0, skipped_reason: 'no_persister' };
   }
 
-  if (result.extraction.document_type !== 'lab_pdf') {
-    // Defensive: schema-valid + lab_pdf doc_type should match, but if the
-    // shape disagrees (impossible after Zod parse), treat as schema_invalid.
-    return { attempted: false, inserted: 0, updated: 0, failed: 0, skipped_reason: 'schema_invalid' };
+  // Decide which rows to persist. `verified` and `not_applicable` write
+  // every row. `partial` filters down to the verified subset; if for
+  // some reason no rows were verified (only non-row citations like
+  // `interpretive_comments` matched), treat as a hallucination and
+  // refuse rather than persisting nothing silently.
+  const allResults = result.extraction.results;
+  let rowsToPersistIndices: ReadonlyArray<number>;
+  if (result.crossCheckStatus === 'partial') {
+    rowsToPersistIndices = result.verifiedResultIndices;
+    if (rowsToPersistIndices.length === 0) {
+      return { attempted: false, inserted: 0, updated: 0, failed: 0, skipped_reason: 'cross_check_failed' };
+    }
+  } else {
+    // verified or not_applicable
+    rowsToPersistIndices = allResults.map((_, i) => i);
   }
 
   // Strip the per-result `citation` envelope before persistence — citations
@@ -313,17 +345,22 @@ async function maybePersistObservations(
   // them into the Observation row body bloats storage and risks PHI in
   // payload bodies (S11 deny-list applies to spans, not row bodies, but
   // the principle is the same: minimum payload surface).
-  const rows = result.extraction.results.map((r) => ({
-    test_name: r.test_name,
-    loinc: r.loinc,
-    value: r.value,
-    unit: r.unit,
-    reference_range_low: r.reference_range_low,
-    reference_range_high: r.reference_range_high,
-    reference_range_text: r.reference_range_text,
-    collection_date: r.collection_date,
-    abnormal_flag: r.abnormal_flag,
-  }));
+  const rows = rowsToPersistIndices.map((idx) => {
+    const r = allResults[idx]!;
+    return {
+      test_name: r.test_name,
+      loinc: r.loinc,
+      value: r.value,
+      unit: r.unit,
+      reference_range_low: r.reference_range_low,
+      reference_range_high: r.reference_range_high,
+      reference_range_text: r.reference_range_text,
+      collection_date: r.collection_date,
+      abnormal_flag: r.abnormal_flag,
+    };
+  });
+
+  const rowsDroppedUnverified = allResults.length - rows.length;
 
   try {
     const out = await deps.persistObservations({
@@ -336,6 +373,7 @@ async function maybePersistObservations(
       inserted: out.inserted,
       updated: out.updated,
       failed: out.failed,
+      ...(rowsDroppedUnverified > 0 ? { rows_dropped_unverified: rowsDroppedUnverified } : {}),
     };
   } catch (e) {
     console.error('attach_and_extract_persistence_threw', {
@@ -343,6 +381,12 @@ async function maybePersistObservations(
       docref_uuid_prefix: input.docref_uuid.slice(0, 8),
       error_name: e instanceof Error ? e.name : 'unknown',
     });
-    return { attempted: true, inserted: 0, updated: 0, failed: rows.length };
+    return {
+      attempted: true,
+      inserted: 0,
+      updated: 0,
+      failed: rows.length,
+      ...(rowsDroppedUnverified > 0 ? { rows_dropped_unverified: rowsDroppedUnverified } : {}),
+    };
   }
 }

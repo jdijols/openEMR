@@ -47,6 +47,15 @@ export type IntakeExtractorResult = {
   readonly factsTotal: number;
   readonly factsVerified: number;
   readonly factsUnverified: number;
+  /**
+   * For lab PDFs only: indices into `extraction.results` whose citation
+   * `quote_or_value` was located in the PDF text layer. Used by the
+   * persistence gate for per-row partial writes — when cross-check is
+   * `partial`, only these rows persist, and the rest are dropped (S14).
+   * Empty for intake_form, image inputs, and the `not_applicable` /
+   * `unverified` branches where the full-row decision is made elsewhere.
+   */
+  readonly verifiedResultIndices: ReadonlyArray<number>;
   readonly metadata: {
     readonly mime: string;
     readonly docType: 'lab_pdf' | 'intake_form';
@@ -163,27 +172,54 @@ export async function runIntakeExtractor(
       factsTotal: 0,
       factsVerified: 0,
       factsUnverified: 0,
+      verifiedResultIndices: [],
       metadata: { mime: input.mimeType, docType: input.docType, inputTokens, outputTokens },
     };
   }
 
   // PDF deterministic cross-check (S14).
+  //
+  // Two PDF realities the cross-check has to handle:
+  //
+  //   1. Text-layer PDFs — pdf-parse returns the embedded text. We
+  //      normalize both sides and substring-match each citation's
+  //      quote_or_value. Mismatch ⇒ likely hallucination.
+  //   2. Image-only PDFs (scans, photos exported as PDF) — pdf-parse
+  //      returns essentially nothing. Claude's vision still reads them,
+  //      so the schema parse succeeds, but there is no text layer to
+  //      cross-check against. Treat as `not_applicable` (same status as
+  //      a PNG/JPG upload); the persistence gate allows that branch to
+  //      write because vision is the only OCR source.
   let crossCheckStatus: 'verified' | 'partial' | 'unverified' | 'not_applicable' = 'not_applicable';
   let factsTotal = 0;
   let factsVerified = 0;
+  let verifiedResultIndices: number[] = [];
   if (input.mimeType === SUPPORTED_PDF_MIME) {
     const rawText = (await deps.pdfParseFn(input.fileBytes)).text;
-    const counts = countQuoteMatches(parsed.data, rawText);
-    factsTotal = counts.total;
-    factsVerified = counts.verified;
-    if (factsTotal === 0) {
-      crossCheckStatus = 'unverified';
-    } else if (factsVerified === factsTotal) {
-      crossCheckStatus = 'verified';
-    } else if (factsVerified > 0) {
-      crossCheckStatus = 'partial';
+    if (isEffectivelyEmptyTextLayer(rawText)) {
+      crossCheckStatus = 'not_applicable';
     } else {
-      crossCheckStatus = 'unverified';
+      const counts = countQuoteMatches(parsed.data, rawText);
+      factsTotal = counts.total;
+      factsVerified = counts.verified;
+      if (factsTotal === 0) {
+        crossCheckStatus = 'unverified';
+      } else if (factsVerified === factsTotal) {
+        crossCheckStatus = 'verified';
+      } else if (factsVerified > 0) {
+        crossCheckStatus = 'partial';
+      } else {
+        crossCheckStatus = 'unverified';
+      }
+
+      // Per-row verification (lab_pdf only) — feeds the persistence
+      // gate's partial-write path. Walks the same normalized substring
+      // check `countQuoteMatches` uses, but records *which* result
+      // indices matched. On a `partial` cross-check, only these rows
+      // persist; the rest are dropped per S14.
+      if (parsed.data.document_type === 'lab_pdf') {
+        verifiedResultIndices = collectVerifiedResultIndices(parsed.data, rawText);
+      }
     }
   }
 
@@ -207,6 +243,7 @@ export async function runIntakeExtractor(
     factsTotal,
     factsVerified,
     factsUnverified,
+    verifiedResultIndices,
     metadata: { mime: input.mimeType, docType: input.docType, inputTokens, outputTokens },
   };
 }
@@ -424,9 +461,46 @@ function extractJsonFromResponse(response: unknown): unknown {
 }
 
 /**
+ * pdf-parse returns nothing useful for image-only PDFs (scans, photo
+ * exports). Page numbers, headers, and other PDF metadata can leak
+ * through and produce a few dozen characters even for fully scanned
+ * documents. A real text-layer lab — even a single-result one —
+ * produces hundreds of non-whitespace characters (patient block, lab
+ * letterhead, test rows, reference ranges). The threshold sits in the
+ * gap between those two regimes.
+ */
+const IMAGE_ONLY_PDF_TEXT_THRESHOLD = 100;
+
+function isEffectivelyEmptyTextLayer(rawText: string): boolean {
+  return rawText.replace(/\s+/g, '').length < IMAGE_ONLY_PDF_TEXT_THRESHOLD;
+}
+
+/**
+ * Normalize text for substring matching across a PDF's text layer and
+ * the LLM's extracted quote. The vision model emits clean ASCII; the
+ * PDF text layer is full of artifacts (line wraps inside phrases,
+ * non-breaking spaces between number and unit, ligatures `fi`/`fl`,
+ * curly quotes, etc.). We need a comparison that tolerates those
+ * without weakening the hallucination guard — a value that is genuinely
+ * not in the source still won't appear after normalization.
+ *
+ *   - NFKC: collapses ligatures and compatibility variants (`ﬁ` → `fi`).
+ *   - Whitespace runs → single space: tolerates wrapped column text.
+ *   - Lowercase: tolerates capitalization differences.
+ *   - Trim: strips leading/trailing whitespace.
+ */
+function normalizeForMatch(s: string): string {
+  return s.normalize('NFKC').replace(/\s+/g, ' ').toLowerCase().trim();
+}
+
+/**
  * Walk every leaf citation in the extraction and string-match its
  * `quote_or_value` against `rawText`. Returns counts; the caller maps
  * counts to a status enum.
+ *
+ * Both sides are normalized before matching (see `normalizeForMatch`)
+ * to tolerate PDF text-layer artifacts. A hallucinated value still
+ * fails — normalization removes formatting noise, not content.
  */
 export function countQuoteMatches(
   extraction: LabPdfExtraction | IntakeForm,
@@ -435,12 +509,18 @@ export function countQuoteMatches(
   let total = 0;
   let verified = 0;
 
+  const normalizedRawText = normalizeForMatch(rawText);
+
   const visit = (citation: { quote_or_value: string } | undefined): void => {
     if (!citation || typeof citation.quote_or_value !== 'string' || citation.quote_or_value.length === 0) {
       return;
     }
     total += 1;
-    if (rawText.includes(citation.quote_or_value)) {
+    const normalizedQuote = normalizeForMatch(citation.quote_or_value);
+    if (normalizedQuote.length === 0) {
+      return;
+    }
+    if (normalizedRawText.includes(normalizedQuote)) {
       verified += 1;
     }
   };
@@ -467,4 +547,33 @@ export function countQuoteMatches(
   }
 
   return { total, verified };
+}
+
+/**
+ * Walk a lab extraction's `results` and return the indices of rows
+ * whose citation `quote_or_value` was located in the (normalized) PDF
+ * text layer. Used by the persistence gate to write only the verified
+ * subset on a `partial` cross-check (S14). Mirrors the matching rule
+ * used by `countQuoteMatches` so the two stay in lock-step.
+ */
+export function collectVerifiedResultIndices(
+  extraction: LabPdfExtraction,
+  rawText: string,
+): number[] {
+  const normalizedRawText = normalizeForMatch(rawText);
+  const verified: number[] = [];
+  extraction.results.forEach((result, idx) => {
+    const q = result.citation?.quote_or_value;
+    if (typeof q !== 'string' || q.length === 0) {
+      return;
+    }
+    const normalizedQuote = normalizeForMatch(q);
+    if (normalizedQuote.length === 0) {
+      return;
+    }
+    if (normalizedRawText.includes(normalizedQuote)) {
+      verified.push(idx);
+    }
+  });
+  return verified;
 }
