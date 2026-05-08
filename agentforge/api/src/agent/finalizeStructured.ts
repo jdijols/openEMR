@@ -42,7 +42,17 @@ Hard rules:
 
 - For every cite segment: "text" carries the short visible label (e.g., "ACC/AHA 2018 §3.1", "high-intensity statin therapy"); "citation_id" carries the EXACT id from the allowed set. NEVER invent ids. NEVER use a markdown link in place of a cite segment.
 
-- Reserve "text" blocks for transitional framing only — opening sentences ("Based on the clinical guidelines..."), closing or next-step suggestions ("I would also recommend confirming her current dose..."), or non-clinical context. ALL substantive clinical content goes in claim blocks.
+- Reserve "text" blocks for **purely transitional framing** — only an opening lead-in ("Based on the clinical guidelines:") or an uncited prompt to the user ("Confirm her current dose with her before adjusting" — when the suggestion is procedural, not guideline-derived). EVERYTHING ELSE goes in claim blocks. Specifically, ALL of the following MUST be cite segments inside claim blocks, NEVER in text-block prose:
+  - Treatment recommendations ("intensification is indicated", "high-intensity statin therapy is warranted", "consider X over Y")
+  - Specific drug names with doses ("atorvastatin 40-80 mg", "rosuvastatin 20-40 mg")
+  - Risk-factor enumerations drawn from a guideline ("family history of premature ASCVD, triglycerides ≥175, metabolic syndrome")
+  - Threshold values ("LDL ≥160 mg/dL", "≥50% reduction", "<70 mg/dL target")
+  - Monitoring intervals ("repeat lipid panel in 4–12 weeks")
+  - Decision criteria from guidelines ("if she has at least one risk enhancer", "based on ASCVD risk")
+
+- **NEVER put a "Summary:" or "Conclusion:" or "Bottom line:" section in a text block when it contains any of the above.** A summary that lists recommendations IS substantive clinical content — emit it as one or more claim blocks with cite segments, not as bolded prose. The "Summary:" label does NOT exempt content from the citation density rule. If your draft contains a Summary paragraph with cited-class facts, restructure it as a sequence of short claim blocks (one per recommendation) with the "Summary" heading optionally as a brief text-block opener.
+
+- **Citation density target:** if the legend has N entries, aim to use a substantial fraction of them across the response. Under-citation (using 1 entry when 3 are relevant) is a quality failure mode — the retriever returned those chunks because they're germane to the question, and ignoring them in the response is worse than over-citing.
 
 - **Cite-label length rule (CRITICAL — Wikipedia-style anchor):** Each cite segment's "text" field is the SHORT LINK ANCHOR — typically **1 to 4 words**: a guideline name ("ACC/AHA 2018"), an organization ("ADA"), a section reference ("USPSTF §3.1"), or a key clinical phrase ("statin intensification", "LDL target <70 mg/dL"). NEVER make a cite segment's text a full sentence or a multi-clause phrase. The link should read like a Wikipedia inline reference — discrete, scannable, easy to skip past while reading the prose. Long sentence-span citations look visually heavy, fragment the reader's eye flow, and defeat the inline-citation purpose.
 
@@ -52,7 +62,7 @@ Hard rules:
 
 - Concrete examples — legend: [{citation_id: "u1", section: "ACC/AHA Lipid §3.1"}, {citation_id: "u2", section: "ADA Standards 9.2"}, {citation_id: "u3", section: "ADA monitoring 9.4"}]:
 
-  GOOD envelope (Wikipedia-style — multiple short claim blocks, each with a short 1-4 word cite anchor, natural sentence flow surrounding each cite):
+  GOOD envelope (Wikipedia-style — short cite anchors, natural sentence flow, Summary section restructured as claim blocks):
     blocks: [
       { type: "text", text: "Based on the retrieved guidelines:" },
       { type: "claim", segments: [
@@ -70,9 +80,17 @@ Hard rules:
         { type: "cite", text: "repeat lipid panel in 4-12 weeks", citation_id: "u3" },
         { type: "text", text: " to assess her response." }
       ]},
-      { type: "text", text: "Before intensifying, confirm her current dose, adherence, and any additional ASCVD risk enhancers." }
+      { type: "text", text: "**Summary**" },
+      { type: "claim", segments: [
+        { type: "text", text: "Yes, intensification is likely indicated — escalate to " },
+        { type: "cite", text: "high-intensity statin therapy", citation_id: "u1" },
+        { type: "text", text: " (atorvastatin 40-80 mg or rosuvastatin 20-40 mg daily) if she has additional " },
+        { type: "cite", text: "ASCVD risk enhancers", citation_id: "u1" },
+        { type: "text", text: " such as family history of premature ASCVD, triglycerides ≥175 mg/dL, or metabolic syndrome." }
+      ]},
+      { type: "text", text: "Confirm her current dose and adherence with her before adjusting." }
     ]
-    Note: cite anchors are "ACC/AHA 2018" (2 words), "ADA" (1 word), "repeat lipid panel in 4-12 weeks" (6 words — at the upper acceptable bound, used here because the timing detail IS the citable fact).
+    Note: cite anchors are "ACC/AHA 2018" (2 words), "ADA" (1 word), "repeat lipid panel in 4-12 weeks" (6 words), "high-intensity statin therapy" (3 words), "ASCVD risk enhancers" (3 words) — all short. The Summary section is a brief "**Summary**" text-block heading followed by a CLAIM block for the cited recommendation, NOT a text block dumping all the recommendations as bolded prose.
 
   BAD envelope #1 (pure text with bolded guideline names — NO inline citations rendered, model falls back to its training prior):
     blocks: [
@@ -98,6 +116,18 @@ Hard rules:
       ]}
     ]
     The cite text "repeat lipid panel in 4-12 weeks to assess response and adjust as needed based on the LDL trajectory" is a 17-word run-on phrase — should be reduced to a short anchor like "repeat lipid panel in 4-12 weeks" or simply "monitoring guidance" with the rest of the sentence in surrounding text segments.
+
+  BAD envelope #4 (Summary section dumped as a text block — substantive recommendations uncited, only one tangential fact cited above):
+    blocks: [
+      { type: "text", text: "Based on the clinical evidence:" },
+      { type: "claim", segments: [
+        { type: "text", text: "After any dose escalation, " },
+        { type: "cite", text: "repeat lipid panel in 4-12 weeks", citation_id: "u3" },
+        { type: "text", text: " to assess response." }
+      ]},
+      { type: "text", text: "**Summary:** Yes, intensification is likely indicated. First confirm her current statin dose and adherence, review any additional ASCVD risk factors (family history, prior cardiovascular events, metabolic syndrome), and if present, escalate to high-intensity statin therapy (e.g., atorvastatin 40-80 mg or rosuvastatin 20-40 mg daily). Recheck lipids in 4-12 weeks." }
+    ]
+    The Summary text block here contains FIVE substantive cited-class facts (intensification recommendation, ASCVD risk enhancers list, high-intensity statin recommendation, specific drug doses, monitoring interval) but ZERO cite segments. The "Summary:" heading does not give permission to skip citations — restructure as a heading + one or more claim blocks per the GOOD example above. Under-citation is a worse failure than over-citation.
 
 - If the draft refused or the question is out of scope, emit a single "refusal" block with a short machine-readable reason.
 - Do not echo the citation legend or the draft itself; produce only the final envelope as the user will see it.`;
