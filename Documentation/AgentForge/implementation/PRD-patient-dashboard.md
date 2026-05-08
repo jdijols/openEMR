@@ -41,11 +41,13 @@ If any of these regresses during the build, stop and fix before continuing:
 | D4 | All FHIR responses pass through a Zod-parsed boundary before rendering | "Parse, don't validate" — same discipline as the W2 extraction schemas |
 | D5 | The app builds with `tsc --noEmit` clean — `vite dev` (esbuild) is *not* the type gate | Per project memory: "npm run dev is tsx (transpile-only); type errors stay latent until prod tsc runs them" |
 
-## 4. Framework choice: React + Vite + TypeScript
+## 4. Framework choice: React + Vite + TypeScript + Tailwind CSS
 
 ### Decision
 
-**React 18 + Vite 5 + TypeScript 5 + TanStack Query v5 + Zod v3.** Rendered as an SPA. Hosted as a sibling container to `agentforge/cui` on the same VPS, served at `/dashboard/` via the Caddy / nginx in front of OpenEMR.
+**React 18 + Vite 5 + TypeScript 5 + TanStack Query v5 + Zod v3 + Tailwind CSS v3.** Rendered as an SPA. Hosted as a sibling container to `agentforge/cui` on the same VPS, served at `/dashboard/` via the Caddy / nginx in front of OpenEMR.
+
+**Why Tailwind specifically:** the brief grades the dashboard on feature parity *and* the framework defense, but the demo video also functions as the visible artifact reviewers see first. Tailwind lets us hit a polished, modern visual standard without inventing a CSS architecture under deadline pressure — utility classes + `tailwind.config.js` for our small palette, no `.css` file proliferation, no BEM bikeshedding. Pairs well with React's component shape: each `<ClinicalCard>`, `<PatientHeader>`, etc. owns its own utility-class layout in JSX. The CUI's existing 51K-line `index.css` is a reminder of what hand-rolled CSS at scale looks like; Tailwind is the mitigation, not a regression. Add `@tailwindcss/forms` for the auth round-trip's input fields, and skip the rest of the plugin ecosystem to keep the bundle tight.
 
 ### Why React + Vite (the defense narrative)
 
@@ -67,6 +69,7 @@ The honest tradeoffs we accept (and document in the defense):
 - **Same lint/format.** ESLint + Prettier setup carries over.
 - **No Next.js cognitive load.** App Router's "this file runs on the server, that file runs on the client, this file is a Server Action" overhead is real. SPA is one mental model.
 - **TanStack Query is the right shape for FHIR.** Every clinical card is a `useQuery` against a FHIR endpoint with `patient={id}` as the key. Refetch on focus, stale-while-revalidate, retry-with-backoff are all built-in.
+- **Tailwind for the visual layer.** Utility-class CSS keeps the design language consistent across cards without reaching for a component library (MUI, Chakra, etc.). Each `<ClinicalCard>` is a JSX shape with utility classes inline; no `.css` file per component. `tailwind.config.js` holds the ~6 colors, spacing scale, typography stack we'll use — that file IS the design system. Phase 7 (visual elevation) re-uses the same Tailwind tokens via scoped CSS overrides for the CUI rail and select OpenEMR chrome surfaces, so the dashboard, the rail, and the elevated host chrome all read as one product.
 
 ### Considered and rejected
 
@@ -234,7 +237,7 @@ Numbered for cross-reference; no separate `TASKS.md` section. Tier rules mirror 
 | ID | Task | Tier | Done proof |
 |---|---|---|---|
 | PD-01 | `npm create vite@latest patient-dashboard -- --template react-ts` from repo root; copy `tsconfig.json` + ESLint + Vitest config patterns from `agentforge/cui/` | 0 | `cd patient-dashboard && npm run build` clean; `npx tsc --noEmit` clean |
-| PD-02 | Add deps: `@tanstack/react-query`, `zod`, `react-router-dom` | 0 | `package.json` updated |
+| PD-02 | Add deps: `@tanstack/react-query`, `zod`, `react-router-dom`, `tailwindcss`, `postcss`, `autoprefixer`, `@tailwindcss/forms`. Run `npx tailwindcss init -p` to generate `tailwind.config.js` + `postcss.config.js`. Configure `content: ['./index.html', './src/**/*.{ts,tsx}']`. Add `@tailwind` directives to `src/styles/globals.css`. | 0 | `package.json` updated; `tailwind.config.js` + `postcss.config.js` present; `<div className="text-blue-500">` smoke-test renders blue in dev |
 | PD-03 | `<AuthProvider>` skeleton — React Context holding `accessToken`, `idToken`, `refreshToken` in `useState` (memory only, per D1). Helper hooks `useAccessToken()`, `useAuth()` | 0 | Vitest: AuthProvider renders children; `useAccessToken()` returns null until set |
 | PD-04 | PKCE helpers in `auth/pkce.ts` — pure functions to generate verifier + challenge. Test the SHA-256 base64url encoding round-trip | 0 | Vitest: 3 scenarios green |
 | PD-05 | `/login` route — generates PKCE pair, stores verifier in `AuthProvider`, redirects to OpenEMR's `/oauth2/authorize` with the right params | 0 | Manual smoke against deployed OpenEMR; redirected to login UI |
@@ -288,6 +291,21 @@ Numbered for cross-reference; no separate `TASKS.md` section. Tier rules mirror 
 | PD-51 | Demo video (FB-C-06) includes a 30-second segment showing the dashboard's OAuth2 login + cards rendering with FHIR data | 0 | Video re-cut includes the segment |
 | PD-52 | Final commit + push to GitLab `master` includes the `patient-dashboard/` directory | 0 | `git log --stat` shows the commit |
 
+### Phase 7 — Visual elevation pass on demo surfaces (Saturday late evening, ≤2 hours, OPTIONAL)
+
+> **Cap is hard.** This phase is bounded at 2 hours. If we hit the cap, we ship what's done and move on. **Anything not finished by the 2-hour mark is dropped, not deferred.** Phase 7 exists because the brief grades the demo video as visible evidence; pushing the visual bar on the surfaces graders watch is high-leverage IF the build is otherwise on track. If Saturday's self-injection rehearsal or any FB-A/B/C/D smoke surfaces a regression, Phase 7 is **the first thing cut.**
+
+**Scoping principle:** additive Tailwind classes only — no upstream OpenEMR PHP edits, no CUI rewrites, no global CSS resets. We're targeting elevation, not redesign. The W2 brief's already-shipped CUI keeps every existing test green; Tailwind is layered alongside, not replacing.
+
+| ID | Task | Tier | Done proof |
+|---|---|---|---|
+| PD-70 | Visual pass on the **CUI rail** demo surfaces — the patient-context header strip (top of rail), the IntakeProposalCard, the lab ExtractionAcknowledgment, the AgentStepStrip, the EvalGate + PHI footer badges. Tailwind utility classes added inline; existing CSS classes preserved as fallbacks. Spacing, typography hierarchy, color palette aligned with the new dashboard's design language for visual continuity. **Must NOT regress any vitest scenario.** | 1 | CUI vitest still 83 passing; visual smoke screenshots before/after pasted into journal |
+| PD-71 | Visual pass on the **OpenEMR top patient header bar** (name / DOB / gender pill at the top of the chart) via a scoped CSS override file `interface/themes/agentforge-elevated.css` registered in `globals.php` only when the `agentforge` module is active. Tailwind preflight is NOT loaded into OpenEMR — we hand-write the overrides using Tailwind's design tokens (spacing scale, color palette) for consistency. Risk-bounded: changes are CSS-only, scoped to the patient header DOM, easy to revert via removing the include line. | 1 | Visual smoke before/after; W1 GACL flow still works; iframe still mounts |
+| PD-72 | Visual pass on the **calendar tab** — same approach as PD-71, scoped CSS overrides only. Bigger week-grid cells, clearer appointment chips, AgentForge cohort patients visually distinguished (subtle cohort-badge in the appointment chip). | 1 | Visual smoke before/after; calendar still loads; clicking an appointment still routes correctly |
+| PD-73 | If any time remaining: visual pass on **patient chart sidebar / encounter forms** — same scoped-CSS-overrides approach. Just typography + spacing + color polish, no DOM restructuring. | 1 | Visual smoke before/after |
+
+**Why this is Phase 7 and not interleaved earlier:** doing the polish pass after the dashboard's core is functional means we're polishing what graders actually see, not what we *thought* they'd see. Also — if the dashboard slips Saturday afternoon, Phase 7 is the natural shed-load. Putting it last keeps every earlier phase tier-0.
+
 ## 8. Risks + mitigations
 
 | Risk | Probability | Mitigation |
@@ -323,11 +341,20 @@ To V2 of the dashboard (post-Sunday):
 
 **Saturday 2026-05-09:** Finish Phase 3 + Phase 4. Self-injection rehearsal in parallel (W2 brief track — non-negotiable, 1.5 hours).
 
-**Saturday evening:** Phase 5 (defense doc).
+**Saturday evening:** Phase 5 (defense doc) → Phase 7 (visual elevation pass, hard 2-hour cap).
 
 **Sunday 2026-05-10 AM:** Phase 6. Final submission at 12:00 PM CT.
 
-**If we slip:** the cut order is PD-26 (vitals card → drop, replace with a smaller extra section like immunizations which is a single FHIR call), then PD-30 (loading/error polish → leave default states), then PD-34 (cellular smoke → desktop only). Never cut: auth, the 5 required cards, the patient header, the defense doc.
+**If we slip, the cut order (top = first to drop):**
+1. **PD-73** (chart sidebar polish — Phase 7 stretch)
+2. **PD-72** (calendar visual pass)
+3. **PD-71** (OpenEMR top patient header overrides)
+4. **PD-70** (CUI rail visual pass)
+5. **PD-26** (vitals card — replace with immunizations, a single FHIR call with sparser data)
+6. **PD-30** (loading/error polish — leave default states)
+7. **PD-34** (cellular smoke — desktop only)
+
+**Never cut:** auth round-trip (PD-03..07), the 5 required cards (PD-21..25), the patient header (PD-20), the defense doc (PD-40), the submission scoreboard row (PD-50). Tailwind itself (PD-02) is also un-cuttable — without it, we'd default-fall-back to inline styles that would burn more time than the Tailwind setup costs.
 
 ---
 
