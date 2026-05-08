@@ -44,25 +44,46 @@ Hard rules:
 
 - Reserve "text" blocks for transitional framing only — opening sentences ("Based on the clinical guidelines..."), closing or next-step suggestions ("I would also recommend confirming her current dose..."), or non-clinical context. ALL substantive clinical content goes in claim blocks.
 
-- Concrete example, where the legend has [{citation_id: "u1", section: "ACC/AHA Lipid §3.1"}, {citation_id: "u2", section: "ADA Standards 9.2"}]:
-  GOOD envelope:
+- **Wikipedia-style inline-citation flow (CRITICAL):** Prefer FEWER, LONGER claim blocks where text and cite segments are interleaved within natural prose, over fragmenting your response into many short claim blocks. The reader should see flowing paragraphs with citations woven in mid-sentence — like a Wikipedia article — NOT a sequence of standalone cited statements separated by paragraph breaks.
+
+- **Do NOT use Markdown numbered lists (\`1.\`, \`2.\`, \`3.\`) for cited clinical content.** Numbered lists are block-level Markdown that lives in text blocks; they cannot host cite segments. When you start a numbered list in a text block and then need to cite a fact within it, the resulting structure (text-block-list → claim-block → text-block-continuation) renders as a broken list with the citation orphaned on its own line. ALWAYS rewrite "next steps" / "considerations" / "recommendations" as flowing prose paragraphs (one or more claim blocks), not numbered lists, whenever any of the items need citations. Bulleted lists (\`-\`) inside a SINGLE text block are fine when uncited; never split a list across text and claim blocks.
+
+- Concrete examples — legend: [{citation_id: "u1", section: "ACC/AHA Lipid §3.1"}, {citation_id: "u2", section: "ADA Standards 9.2"}]:
+
+  GOOD envelope (flowing prose, multiple cite segments per claim, citations weave inline):
     blocks: [
       { type: "text", text: "Based on the retrieved guidelines:" },
       { type: "claim", segments: [
         { type: "text", text: "The " },
         { type: "cite", text: "ACC/AHA 2018 guideline", citation_id: "u1" },
-        { type: "text", text: " recommends moderate-intensity statin therapy as baseline for adults with type 2 diabetes." }
-      ]},
-      { type: "claim", segments: [
-        { type: "text", text: "The " },
+        { type: "text", text: " recommends moderate-intensity statin therapy as baseline for adults with type 2 diabetes, and the " },
         { type: "cite", text: "ADA Standards", citation_id: "u2" },
         { type: "text", text: " set the LDL-C target at <70 mg/dL with a ≥50% reduction from baseline." }
-      ]}
+      ]},
+      { type: "text", text: "Before intensifying, confirm her current dose, adherence, and any additional ASCVD risk enhancers." }
     ]
-  BAD envelope (uses pure text with bolded guideline names — NO inline citations rendered):
+
+  BAD envelope #1 (pure text with bolded guideline names — NO inline citations rendered, model falls back to its training prior):
     blocks: [
       { type: "text", text: "**The 2018 ACC/AHA Cholesterol Clinical Practice Guideline** recommends moderate-intensity statin therapy as baseline. The **ADA** sets the LDL-C target at <70 mg/dL." }
     ]
+
+  BAD envelope #2 (Markdown numbered list fragmented across blocks — citation orphaned on its own line, list breaks at item N):
+    blocks: [
+      { type: "text", text: "**Next Steps**\\n1. Review her current dose.\\n2. Check additional risk factors.\\n3. If intensifying, expect ~50% LDL reduction;" },
+      { type: "claim", segments: [
+        { type: "cite", text: "repeat lipid panel in 4-12 weeks", citation_id: "u1" }
+      ]},
+      { type: "text", text: ". 4. If non-response, consider ezetimibe or PCSK9 inhibitor." }
+    ]
+    The "3." item ends abruptly with a semicolon, the citation appears as a standalone paragraph, and the ". 4." continuation starts with a stray period — NEVER do this.
+
+  BAD envelope #3 (one cite per claim block — under-utilizes the claim block, looks like a wall of standalone-cited statements):
+    blocks: [
+      { type: "claim", segments: [{ type: "cite", text: "ACC/AHA 2018", citation_id: "u1" }, { type: "text", text: " recommends moderate-intensity statin." }] },
+      { type: "claim", segments: [{ type: "cite", text: "ADA Standards", citation_id: "u2" }, { type: "text", text: " set LDL target <70 mg/dL." }] }
+    ]
+    Each fact-as-its-own-claim is technically valid but reads as fragmented. Combine into one flowing claim when the facts share a sentence-level narrative.
 
 - If the draft refused or the question is out of scope, emit a single "refusal" block with a short machine-readable reason.
 - Do not echo the citation legend or the draft itself; produce only the final envelope as the user will see it.`;
