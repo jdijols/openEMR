@@ -35,9 +35,35 @@ const FINALIZER_SYSTEM_PROMPT = `You convert a clinical assistant's draft answer
 
 Hard rules:
 - Output MUST conform to the supplied JSON schema. The schema enforces block types and citation_id values.
-- For every clinical fact (recommendation, guideline statement, lab value, allergy, medication), emit a "claim" block whose "segments" mix "text" and "cite" entries. Each "cite" segment carries the short visible label in "text" and the EXACT citation_id from the allowed set.
-- The allowed citation_ids are a closed list. NEVER invent an id. NEVER cite a guideline by name (e.g., "ACC/AHA 2018") in prose — link via a cite segment to a real citation_id, or omit the claim.
-- General prose (greetings, framing, "next steps" suggestions that aren't clinical facts) goes in "text" blocks. Markdown headings/lists/bold inside text strings are allowed.
+
+- **CITATION DENSITY RULE (read carefully):** When the citation legend in the user prompt contains ANY entries (i.e., evidence was retrieved this turn), your envelope MUST include AT LEAST ONE "claim" block with cite segments referencing those legend entries. A response that uses only "text" blocks while evidence is available is INVALID — the user expects clickable inline citations to the retrieved sources, not prose-only summaries with bolded guideline names. If multiple legend entries are relevant, prefer multiple claim blocks (one per distinct fact) over consolidating everything into one mega-claim.
+
+- **ANY guideline name, threshold value, treatment recommendation, or specific clinical figure** (e.g., "moderate-intensity statin therapy", "LDL ≥160 mg/dL", "high-intensity statin", "≥50% LDL reduction", "ACC/AHA 2018", "ADA Standards of Care") MUST be a cite segment inside a claim block — NEVER bolded prose in a text block. Bolding a guideline name in a text block is a citation failure; the ONLY correct way to surface a guideline reference is via a cite segment whose citation_id maps to a legend entry.
+
+- For every cite segment: "text" carries the short visible label (e.g., "ACC/AHA 2018 §3.1", "high-intensity statin therapy"); "citation_id" carries the EXACT id from the allowed set. NEVER invent ids. NEVER use a markdown link in place of a cite segment.
+
+- Reserve "text" blocks for transitional framing only — opening sentences ("Based on the clinical guidelines..."), closing or next-step suggestions ("I would also recommend confirming her current dose..."), or non-clinical context. ALL substantive clinical content goes in claim blocks.
+
+- Concrete example, where the legend has [{citation_id: "u1", section: "ACC/AHA Lipid §3.1"}, {citation_id: "u2", section: "ADA Standards 9.2"}]:
+  GOOD envelope:
+    blocks: [
+      { type: "text", text: "Based on the retrieved guidelines:" },
+      { type: "claim", segments: [
+        { type: "text", text: "The " },
+        { type: "cite", text: "ACC/AHA 2018 guideline", citation_id: "u1" },
+        { type: "text", text: " recommends moderate-intensity statin therapy as baseline for adults with type 2 diabetes." }
+      ]},
+      { type: "claim", segments: [
+        { type: "text", text: "The " },
+        { type: "cite", text: "ADA Standards", citation_id: "u2" },
+        { type: "text", text: " set the LDL-C target at <70 mg/dL with a ≥50% reduction from baseline." }
+      ]}
+    ]
+  BAD envelope (uses pure text with bolded guideline names — NO inline citations rendered):
+    blocks: [
+      { type: "text", text: "**The 2018 ACC/AHA Cholesterol Clinical Practice Guideline** recommends moderate-intensity statin therapy as baseline. The **ADA** sets the LDL-C target at <70 mg/dL." }
+    ]
+
 - If the draft refused or the question is out of scope, emit a single "refusal" block with a short machine-readable reason.
 - Do not echo the citation legend or the draft itself; produce only the final envelope as the user will see it.`;
 
@@ -109,6 +135,7 @@ export async function finalizeStructuredEnvelope(
       return null;
     }
 
+    const claimBlockCount = envelope.blocks.filter((b) => b.type === 'claim').length;
     await input.observability.recordLlmCall({
       correlationId: input.correlationId,
       providerModel: 'finalizer',
@@ -116,9 +143,29 @@ export async function finalizeStructuredEnvelope(
         phase: 'structured_finalize_response',
         outcome: 'ok',
         block_count: envelope.blocks.length,
-        claim_blocks: envelope.blocks.filter((b) => b.type === 'claim').length,
+        claim_blocks: claimBlockCount,
+        legend_size: input.citationLegend.length,
       },
     });
+
+    // Defense-in-depth: if the legend was non-empty but the finalizer
+    // produced zero claim blocks (model chose all-text despite the
+    // citation-density rule), flag it loudly. The failure is not blocking
+    // — we still return the structured blocks since they're schema-valid —
+    // but the warning gives us a Langfuse signal we can grep on if the
+    // rate climbs and we need to tighten the prompt further.
+    if (input.citationLegend.length > 0 && claimBlockCount === 0) {
+      await input.observability.recordEvent({
+        correlationId: input.correlationId,
+        name: 'orchestrator.structured_finalize_zero_claims',
+        meta: {
+          legend_size: input.citationLegend.length,
+          allowed_citation_ids_size: input.allowedCitationIds.size,
+          block_count: envelope.blocks.length,
+          outcome: 'all_text_despite_evidence',
+        },
+      });
+    }
 
     return { blocks: envelopeToChatBlocks(envelope), structured: true };
   } catch (e) {
