@@ -70,12 +70,13 @@ copilot iframe makes CORS-allowed cross-origin fetches to `https://${HOST}` (Cad
 
 Do this on the server where Docker runs (same layout as `development-easy` + overrides).
 
-1. **DNS / ports** — `AGENTFORGE_PUBLIC_HOSTNAME` (e.g. `YOUR_IP.nip.io`) must resolve to the VPS; inbound **80** and **443** open (Let’s Encrypt HTTP-01).
+1. **DNS / ports** — both `AGENTFORGE_PUBLIC_HOSTNAME` and `OPENEMR_PUBLIC_HOSTNAME` (e.g. `YOUR_IP.nip.io` and `oe.YOUR_IP.nip.io`) must resolve to the VPS; inbound **80** and **443** open (Let’s Encrypt HTTP-01 for both certs).
 
 2. **`secrets.prod.env` on the VPS** (copy from `secrets.env.example`, never commit):
-   - `AGENTFORGE_PUBLIC_HOSTNAME` — hostname Caddy will obtain a cert for (no `https://`).
+   - `AGENTFORGE_PUBLIC_HOSTNAME` — hostname Caddy will obtain a cert for (no `https://`). Used by the Agent API site.
    - `AGENTFORGE_API_PUBLIC_URL` — `https://` + that same hostname (what the **browser** calls; `panel.php` injects this).
-   - `CUI_ALLOWED_ORIGINS` — **exact** Origin for OpenEMR as seen in DevTools (scheme + host + port), e.g. `http://YOUR_IP.nip.io:8300`. A mismatch → CORS failures in the rail.
+   - `OPENEMR_PUBLIC_HOSTNAME` — hostname Caddy will obtain a second cert for, fronting OpenEMR. **This is the URL the Gauntlet submission form requires** (HTTPS-only). Optional: omit to keep OpenEMR on plain HTTP via its host port mapping (the rail still works since the API has its own HTTPS hostname).
+   - `CUI_ALLOWED_ORIGINS` — **exact** Origin for OpenEMR as seen in DevTools (scheme + host + port). When using the new HTTPS proxy, set to `https://${OPENEMR_PUBLIC_HOSTNAME}` (no port — Caddy listens on 443). For backward compatibility you can list both old and new origins comma-separated, e.g. `http://YOUR_IP.nip.io:8300,https://oe.YOUR_IP.nip.io`. A mismatch → CORS failures in the rail.
    - `OPENEMR_MODULE_BASE_URL` — keep **`http://openemr/interface/.../public`** (Docker service name; Agent API reaches OpenEMR on the internal network).
    - `POSTGRES_URL` — must match `postgres` service credentials in `docker-compose.override.yml` (default user/db `agentforge` / password `agentforge`).
    - `OPENEMR_MODULE_SHARED_SECRET` and `SESSION_TOKEN_SECRET` — strong unique values; **identical** meanings in OpenEMR PHP env and Agent API (both services load the same `env_file`).
@@ -102,6 +103,57 @@ Do this on the server where Docker runs (same layout as `development-easy` + ove
 6. **Logs** — `docker compose logs -f agentforge-api caddy openemr` (service names may vary slightly by profile).
 
 Rotate any API keys or shared secrets if they appeared in plaintext outside the VPS.
+
+### Adding HTTPS to OpenEMR on an existing VPS deploy
+
+If your existing prod deploy has Caddy fronting only the Agent API and OpenEMR is reachable on plain HTTP at port 8300 (the W1 baseline), follow these steps to add a second HTTPS site for OpenEMR. The Gauntlet submission form requires the deployed-app URL to be HTTPS, and graders open this URL directly to test — bare IP + port + http does not satisfy the requirement.
+
+**On your laptop:** the Caddyfile change ships in `docker/agentforge/Caddyfile` (Site 2 block keyed on `OPENEMR_PUBLIC_HOSTNAME`). Pull the latest master on the VPS, and the new config is in place.
+
+**On the VPS** (ssh in first):
+
+1. **Pick the OpenEMR hostname.** With nip.io, no DNS work is needed — any subdomain prefix resolves to the encoded IP. Example: VPS public IP `108.61.145.220` → use `oe.108-61-145-220.nip.io`.
+
+2. **Edit `docker/agentforge/secrets.prod.env`**:
+   ```env
+   # add this line:
+   OPENEMR_PUBLIC_HOSTNAME=oe.108-61-145-220.nip.io
+   # update CUI_ALLOWED_ORIGINS to include the new HTTPS origin:
+   CUI_ALLOWED_ORIGINS=http://108-61-145-220.nip.io:8300,https://oe.108-61-145-220.nip.io
+   ```
+   Listing both origins lets the legacy HTTP path keep working while the HTTPS path comes online — no flag-day cutover required.
+
+3. **Pull master on the VPS** (if not already):
+   ```bash
+   git pull origin master
+   ```
+
+4. **Restart Caddy with the new config** — from `docker/development-easy`:
+   ```bash
+   AGENTFORGE_SECRETS_FILE=../agentforge/secrets.prod.env docker compose \
+     -f docker-compose.yml \
+     -f ../agentforge/docker-compose.override.yml \
+     -f ../agentforge/docker-compose.prod.yml \
+     up -d caddy
+   ```
+   Caddy will request a Let's Encrypt cert for the new OpenEMR hostname via HTTP-01 challenge. The first request takes a few seconds while the cert is issued; subsequent requests are instant.
+
+5. **Verify** (from your laptop):
+   ```bash
+   # cert issued and serving:
+   curl -fsS "https://${OPENEMR_PUBLIC_HOSTNAME}/" -o /dev/null -w "%{http_code}\n"
+   # expect 200 or 302 (OpenEMR redirect to login)
+
+   # the Agent API HTTPS site is unaffected:
+   curl -fsS "https://${AGENTFORGE_PUBLIC_HOSTNAME}/health"
+   # expect ok: true
+   ```
+
+6. **Smoke in browser** — open `https://${OPENEMR_PUBLIC_HOSTNAME}/` directly. Login, open a cohort chart, the rail should load with no mixed-content warnings (the rail's own fetches go to the API HTTPS hostname). The footer EvalGate + PHI badges should be green.
+
+**Use this URL** in the Gauntlet submission form. Keep the legacy `http://...:8300` URL for any internal smoke that isn't graded.
+
+If `https://${OPENEMR_PUBLIC_HOSTNAME}/` returns connection refused or a Caddy error page, check `docker compose logs caddy` for ACME challenge failures (most common cause: port 80 not reachable from the public internet — confirm the VPS firewall allows inbound 80 and 443).
 
 ### Agent Postgres baseline (Gate G3-00)
 

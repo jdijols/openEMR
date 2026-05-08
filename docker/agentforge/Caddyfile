@@ -1,10 +1,32 @@
-# Public TLS reverse proxy for the Agent API.
-# Hostname is taken from the AGENTFORGE_PUBLIC_HOSTNAME env var on the caddy
-# container. Caddy handles automatic HTTPS via Let's Encrypt (HTTP-01 on :80,
-# serving on :443). agentforge-api stays on the internal Docker network only.
+# Public TLS reverse proxy. Two sites, both auto-provisioned by Let's Encrypt
+# (HTTP-01 challenge on :80, serving on :443). Both upstream services stay on
+# the internal Docker network — never published directly to the host.
+#
+# Site 1: Agent API. Hostname taken from AGENTFORGE_PUBLIC_HOSTNAME env var.
 {$AGENTFORGE_PUBLIC_HOSTNAME} {
     encode gzip
     reverse_proxy agentforge-api:3000
+    log {
+        output stdout
+        format console
+    }
+}
+
+# Site 2: OpenEMR application (the deployed-app URL the Gauntlet submission
+# form requires to be HTTPS). Hostname taken from OPENEMR_PUBLIC_HOSTNAME.
+# Caddy reaches the openemr container via service-name DNS on the
+# agentforge_internal network. X-Forwarded-Proto is set so OpenEMR generates
+# HTTPS-scheme URLs in redirects and absolute links.
+#
+# If OPENEMR_PUBLIC_HOSTNAME is unset, Caddy will literally use the empty
+# string as the site label and skip provisioning — single-site (API-only)
+# behavior preserved for any environment not opted in to OpenEMR-via-Caddy.
+{$OPENEMR_PUBLIC_HOSTNAME} {
+    encode gzip
+    reverse_proxy openemr:80 {
+        header_up X-Forwarded-Proto https
+        header_up X-Forwarded-Host {host}
+    }
     log {
         output stdout
         format console
