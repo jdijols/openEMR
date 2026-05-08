@@ -743,18 +743,37 @@ export default function App(): ReactElement {
   }, [acceptFile]);
 
   function refreshChartBinding(): void {
-    // P3 fix: a plain `window.location.reload()` re-mounts the iframe but does
-    // NOT bust the agent-side 2-hour brief cache, so an operator who saw a
-    // blank/stale brief and clicked Refresh would get the same blank brief
-    // back. Fire a `force_refresh` present-patient first so the API drops the
-    // cached entry for this (patient, encounter, sessionToken) tuple. This is
-    // fire-and-forget — failures are tolerated silently because the reload
-    // that follows will retry from a clean iframe mount anyway.
+    // P5 fix (Bug B): the previous P3 implementation called
+    // `window.location.reload()` after the cache-bust to re-mount the iframe
+    // from a clean state. That re-runs `panel.php` which mints a NEW one-time
+    // launch code; under normal conditions `useHandshake` redeems the new
+    // code and the rail comes back. Under transient conditions (in-flight
+    // cache-bust racing the reload, brief session refresh, double-mount in
+    // dev StrictMode), the redeem can land in `status: 'error'` and the rail
+    // renders nothing visible — operator sees "panel disappeared."
+    //
+    // Soft refresh path: when the handshake is already valid, we don't need
+    // to re-mount the iframe at all. Bust the API brief cache (so the next
+    // present-patient fetch is fresh) and nudge the brief state machine back
+    // to `idle` — the auto-fetch effect at the briefStatus useEffect re-runs
+    // whenever `briefStatus.kind === 'idle'` and re-presents the patient
+    // without remounting the iframe document. No launch-code re-redemption,
+    // no risk of the panel disappearing.
     if (handshake.status === 'ready' && patientUuid !== null && patientUuid !== '') {
       void postPresentPatient(apiBase, handshake.sessionToken, patientUuid, true).catch(() => {
-        /* ignore — the reload below is the user-visible recovery path */
+        /* ignore — the briefStatus reset below is the user-visible recovery path */
       });
+      // Reset the in-flight ref so the brief-fetch effect can re-run within
+      // the same mount. Without this, the auto-fetch effect's idempotency
+      // guard would prevent a second fetch on the same iframe instance.
+      briefInFlightRef.current = false;
+      setBriefStatus({ kind: 'idle' });
+      return;
     }
+    // Pre-handshake / error-state escape hatch — only reach here when the
+    // operator clicks Refresh from a stuck connecting / error state. Hard
+    // reload is the only recovery; the launch code is invalid anyway so
+    // re-redemption is the desired outcome.
     window.location.reload();
   }
 

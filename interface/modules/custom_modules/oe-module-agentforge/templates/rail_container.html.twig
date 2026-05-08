@@ -764,6 +764,33 @@
                     return;
                 }
                 triggerOpenEmrEncounterRefresh();
+
+                // P5 fix (Bug A): patient-level writes update lists / demographics
+                // panes outside encounter forms. `triggerOpenEmrEncounterRefresh()`
+                // only reloads `forms.php` (the encounter forms panel) — for
+                // allergies / medications / family history / demographics /
+                // intake-confirm, the new data lives on the demographics tab and
+                // the patient sidebar, which `forms.php` does not include. Also
+                // call `navigateDemographicsInChrome()` (which calls OpenEMR's
+                // `loadCurrentPatient()` — the same global the top-bar
+                // patient-name link is bound to) so those surfaces refresh
+                // without the operator manually clicking the patient name.
+                // Encounter-level write_targets (chief_complaint, vitals,
+                // clinical_note, tobacco) are intentionally excluded — their
+                // surfaces are already handled by the encounter refresh above.
+                var patientLevelWriteTargets = [
+                    'intake_proposal',
+                    'allergy',
+                    'allergy_delete',
+                    'medication_add',
+                    'medication_discontinue',
+                    'family_history_add',
+                    'demographics_update'
+                ];
+                var writeTarget = typeof data.write_target === 'string' ? data.write_target : '';
+                if (writeTarget !== '' && patientLevelWriteTargets.indexOf(writeTarget) !== -1) {
+                    navigateDemographicsInChrome();
+                }
                 return;
             }
 
