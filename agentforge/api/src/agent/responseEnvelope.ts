@@ -66,7 +66,12 @@ export function buildResponseEnvelopeSchema(allowedCitationIds: AllowedCitationI
     }),
     z.object({
       type: z.literal('cite'),
-      text: z.string().min(1).describe('Short visible label for the citation, e.g., "high-intensity statin therapy".'),
+      text: z
+        .string()
+        .min(1)
+        .describe(
+          'SHORT inline-link anchor (Wikipedia-style): typically 1 to 4 words — a guideline name ("ACC/AHA 2018"), an organization ("ADA"), a section reference ("USPSTF §3.1"), or a key clinical phrase ("statin intensification"). NEVER a full sentence or multi-clause phrase — the surrounding sentence prose lives in adjacent text segments, not inside the cite anchor.',
+        ),
       citation_id: citationIdSchema.describe('MUST be one of the allowed citation_ids. Hallucinated ids are rejected.'),
     }),
   ]);

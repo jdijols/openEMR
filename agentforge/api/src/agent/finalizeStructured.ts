@@ -44,24 +44,35 @@ Hard rules:
 
 - Reserve "text" blocks for transitional framing only — opening sentences ("Based on the clinical guidelines..."), closing or next-step suggestions ("I would also recommend confirming her current dose..."), or non-clinical context. ALL substantive clinical content goes in claim blocks.
 
-- **Wikipedia-style inline-citation flow (CRITICAL):** Prefer FEWER, LONGER claim blocks where text and cite segments are interleaved within natural prose, over fragmenting your response into many short claim blocks. The reader should see flowing paragraphs with citations woven in mid-sentence — like a Wikipedia article — NOT a sequence of standalone cited statements separated by paragraph breaks.
+- **Cite-label length rule (CRITICAL — Wikipedia-style anchor):** Each cite segment's "text" field is the SHORT LINK ANCHOR — typically **1 to 4 words**: a guideline name ("ACC/AHA 2018"), an organization ("ADA"), a section reference ("USPSTF §3.1"), or a key clinical phrase ("statin intensification", "LDL target <70 mg/dL"). NEVER make a cite segment's text a full sentence or a multi-clause phrase. The link should read like a Wikipedia inline reference — discrete, scannable, easy to skip past while reading the prose. Long sentence-span citations look visually heavy, fragment the reader's eye flow, and defeat the inline-citation purpose.
+
+- **Multiple short claim blocks per response are fine and preferred.** When your response addresses several distinct clinical facts, emit ONE claim block per fact, each with a short cite label (1-4 words) and natural prose surrounding it. Do NOT consolidate multiple unrelated facts into a single claim block with a long run-on sentence. The reader will see a sequence of short sentences with one citation each — exactly the Wikipedia article reading experience.
 
 - **Do NOT use Markdown numbered lists (\`1.\`, \`2.\`, \`3.\`) for cited clinical content.** Numbered lists are block-level Markdown that lives in text blocks; they cannot host cite segments. When you start a numbered list in a text block and then need to cite a fact within it, the resulting structure (text-block-list → claim-block → text-block-continuation) renders as a broken list with the citation orphaned on its own line. ALWAYS rewrite "next steps" / "considerations" / "recommendations" as flowing prose paragraphs (one or more claim blocks), not numbered lists, whenever any of the items need citations. Bulleted lists (\`-\`) inside a SINGLE text block are fine when uncited; never split a list across text and claim blocks.
 
-- Concrete examples — legend: [{citation_id: "u1", section: "ACC/AHA Lipid §3.1"}, {citation_id: "u2", section: "ADA Standards 9.2"}]:
+- Concrete examples — legend: [{citation_id: "u1", section: "ACC/AHA Lipid §3.1"}, {citation_id: "u2", section: "ADA Standards 9.2"}, {citation_id: "u3", section: "ADA monitoring 9.4"}]:
 
-  GOOD envelope (flowing prose, multiple cite segments per claim, citations weave inline):
+  GOOD envelope (Wikipedia-style — multiple short claim blocks, each with a short 1-4 word cite anchor, natural sentence flow surrounding each cite):
     blocks: [
       { type: "text", text: "Based on the retrieved guidelines:" },
       { type: "claim", segments: [
+        { type: "text", text: "Moderate-intensity statin therapy is the baseline recommendation for adults with type 2 diabetes per the " },
+        { type: "cite", text: "ACC/AHA 2018", citation_id: "u1" },
+        { type: "text", text: " cholesterol guideline." }
+      ]},
+      { type: "claim", segments: [
         { type: "text", text: "The " },
-        { type: "cite", text: "ACC/AHA 2018 guideline", citation_id: "u1" },
-        { type: "text", text: " recommends moderate-intensity statin therapy as baseline for adults with type 2 diabetes, and the " },
-        { type: "cite", text: "ADA Standards", citation_id: "u2" },
-        { type: "text", text: " set the LDL-C target at <70 mg/dL with a ≥50% reduction from baseline." }
+        { type: "cite", text: "ADA", citation_id: "u2" },
+        { type: "text", text: " sets the LDL-C target at <70 mg/dL with a ≥50% reduction from baseline." }
+      ]},
+      { type: "claim", segments: [
+        { type: "text", text: "After dose escalation, " },
+        { type: "cite", text: "repeat lipid panel in 4-12 weeks", citation_id: "u3" },
+        { type: "text", text: " to assess her response." }
       ]},
       { type: "text", text: "Before intensifying, confirm her current dose, adherence, and any additional ASCVD risk enhancers." }
     ]
+    Note: cite anchors are "ACC/AHA 2018" (2 words), "ADA" (1 word), "repeat lipid panel in 4-12 weeks" (6 words — at the upper acceptable bound, used here because the timing detail IS the citable fact).
 
   BAD envelope #1 (pure text with bolded guideline names — NO inline citations rendered, model falls back to its training prior):
     blocks: [
@@ -78,12 +89,15 @@ Hard rules:
     ]
     The "3." item ends abruptly with a semicolon, the citation appears as a standalone paragraph, and the ". 4." continuation starts with a stray period — NEVER do this.
 
-  BAD envelope #3 (one cite per claim block — under-utilizes the claim block, looks like a wall of standalone-cited statements):
+  BAD envelope #3 (cite segment text is a full sentence — Wikipedia anchor rule violated, link reads visually heavy):
     blocks: [
-      { type: "claim", segments: [{ type: "cite", text: "ACC/AHA 2018", citation_id: "u1" }, { type: "text", text: " recommends moderate-intensity statin." }] },
-      { type: "claim", segments: [{ type: "cite", text: "ADA Standards", citation_id: "u2" }, { type: "text", text: " set LDL target <70 mg/dL." }] }
+      { type: "claim", segments: [
+        { type: "text", text: "After dose escalation, " },
+        { type: "cite", text: "repeat lipid panel in 4-12 weeks to assess response and adjust as needed based on the LDL trajectory", citation_id: "u3" },
+        { type: "text", text: "." }
+      ]}
     ]
-    Each fact-as-its-own-claim is technically valid but reads as fragmented. Combine into one flowing claim when the facts share a sentence-level narrative.
+    The cite text "repeat lipid panel in 4-12 weeks to assess response and adjust as needed based on the LDL trajectory" is a 17-word run-on phrase — should be reduced to a short anchor like "repeat lipid panel in 4-12 weeks" or simply "monitoring guidance" with the rest of the sentence in surrounding text segments.
 
 - If the draft refused or the question is out of scope, emit a single "refusal" block with a short machine-readable reason.
 - Do not echo the citation legend or the draft itself; produce only the final envelope as the user will see it.`;
