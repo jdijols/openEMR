@@ -673,15 +673,46 @@ function renderBlock(
         return (
           <p key={key} className="agentforge-msg__claim">
             {segments.map((seg, i) => {
+              // Render-time word-boundary spacing (P5 fix, 2026-05-07): the
+              // server-side padSegmentBoundaries in responseEnvelope.ts
+              // already prepends a space to the current segment when both
+              // adjacent characters are non-whitespace, but inline rendering
+              // collapses leading whitespace inside <a>/<button> elements
+              // (markdown's whitespace normalization on adjacent text
+              // segments + browser handling of leading whitespace in inline
+              // elements). Add an explicit space TEXT NODE between segments
+              // when needed — text nodes between elements survive any
+              // markdown/inline-element whitespace stripping. Idempotent
+              // with padSegmentBoundaries (the regex check sees the prepended
+              // space if it survived; otherwise inserts the space here).
+              const prev = i > 0 ? (segments[i - 1] ?? null) : null;
+              const needsBoundarySpace =
+                prev !== null
+                && prev.text.length > 0
+                && seg.text.length > 0
+                && !/\s/.test(prev.text.slice(-1))
+                && !/\s/.test(seg.text.slice(0, 1));
+              const boundary = needsBoundarySpace ? ' ' : '';
+
               if (seg.type === 'text') {
                 const t = opts.assistantMessage === true ? displayAssistantText(seg.text) : seg.text;
                 if (opts.assistantMessage === true) {
                   // Inline Markdown: bold/italic/code render, but block-level
                   // constructs are unwrapped so they can't break out of the
                   // surrounding <p> (claim sentences sit between cite buttons).
-                  return <AssistantMarkdown key={i} text={t} inline />;
+                  return (
+                    <Fragment key={i}>
+                      {boundary}
+                      <AssistantMarkdown text={t} inline />
+                    </Fragment>
+                  );
                 }
-                return <span key={i}>{t}</span>;
+                return (
+                  <span key={i}>
+                    {boundary}
+                    {t}
+                  </span>
+                );
               }
 
               const hint = nav?.[seg.citation_id];
@@ -696,37 +727,42 @@ function renderBlock(
                 const sourceUrl = (hint.params as { source_url?: unknown }).source_url;
                 if (typeof sourceUrl === 'string' && sourceUrl !== '') {
                   return (
-                    <a
-                      key={i}
-                      href={sourceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="agentforge-msg__cite-link"
-                    >
-                      {seg.text}
-                      <IconExternalLink />
-                    </a>
+                    <Fragment key={i}>
+                      {boundary}
+                      <a
+                        href={sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="agentforge-msg__cite-link"
+                      >
+                        {seg.text}
+                        <IconExternalLink />
+                      </a>
+                    </Fragment>
                   );
                 }
               }
 
               if (canNav) {
                 return (
-                  <button
-                    key={i}
-                    type="button"
-                    className="agentforge-msg__cite-link"
-                    onClick={() => requestCitationNavigation(seg.citation_id, hint, bound)}
-                  >
-                    {seg.text}
-                  </button>
+                  <Fragment key={i}>
+                    {boundary}
+                    <button
+                      type="button"
+                      className="agentforge-msg__cite-link"
+                      onClick={() => requestCitationNavigation(seg.citation_id, hint, bound)}
+                    >
+                      {seg.text}
+                    </button>
+                  </Fragment>
                 );
               }
 
               return (
-                <span key={i} className="agentforge-msg__cite-fallback">
-                  {seg.text}
-                </span>
+                <Fragment key={i}>
+                  {boundary}
+                  <span className="agentforge-msg__cite-fallback">{seg.text}</span>
+                </Fragment>
               );
             })}
           </p>
