@@ -245,7 +245,7 @@ function summarizeExtractionConfidence(
   // Walk every leaf citation across both schema shapes and bucket
   // each citation's `confidence` value.
   const buckets = { high: 0, medium: 0, low: 0, missing: 0 };
-  const visit = (c: { confidence?: number } | undefined): void => {
+  const visit = (c: { confidence?: number | undefined } | undefined): void => {
     if (c === undefined) return;
     const v = c.confidence;
     if (typeof v !== 'number') {
