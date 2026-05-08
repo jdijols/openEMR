@@ -16,10 +16,16 @@ import { estimateUsdForProviderTokens } from './cost_estimate.js';
 import { todayInFacilityTz } from './local_date.js';
 import { CLINICAL_SYSTEM_PROMPT } from './system_prompt.js';
 import { getChatModel, getProviderModelId } from './model.js';
-import { buildCitationNavigationIndex, buildClinicalToolEvidence, type CitationNavigationHint } from './toolEvidence.js';
+import {
+  buildCitationLegendFromToolResults,
+  buildCitationNavigationIndex,
+  buildClinicalToolEvidence,
+  type CitationNavigationHint,
+} from './toolEvidence.js';
 import { verifyClinicalBlocks } from './verification.js';
 import { type AiToolResultLike, isToolResultLike } from './tool_results.js';
 import { HANDOFF_REASONS } from './handoff.js';
+import { finalizeStructuredEnvelope } from './finalizeStructured.js';
 
 const blocksEnvelopeSchema = z.object({
   blocks: z.array(chatBlockSchema),
@@ -854,6 +860,44 @@ export async function runChatTurn(
   const mergedToolResults = collectToolResultsFromGenerateTextResult(result);
 
   let blocks = parseBlocksFromModelText(result.text);
+
+  // P0-B / FB-D follow-up (2026-05-07) — when the turn used evidence_retrieve,
+  // run the structured-finalize pass to convert the LLM's free-text draft
+  // into a schema-validated envelope where claim blocks carry inline cite
+  // segments to the returned guideline chunks. The legacy parser
+  // (parseBlocksFromModelText above) handles chart-data turns correctly —
+  // the model produces proper claim+cite shapes natively for those — but on
+  // evidence_retrieve turns the model falls back to a "textbook prose +
+  // sources list at the end" shape that strips inline citations. The
+  // finalizer's Zod schema makes that shape unrepresentable: every claim
+  // block requires ≥1 cite segment, and citation_id is constrained to a
+  // closed enum of the chunk UUIDs returned this turn.
+  //
+  // Conditioned on the legend being non-empty (i.e. evidence_retrieve was
+  // actually invoked) so chart-data-only turns keep the proven legacy path
+  // and we don't pay an extra LLM call per turn for content that doesn't
+  // need restructuring. On finalizer failure (schema validation throws,
+  // model timeout, etc.) we fall through to the legacy blocks — same
+  // failure mode as today, no regression risk.
+  const citationLegendForFinalizer = buildCitationLegendFromToolResults(mergedToolResults);
+  if (citationLegendForFinalizer.length > 0) {
+    const evidenceForFinalizer = buildClinicalToolEvidence(input.patientUuid, mergedToolResults);
+    if (evidenceForFinalizer.citationUuids.size > 0) {
+      const structured = await finalizeStructuredEnvelope({
+        model,
+        userMessage: input.userMessage,
+        draftText: result.text,
+        citationLegend: citationLegendForFinalizer,
+        allowedCitationIds: evidenceForFinalizer.citationUuids,
+        observability,
+        correlationId,
+      });
+      if (structured !== null) {
+        blocks = structured.blocks;
+      }
+    }
+  }
+
   blocks = [...blocks, ...coerceProposalChatBlocks(mergedToolResults)];
 
   // §9 / G2-MVP-99 — surface successful attach_and_extract result as an

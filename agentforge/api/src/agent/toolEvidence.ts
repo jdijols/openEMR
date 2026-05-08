@@ -1,4 +1,5 @@
 import { sourcePackSchema, type SourcePack } from '../openemr/types.js';
+import type { CitationLegendEntry } from './mandatoryRetrieval.js';
 
 /** UUID → navigation_hint from Context Service rows (PRD §4.5 / §6.7); used only for CUI citation clicks. */
 export type CitationNavigationHint = {
@@ -217,4 +218,58 @@ export function buildCitationNavigationIndex(
   }
 
   return out;
+}
+
+/**
+ * Build the structured-finalization citation legend (citation_id → short
+ * label + source url + preview) from `evidence_retrieve` tool results. Used
+ * by the orchestrator's post-generateText structured-finalize call to feed
+ * `generateObject` the closed list of citable guideline chunks for this turn.
+ *
+ * Mirrors the legend `runMandatoryRetrieval` builds, but reads from the
+ * mid-turn tool result instead of pre-running the worker — so it works for
+ * both the model-driven `evidence_retrieve` tool path and any future
+ * mandatory-retrieval injection without duplication.
+ *
+ * Chart-data tools (get_allergies, get_meds, etc.) are intentionally NOT
+ * surfaced into the legend — chart citations work today via the legacy
+ * parser; the structured finalizer is the regression-fix surface for
+ * guideline citations specifically.
+ */
+export function buildCitationLegendFromToolResults(
+  toolResults: readonly { type?: string; toolName?: string; output?: unknown }[],
+): CitationLegendEntry[] {
+  const legend: CitationLegendEntry[] = [];
+  const seenIds = new Set<string>();
+
+  for (const tr of toolResults) {
+    if (tr.type !== 'tool-result' || tr.toolName !== 'evidence_retrieve') {
+      continue;
+    }
+    const output = tr.output;
+    if (!isPlainObject(output) || output['ok'] !== true) {
+      continue;
+    }
+    const chunks = output['chunks'];
+    if (!Array.isArray(chunks)) {
+      continue;
+    }
+    for (const chunk of chunks as readonly unknown[]) {
+      if (!isPlainObject(chunk)) continue;
+      const chunkId = typeof chunk['chunk_id'] === 'string' ? (chunk['chunk_id'] as string) : '';
+      const section = typeof chunk['section'] === 'string' ? (chunk['section'] as string) : '';
+      const sourceUrl = typeof chunk['source_url'] === 'string' ? (chunk['source_url'] as string) : '';
+      const text = typeof chunk['text'] === 'string' ? (chunk['text'] as string) : '';
+      if (chunkId === '' || seenIds.has(chunkId)) continue;
+      seenIds.add(chunkId);
+      legend.push({
+        citation_id: chunkId,
+        section,
+        source_url: sourceUrl,
+        preview: text.length > 240 ? `${text.slice(0, 239)}…` : text,
+      });
+    }
+  }
+
+  return legend;
 }
