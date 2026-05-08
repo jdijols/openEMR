@@ -34,7 +34,8 @@ require_once $fileRoot . '/interface/globals.php';
 final class AgentForgeCohortSeeder
 {
     private const PUBPID_PREFIX = 'AF-COHORT-';
-    private const COHORT_MARKER_NAME = 'AgentForge Cohort ID';
+    private const DEMO_MARKER_TABLE = 'agentforge_demo_patient_markers';
+    private const DEMO_MARKER_KIND = 'cohort';
     private const DEFAULT_GROUP = 'Default';
     private const EASY_DEV_BASE_URL = 'http://localhost:8300';
 
@@ -69,6 +70,7 @@ final class AgentForgeCohortSeeder
     public function run(): void
     {
         $this->assertDemoBaseline();
+        $this->ensureDemoMarkerTable();
         $this->normalizeStockDemoPatients();
         $this->clearExistingCohort();
 
@@ -229,14 +231,18 @@ final class AgentForgeCohortSeeder
 
     private function clearExistingCohort(): void
     {
+        // Identify cohort patients via the demo-marker table. Legacy installs
+        // also stored markers in genericname1/genericval1 (which leaked into
+        // the demographics "User Defined" UI); pick those up too so the first
+        // re-seed after this migration cleans both surfaces.
         $patients = QueryUtils::fetchRecords(
             "SELECT pid
              FROM patient_data
-             WHERE pubpid LIKE ?
+             WHERE pid IN (SELECT pid FROM " . self::DEMO_MARKER_TABLE . " WHERE marker_kind = ?)
                 OR (genericname1 = ? AND genericval1 LIKE ?)",
             [
-                self::PUBPID_PREFIX . '%',
-                self::COHORT_MARKER_NAME,
+                self::DEMO_MARKER_KIND,
+                'AgentForge Cohort ID',
                 self::PUBPID_PREFIX . '%',
             ]
         );
@@ -306,8 +312,39 @@ final class AgentForgeCohortSeeder
         }
 
         QueryUtils::sqlStatementThrowException(
+            $this->inSql("DELETE FROM " . self::DEMO_MARKER_TABLE . " WHERE pid IN (%s)", $pids),
+            $pids
+        );
+
+        QueryUtils::sqlStatementThrowException(
             $this->inSql("DELETE FROM patient_data WHERE pid IN (%s)", $pids),
             $pids
+        );
+    }
+
+    private function ensureDemoMarkerTable(): void
+    {
+        // Identifies AgentForge demo patients without polluting patient_data
+        // user-facing fields. Stored separately so the demographics widget
+        // shows a blank "User Defined" line, the way stock OpenEMR patients do.
+        QueryUtils::sqlStatementThrowException(
+            "CREATE TABLE IF NOT EXISTS " . self::DEMO_MARKER_TABLE . " (
+                pid INT(11) NOT NULL PRIMARY KEY,
+                marker_kind VARCHAR(20) NOT NULL,
+                marker_label VARCHAR(50) NOT NULL,
+                KEY idx_marker_kind (marker_kind),
+                KEY idx_marker_label (marker_label)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+        );
+    }
+
+    private function insertDemoMarker(int $pid, string $label): void
+    {
+        QueryUtils::sqlStatementThrowException(
+            "INSERT INTO " . self::DEMO_MARKER_TABLE . " (pid, marker_kind, marker_label)
+             VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE marker_kind = VALUES(marker_kind), marker_label = VALUES(marker_label)",
+            [$pid, self::DEMO_MARKER_KIND, $label]
         );
     }
 
@@ -391,8 +428,6 @@ final class AgentForgeCohortSeeder
             'ss' => $patientSpec['ss'] ?? sprintf('900-45-%04d', 1000 + $cohortNumber),
             'email' => $patientSpec['email'] ?? strtolower($patientSpec['fname'] . '.' . $patientSpec['lname']) . '@example.invalid',
             'providerID' => $provider['id'],
-            'genericname1' => self::COHORT_MARKER_NAME,
-            'genericval1' => $patientSpec['pubpid'],
             'financial_review' => date('Y-m-d 00:00:00'),
             'hipaa_mail' => 'YES',
             'hipaa_voice' => 'YES',
@@ -402,9 +437,11 @@ final class AgentForgeCohortSeeder
 
         $this->assertProcessingResult($result, 'patient ' . $patientSpec['pubpid']);
         $record = $result->getFirstDataResult();
+        $pid = (int)$record['pid'];
+        $this->insertDemoMarker($pid, (string)$patientSpec['pubpid']);
 
         return [
-            'pid' => (int)$record['pid'],
+            'pid' => $pid,
             'uuid' => (string)$record['uuid'],
         ];
     }
@@ -756,12 +793,15 @@ final class AgentForgeCohortSeeder
         $lines[] = '## Sanity Queries';
         $lines[] = '';
         $lines[] = '```sql';
-        $lines[] = "SELECT COUNT(*) AS patients FROM patient_data WHERE genericname1 = 'AgentForge Cohort ID' AND genericval1 LIKE 'AF-COHORT-%';";
-        $lines[] = "SELECT pubpid, COUNT(e.encounter) AS visits, MIN(e.date), MAX(e.date)";
-        $lines[] = '  FROM patient_data p LEFT JOIN form_encounter e USING (pid)';
-        $lines[] = "  WHERE genericname1 = 'AgentForge Cohort ID' AND genericval1 LIKE 'AF-COHORT-%' GROUP BY pubpid ORDER BY CAST(pubpid AS UNSIGNED);";
-        $lines[] = "SELECT type, COUNT(*) FROM lists l JOIN patient_data p USING (pid)";
-        $lines[] = "  WHERE p.genericname1 = 'AgentForge Cohort ID' AND p.genericval1 LIKE 'AF-COHORT-%' GROUP BY type;";
+        $lines[] = "SELECT COUNT(*) AS patients FROM agentforge_demo_patient_markers WHERE marker_kind = 'cohort';";
+        $lines[] = "SELECT p.pubpid, COUNT(e.encounter) AS visits, MIN(e.date), MAX(e.date)";
+        $lines[] = '  FROM agentforge_demo_patient_markers m';
+        $lines[] = '  JOIN patient_data p ON p.pid = m.pid';
+        $lines[] = '  LEFT JOIN form_encounter e ON e.pid = m.pid';
+        $lines[] = "  WHERE m.marker_kind = 'cohort' GROUP BY p.pubpid ORDER BY CAST(p.pubpid AS UNSIGNED);";
+        $lines[] = "SELECT l.type, COUNT(*) FROM lists l";
+        $lines[] = '  JOIN agentforge_demo_patient_markers m ON m.pid = l.pid';
+        $lines[] = "  WHERE m.marker_kind = 'cohort' GROUP BY l.type;";
         $lines[] = '```';
         $lines[] = '';
         $lines[] = '## Snapshot';
@@ -802,9 +842,9 @@ final class AgentForgeCohortSeeder
     private function printSanityQueries(): void
     {
         echo "\nSanity queries:\n";
-        echo "SELECT COUNT(*) AS patients FROM patient_data WHERE genericname1 = 'AgentForge Cohort ID' AND genericval1 LIKE 'AF-COHORT-%';\n";
-        echo "SELECT pubpid, COUNT(e.encounter) AS visits, MIN(e.date), MAX(e.date) FROM patient_data p LEFT JOIN form_encounter e USING (pid) WHERE genericname1 = 'AgentForge Cohort ID' AND genericval1 LIKE 'AF-COHORT-%' GROUP BY pubpid ORDER BY CAST(pubpid AS UNSIGNED);\n";
-        echo "SELECT type, COUNT(*) FROM lists l JOIN patient_data p USING (pid) WHERE p.genericname1 = 'AgentForge Cohort ID' AND p.genericval1 LIKE 'AF-COHORT-%' GROUP BY type;\n";
+        echo "SELECT COUNT(*) AS patients FROM agentforge_demo_patient_markers WHERE marker_kind = 'cohort';\n";
+        echo "SELECT p.pubpid, COUNT(e.encounter) AS visits, MIN(e.date), MAX(e.date) FROM agentforge_demo_patient_markers m JOIN patient_data p ON p.pid = m.pid LEFT JOIN form_encounter e ON e.pid = m.pid WHERE m.marker_kind = 'cohort' GROUP BY p.pubpid ORDER BY CAST(p.pubpid AS UNSIGNED);\n";
+        echo "SELECT l.type, COUNT(*) FROM lists l JOIN agentforge_demo_patient_markers m ON m.pid = l.pid WHERE m.marker_kind = 'cohort' GROUP BY l.type;\n";
     }
 
     private function assertProcessingResult(ProcessingResult $result, string $label): void
@@ -856,7 +896,16 @@ final class AgentForgeCohortSeeder
      */
     private function externalIdFor(array $patientSpec): string
     {
-        return sprintf('%04d', $this->cohortNumber($patientSpec) + 3);
+        $cohortNumber = $this->cohortNumber($patientSpec);
+        // W2 cohort (cohortNumber 11..14) maps to pubpid 0029..0032 to avoid
+        // colliding with seed_appointments.php's scheduled-patient external
+        // IDs (0014..0028, FIRST_SCHEDULED_PATIENT_EXTERNAL_ID + count). The
+        // intended pubpid layout is: 0001-0003 stock, 0004-0013 W1 cohort,
+        // 0014-0028 scheduled, 0029-0032 W2 cohort (32 unique IDs total).
+        if ($cohortNumber >= 11) {
+            return sprintf('%04d', $cohortNumber + 18);
+        }
+        return sprintf('%04d', $cohortNumber + 3);
     }
 }
 

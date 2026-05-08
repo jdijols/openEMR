@@ -33,6 +33,14 @@ final class AgentForgeAppointmentSeeder
     /**
      * Fixed four-day demo window. Each demo patient is scheduled exactly once across these days; dev/demo only.
      *
+     * 2026-05-07 migration: window shifted from 2026-05-10..13 (Sun-Wed)
+     * to 2026-05-09..12 (Sat-Tue) and Saturday became the W2-cohort
+     * spotlight day. The four W2 cohort patients (Margaret Chen, James
+     * Whitaker, Sofia Reyes, Robert Kowalski) fill the first four 30-min
+     * new-patient slots on Saturday so the multimodal extractor/retriever
+     * demo lands on a single day. Saturday carries 11 appointments;
+     * Sun/Mon/Tue carry 7 each (32 total, unchanged).
+     *
      * G2-Final-71 (2026-05-06): demo window migrated forward from
      * 2026-05-01..04 to 2026-05-10..13 (Sun-Wed of submission week) so
      * graders opening the deployed app on submission day see fresh
@@ -41,19 +49,24 @@ final class AgentForgeAppointmentSeeder
      * @var list<string>
      */
     private const DEMO_WEEKDAY_DATES = [
+        '2026-05-09',
         '2026-05-10',
         '2026-05-11',
         '2026-05-12',
-        '2026-05-13',
     ];
 
     private const EXPECTED_DEMO_PATIENT_COUNT = 32;
     private const APPOINTMENT_MARKER = '[AgentForge Appointment Seed]';
-    private const SCHEDULED_PATIENT_MARKER_NAME = 'AgentForge Scheduled Patient ID';
     private const SCHEDULED_PATIENT_PREFIX = 'AF-SCHEDULED-';
     private const FIRST_SCHEDULED_PATIENT_EXTERNAL_ID = 14;
-    private const COHORT_MARKER_NAME = 'AgentForge Cohort ID';
     private const COHORT_PREFIX = 'AF-COHORT-';
+    private const DEMO_MARKER_TABLE = 'agentforge_demo_patient_markers';
+    private const DEMO_MARKER_KIND_SCHEDULED = 'scheduled';
+    private const DEMO_MARKER_KIND_COHORT = 'cohort';
+    // Legacy genericname1/genericval1 marker name used pre-2026-05-08; the
+    // scheduled-patient cleanup query still falls back to this so a re-seed
+    // against an older DB picks up rows that pre-date the marker table.
+    private const LEGACY_SCHEDULED_MARKER_NAME = 'AgentForge Scheduled Patient ID';
     private const DEFAULT_GROUP = 'Default';
     private const EASY_DEV_BASE_URL = 'http://localhost:8300';
 
@@ -88,6 +101,7 @@ final class AgentForgeAppointmentSeeder
     public function run(): void
     {
         $this->assertBaseline();
+        $this->ensureDemoMarkerTable();
         $this->normalizeStockDemoPatients();
         $this->clearExistingSeed();
 
@@ -97,16 +111,16 @@ final class AgentForgeAppointmentSeeder
 
         // Split cohort by source. W1 cohort patients (AF-COHORT-001..010, source
         // 'cohort') are established follow-ups that fill 'established' template
-        // slots. W2 cohort patients (AF-COHORT-011+, source 'new') are walk-in
-        // new-patient appointments per W2_ARCHITECTURE.md §10 — they join the
-        // new-patient pool alongside the appointment-only scheduled patients
-        // and the existing overflow logic places them as new-patient appointments
-        // on the last demo day.
+        // slots. W2 cohort patients (AF-COHORT-011..014, source 'new') are the
+        // multimodal-orchestrator extractor/retriever test cohort and must all
+        // land on day 0 (Saturday) at 30 min each. They are placed at the front
+        // of the new-patient pool so the day-0 template's first four 'new' slots
+        // pick them up in order (Chen, Whitaker, Reyes, Kowalski).
         $w1CohortPatients = array_values(array_filter($cohortPatients, static fn(array $p): bool => $p['source'] === 'cohort'));
         $w2CohortPatients = array_values(array_filter($cohortPatients, static fn(array $p): bool => $p['source'] === 'new'));
 
         $establishedPatients = array_merge($stockPatients, $w1CohortPatients);
-        $newPatients = array_merge($scheduledPatients, $w2CohortPatients);
+        $newPatients = array_merge($w2CohortPatients, $scheduledPatients);
         $demoPatients = array_merge($establishedPatients, $newPatients);
         $this->assignDemoPatientsToAppointmentProvider($demoPatients);
 
@@ -246,12 +260,20 @@ final class AgentForgeAppointmentSeeder
             [self::APPOINTMENT_MARKER . '%']
         );
 
+        // Identify scheduled patients via the demo-marker table; also pick up
+        // any legacy rows that still carry the marker in genericname1/val1 so
+        // the first re-seed after this migration cleans both surfaces.
         $scheduledPatientPids = QueryUtils::fetchTableColumn(
             "SELECT pid
              FROM patient_data
-             WHERE genericname1 = ? AND genericval1 LIKE ?",
+             WHERE pid IN (SELECT pid FROM " . self::DEMO_MARKER_TABLE . " WHERE marker_kind = ?)
+                OR (genericname1 = ? AND genericval1 LIKE ?)",
             'pid',
-            [self::SCHEDULED_PATIENT_MARKER_NAME, self::SCHEDULED_PATIENT_PREFIX . '%']
+            [
+                self::DEMO_MARKER_KIND_SCHEDULED,
+                self::LEGACY_SCHEDULED_MARKER_NAME,
+                self::SCHEDULED_PATIENT_PREFIX . '%',
+            ]
         );
 
         $pids = array_map(static fn(int|string $pid): int => (int)$pid, $scheduledPatientPids);
@@ -265,6 +287,10 @@ final class AgentForgeAppointmentSeeder
         );
         QueryUtils::sqlStatementThrowException(
             $this->inSql("DELETE FROM patient_access_onsite WHERE pid IN (%s)", $pids),
+            $pids
+        );
+        QueryUtils::sqlStatementThrowException(
+            $this->inSql("DELETE FROM " . self::DEMO_MARKER_TABLE . " WHERE pid IN (%s)", $pids),
             $pids
         );
         QueryUtils::sqlStatementThrowException(
@@ -358,8 +384,6 @@ final class AgentForgeAppointmentSeeder
                 'ss' => $patientSpec['ss'] ?? sprintf('900-46-%04d', 3000 + $number),
                 'email' => $patientSpec['email'] ?? strtolower($patientSpec['fname'] . '.' . $patientSpec['lname']) . '@example.invalid',
                 'providerID' => $provider['id'],
-                'genericname1' => self::SCHEDULED_PATIENT_MARKER_NAME,
-                'genericval1' => $marker,
                 'financial_review' => date('Y-m-d 00:00:00'),
                 'hipaa_mail' => 'YES',
                 'hipaa_voice' => 'YES',
@@ -369,8 +393,10 @@ final class AgentForgeAppointmentSeeder
 
             $this->assertProcessingResult($result, 'scheduled patient ' . $marker);
             $record = $result->getFirstDataResult();
+            $pid = (int)$record['pid'];
+            $this->insertDemoMarker($pid, self::DEMO_MARKER_KIND_SCHEDULED, $marker);
             $patients[] = [
-                'pid' => (int)$record['pid'],
+                'pid' => $pid,
                 'pubpid' => $externalId,
                 'name' => $patientSpec['fname'] . ' ' . $patientSpec['lname'],
                 'source' => 'new',
@@ -411,13 +437,14 @@ final class AgentForgeAppointmentSeeder
     private function loadCohortPatients(): array
     {
         $rows = QueryUtils::fetchRecords(
-            "SELECT p.pid, p.pubpid, p.fname, p.lname, p.genericval1,
+            "SELECT p.pid, p.pubpid, p.fname, p.lname, m.marker_label,
                     u.fname AS provider_fname, u.lname AS provider_lname
-             FROM patient_data p
+             FROM " . self::DEMO_MARKER_TABLE . " m
+             JOIN patient_data p ON p.pid = m.pid
              LEFT JOIN users u ON u.id = p.providerID
-             WHERE p.genericname1 = ? AND p.genericval1 LIKE ?
+             WHERE m.marker_kind = ?
              ORDER BY CAST(p.pubpid AS UNSIGNED), p.pid",
-            [self::COHORT_MARKER_NAME, self::COHORT_PREFIX . '%']
+            [self::DEMO_MARKER_KIND_COHORT]
         );
 
         $prefixLen = strlen(self::COHORT_PREFIX);
@@ -425,7 +452,7 @@ final class AgentForgeAppointmentSeeder
             // W2 cohort patients (AF-COHORT-011+) are walk-in new-patient
             // appointments per W2_ARCHITECTURE.md §10. W1 cohort patients
             // (AF-COHORT-001..010) remain established follow-ups.
-            $cohortNumber = (int)substr((string)$row['genericval1'], $prefixLen);
+            $cohortNumber = (int)substr((string)$row['marker_label'], $prefixLen);
             return [
                 'pid' => (int)$row['pid'],
                 'pubpid' => (string)$row['pubpid'],
@@ -723,49 +750,62 @@ final class AgentForgeAppointmentSeeder
 
     private function scheduleTemplates(): array
     {
+        // Day 0 (Saturday) is the W2-cohort spotlight day with 11 appointments:
+        // a back-to-back morning block of four 30-min new-patient intakes (the
+        // four W2 cohort patients in pool order), then a small mid-morning
+        // established-patient cluster, then more new-patient slots through
+        // lunch. Days 1-3 (Sun/Mon/Tue) are normal 7-appointment clinic days.
         return [
+            // Day 0 — Saturday (11 slots): 8 new (4 W2 cohort + 4 scheduled), 3 established.
             [
-                'A' => $this->block('08:30', [
-                    ['established', 15],
-                    ['established', 15],
+                'A' => $this->block('08:00', [
+                    ['new', 30],
+                    ['new', 30],
+                    ['new', 30],
                     ['new', 30],
                     ['established', 15],
                     ['established', 15],
                     ['new', 30],
-                    ['established', 15],
-                ]),
-            ],
-            [
-                'A' => $this->block('08:30', [
-                    ['new', 30],
-                    ['established', 15],
-                    ['new', 30],
-                    ['established', 15],
-                    ['new', 30],
-                    ['established', 15],
-                    ['new', 30],
-                ]),
-            ],
-            [
-                'A' => $this->block('08:30', [
-                    ['established', 15],
-                    ['new', 30],
-                    ['established', 15],
                     ['new', 30],
                     ['established', 15],
                     ['new', 30],
                     ['new', 30],
                 ]),
             ],
+            // Day 1 — Sunday (7 slots): 4 new, 3 established.
+            [
+                'A' => $this->block('08:30', [
+                    ['established', 15],
+                    ['new', 30],
+                    ['established', 15],
+                    ['new', 30],
+                    ['new', 30],
+                    ['established', 15],
+                    ['new', 30],
+                ]),
+            ],
+            // Day 2 — Monday (7 slots): 4 new, 3 established.
             [
                 'A' => $this->block('08:30', [
                     ['new', 30],
-                    ['new', 30],
-                    ['new', 30],
                     ['established', 15],
                     ['new', 30],
                     ['new', 30],
                     ['established', 15],
+                    ['new', 30],
+                    ['established', 15],
+                ]),
+            ],
+            // Day 3 — Tuesday (7 slots): 3 new, 4 established.
+            [
+                'A' => $this->block('08:30', [
+                    ['established', 15],
+                    ['new', 30],
+                    ['established', 15],
+                    ['established', 15],
+                    ['new', 30],
+                    ['established', 15],
+                    ['new', 30],
                 ]),
             ],
         ];
@@ -932,7 +972,7 @@ final class AgentForgeAppointmentSeeder
             '',
             'All appointments and scheduled-patient records are fabricated synthetic data for demo and evaluation use only.',
             '',
-            '**Demo window:** **Sunday 2026-05-10 through Wednesday 2026-05-13** only. Each of the 32 demo patients appears **exactly once** across the four-day Donna Lee schedule.',
+            '**Demo window:** **Saturday 2026-05-09 through Tuesday 2026-05-12** only. Saturday is the W2-cohort spotlight day (4 multimodal-orchestrator test patients in the first four 30-min slots, then 7 other appointments). Each of the 32 demo patients appears **exactly once** across the four-day Donna Lee schedule.',
             'Run `contrib/util/agentforge/seed_visit_intake.php` after this script to create same-day intake encounters.',
             '',
             '## Patient Sources',
@@ -1108,6 +1148,32 @@ final class AgentForgeAppointmentSeeder
     private function inSql(string $template, array $values): string
     {
         return sprintf($template, $this->placeholders($values));
+    }
+
+    private function ensureDemoMarkerTable(): void
+    {
+        // Identifies AgentForge demo patients without polluting patient_data
+        // user-facing fields. Stored separately so the demographics widget
+        // shows a blank "User Defined" line, the way stock OpenEMR patients do.
+        QueryUtils::sqlStatementThrowException(
+            "CREATE TABLE IF NOT EXISTS " . self::DEMO_MARKER_TABLE . " (
+                pid INT(11) NOT NULL PRIMARY KEY,
+                marker_kind VARCHAR(20) NOT NULL,
+                marker_label VARCHAR(50) NOT NULL,
+                KEY idx_marker_kind (marker_kind),
+                KEY idx_marker_label (marker_label)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+        );
+    }
+
+    private function insertDemoMarker(int $pid, string $kind, string $label): void
+    {
+        QueryUtils::sqlStatementThrowException(
+            "INSERT INTO " . self::DEMO_MARKER_TABLE . " (pid, marker_kind, marker_label)
+             VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE marker_kind = VALUES(marker_kind), marker_label = VALUES(marker_label)",
+            [$pid, $kind, $label]
+        );
     }
 }
 

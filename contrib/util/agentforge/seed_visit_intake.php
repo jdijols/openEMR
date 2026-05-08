@@ -40,20 +40,28 @@ final class AgentForgeVisitIntakeSeeder
 
     /** @var list<string> */
     private const DEMO_WEEKDAY_DATES = [
-        '2026-05-01',
-        '2026-05-02',
-        '2026-05-03',
-        '2026-05-04',
+        '2026-05-09',
+        '2026-05-10',
+        '2026-05-11',
+        '2026-05-12',
     ];
 
-    private const EXPECTED_DEMO_PATIENT_COUNT = 28;
+    private const EXPECTED_DEMO_PATIENT_COUNT = 32;
+    // LEGACY range covers every prior demo window: W1 (2026-05-01..04) and the
+    // shipped-but-unrun G2-Final-71 window (2026-05-10..13). The range overlaps
+    // the current DEMO window; that is intentional — the legacy purge runs
+    // before encounter creation, so the new encounters end up clean.
     private const LEGACY_DELETE_START = '2026-05-01';
-    private const LEGACY_DELETE_END = '2026-05-04';
+    private const LEGACY_DELETE_END = '2026-05-13';
 
-    private const COHORT_MARKER_NAME = 'AgentForge Cohort ID';
-    private const COHORT_PREFIX = 'AF-COHORT-';
-    private const SCHEDULED_PATIENT_MARKER_NAME = 'AgentForge Scheduled Patient ID';
-    private const SCHEDULED_PATIENT_PREFIX = 'AF-SCHEDULED-';
+    private const DEMO_MARKER_TABLE = 'agentforge_demo_patient_markers';
+    // Legacy genericname1/genericval1 markers used pre-2026-05-08; the demo-pid
+    // lookup still falls back to these so a run against an older DB still
+    // finds patients that pre-date the marker table.
+    private const LEGACY_COHORT_MARKER_NAME = 'AgentForge Cohort ID';
+    private const LEGACY_COHORT_PREFIX = 'AF-COHORT-';
+    private const LEGACY_SCHEDULED_MARKER_NAME = 'AgentForge Scheduled Patient ID';
+    private const LEGACY_SCHEDULED_PREFIX = 'AF-SCHEDULED-';
     private const DEFAULT_GROUP = 'Default';
 
     private EncounterService $encounterService;
@@ -79,6 +87,7 @@ final class AgentForgeVisitIntakeSeeder
     public function run(): void
     {
         UuidRegistry::createMissingUuidsForTables(['patient_data']);
+        $this->ensureDemoMarkerTable();
 
         $demoPids = $this->loadDemoPatientIds();
         if ($demoPids === []) {
@@ -113,14 +122,15 @@ final class AgentForgeVisitIntakeSeeder
         $rows = QueryUtils::fetchRecords(
             "SELECT pid FROM patient_data
              WHERE pid IN (1, 2, 3)
+                OR pid IN (SELECT pid FROM " . self::DEMO_MARKER_TABLE . ")
                 OR (genericname1 = ? AND genericval1 LIKE ?)
                 OR (genericname1 = ? AND genericval1 LIKE ?)
              ORDER BY pid",
             [
-                self::COHORT_MARKER_NAME,
-                self::COHORT_PREFIX . '%',
-                self::SCHEDULED_PATIENT_MARKER_NAME,
-                self::SCHEDULED_PATIENT_PREFIX . '%',
+                self::LEGACY_COHORT_MARKER_NAME,
+                self::LEGACY_COHORT_PREFIX . '%',
+                self::LEGACY_SCHEDULED_MARKER_NAME,
+                self::LEGACY_SCHEDULED_PREFIX . '%',
             ]
         );
 
@@ -625,7 +635,11 @@ final class AgentForgeVisitIntakeSeeder
         }
 
         $raw = $row[0]['uuid'];
-        if (is_string($raw) && str_contains($raw, '-')) {
+        // Display-form UUIDs are exactly 36 chars (8-4-4-4-12 with dashes).
+        // The previous "contains a dash" heuristic is unsafe — binary UUIDs
+        // can contain byte 0x2D (e.g. pid 85's a1b56fee-6be2-422d-…), so the
+        // raw 16-byte blob would be returned as-is and fail UUID validation.
+        if (is_string($raw) && strlen($raw) === 36) {
             return $raw;
         }
 
@@ -705,6 +719,22 @@ final class AgentForgeVisitIntakeSeeder
     private function placeholders(array $values): string
     {
         return implode(',', array_fill(0, count($values), '?'));
+    }
+
+    private function ensureDemoMarkerTable(): void
+    {
+        // Defensive — seed_cohort.php and seed_appointments.php normally
+        // create this table before this script runs, but a standalone run
+        // against a fresh DB would otherwise fail on the marker subquery.
+        QueryUtils::sqlStatementThrowException(
+            "CREATE TABLE IF NOT EXISTS " . self::DEMO_MARKER_TABLE . " (
+                pid INT(11) NOT NULL PRIMARY KEY,
+                marker_kind VARCHAR(20) NOT NULL,
+                marker_label VARCHAR(50) NOT NULL,
+                KEY idx_marker_kind (marker_kind),
+                KEY idx_marker_label (marker_label)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+        );
     }
 }
 
