@@ -1035,21 +1035,20 @@ export function MessageList(props: {
                 className="agentforge-msg agentforge-msg--attachment-row"
                 aria-label="Attached file"
               >
-                {/* P5 fix (2026-05-07): the conversation cache JSON-serializes
-                    messages to sessionStorage so a refresh / iframe remount
-                    can replay the dialog. `File` objects don't survive
-                    JSON.stringify (they coerce to `{}`), so on cache replay
-                    `m.attachment.file` is undefined and AttachmentPreview's
-                    `props.file.type.startsWith(...)` throws — which crashes
-                    the whole rail (the symptom Jason hit clicking the CUI
-                    refresh button after uploading an intake form). Guard:
-                    only render the live preview when the File is still
-                    around; on cache replay, render a minimal filename chip
-                    using the persisted metadata (name + docrefUuid) so the
-                    attachment stays visible in the thread without crashing.
-                    The chip is still clickable to open DocumentModal once
-                    the upload has resolved a docref. */}
-                {m.attachment.file !== undefined && m.attachment.file !== null ? (
+                {/* P5 fix (2026-05-07, second pass): the conversation cache
+                    JSON-serializes messages to sessionStorage so a refresh /
+                    iframe remount can replay the dialog. `File` objects
+                    don't survive JSON.stringify — they coerce to **empty
+                    objects** (`{}`), NOT to undefined or null. So a naive
+                    `m.attachment.file !== undefined` guard slips through,
+                    AttachmentPreview gets `file = {}`, calls `{}.type` which
+                    is undefined, calls `undefined.startsWith(...)` and the
+                    whole rail unmounts. Use `instanceof File` so the guard
+                    catches the empty-object case too. On cache replay,
+                    render a clickable filename chip using the persisted
+                    metadata (name + docrefUuid) so the attachment stays
+                    visible without crashing. */}
+                {m.attachment.file instanceof File ? (
                   <AttachmentPreview
                     file={m.attachment.file}
                     {...(m.attachment.docrefUuid !== undefined && props.onOpenDocument !== undefined

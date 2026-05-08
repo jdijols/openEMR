@@ -743,38 +743,67 @@ export default function App(): ReactElement {
   }, [acceptFile]);
 
   function refreshChartBinding(): void {
-    // P5 fix (Bug B): the previous P3 implementation called
-    // `window.location.reload()` after the cache-bust to re-mount the iframe
-    // from a clean state. That re-runs `panel.php` which mints a NEW one-time
-    // launch code; under normal conditions `useHandshake` redeems the new
-    // code and the rail comes back. Under transient conditions (in-flight
-    // cache-bust racing the reload, brief session refresh, double-mount in
-    // dev StrictMode), the redeem can land in `status: 'error'` and the rail
-    // renders nothing visible — operator sees "panel disappeared."
+    // P5 fix (Bug B, third pass): two prior implementations were wrong.
     //
-    // Soft refresh path: when the handshake is already valid, we don't need
-    // to re-mount the iframe at all. Bust the API brief cache (so the next
-    // present-patient fetch is fresh) and nudge the brief state machine back
-    // to `idle` — the auto-fetch effect at the briefStatus useEffect re-runs
-    // whenever `briefStatus.kind === 'idle'` and re-presents the patient
-    // without remounting the iframe document. No launch-code re-redemption,
-    // no risk of the panel disappearing.
-    if (handshake.status === 'ready' && patientUuid !== null && patientUuid !== '') {
-      void postPresentPatient(apiBase, handshake.sessionToken, patientUuid, true).catch(() => {
-        /* ignore — the briefStatus reset below is the user-visible recovery path */
-      });
-      // Reset the in-flight ref so the brief-fetch effect can re-run within
-      // the same mount. Without this, the auto-fetch effect's idempotency
-      // guard would prevent a second fetch on the same iframe instance.
-      briefInFlightRef.current = false;
-      setBriefStatus({ kind: 'idle' });
+    // Pass 1: `window.location.reload()` — re-mounted the iframe, ran panel.php
+    // which minted a new one-time launch code; under transient conditions the
+    // redeem failed and the rail rendered nothing visible.
+    //
+    // Pass 2: soft-reset via `setBriefStatus({ kind: 'idle' })` — bumped the
+    // brief auto-fetch effect to re-run, but that effect's first branch
+    // replays the cached conversation (line 404: setMessages([...cached])),
+    // which (a) didn't visibly refresh anything because the data was the
+    // same, and (b) clobbered live in-memory state (such as a user message's
+    // alive `attachment.file`) with the cache-stripped version (where File
+    // objects coerce to `{}` under JSON.stringify), then crashed in
+    // AttachmentPreview.
+    //
+    // Pass 3 (this one): bypass the cache-replay path entirely. Show a
+    // loading state immediately, fetch a fresh brief with forceRefresh=true,
+    // and replace just the brief message in-place — preserving every other
+    // message in the thread (typed turns, proposal cards, attachments with
+    // live File objects). No state-machine roundtrip, no cache replay, no
+    // remount.
+    if (handshake.status !== 'ready' || patientUuid === null || patientUuid === '') {
+      // Pre-handshake / error-state escape hatch. Hard reload is the only
+      // recovery; the launch code is invalid anyway so re-redemption is
+      // the desired outcome.
+      window.location.reload();
       return;
     }
-    // Pre-handshake / error-state escape hatch — only reach here when the
-    // operator clicks Refresh from a stuck connecting / error state. Hard
-    // reload is the only recovery; the launch code is invalid anyway so
-    // re-redemption is the desired outcome.
-    window.location.reload();
+    if (briefInFlightRef.current) {
+      // Already refreshing — let the in-flight one finish.
+      return;
+    }
+    briefInFlightRef.current = true;
+    setBriefStatus({ kind: 'loading' });
+    void (async () => {
+      try {
+        const out = await postPresentPatient(apiBase, handshake.sessionToken, patientUuid, true);
+        const fresh: ChatMessage = {
+          role: 'assistant',
+          blocks: out.blocks,
+          citation_navigation: out.citation_navigation,
+        };
+        // Replace the first message (the brief — always prepended at line
+        // 356 / 425) in-place; preserve everything after it. Edge case: if
+        // the user somehow got into a state with no assistant brief at
+        // index 0 (shouldn't happen — auto-effect prepends — but defensive),
+        // just prepend.
+        setMessages((prev) => {
+          if (prev[0]?.role === 'assistant') {
+            return [fresh, ...prev.slice(1)];
+          }
+          return [fresh, ...prev];
+        });
+        writeCachedBrief(patientUuid, { blocks: out.blocks, citation_navigation: out.citation_navigation });
+        setBriefStatus({ kind: 'success' });
+      } catch (err) {
+        setBriefStatus({ kind: 'failed', error: toDeliveryFailure(err) });
+      } finally {
+        briefInFlightRef.current = false;
+      }
+    })();
   }
 
   function reloadPanel(): void {
