@@ -86,6 +86,21 @@ export default {
       },
       boxShadow: {
         'af-card': '0 1px 2px rgba(15, 23, 42, 0.04)',
+        'af-card-hover':
+          '0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -12px rgba(15, 23, 42, 0.12)',
+      },
+      keyframes: {
+        // Shimmer loading: gradient sweeps left-to-right across skeleton bars.
+        // Cleaner than `animate-pulse` — communicates "data loading" instead of
+        // a static placeholder. WCAG: respects prefers-reduced-motion (loaders
+        // remain visible but the sweep stops via the media query in index.css).
+        shimmer: {
+          '0%': { backgroundPosition: '200% 0' },
+          '100%': { backgroundPosition: '-200% 0' },
+        },
+      },
+      animation: {
+        shimmer: 'shimmer 1.6s linear infinite',
       },
     },
   },

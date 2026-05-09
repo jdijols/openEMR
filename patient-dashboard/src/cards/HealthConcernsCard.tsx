@@ -1,3 +1,4 @@
+import { Target } from 'lucide-react'
 import { ClinicalCard } from '../components/ClinicalCard'
 import { useFhirQuery } from '../fhir/hooks'
 import {
@@ -18,11 +19,11 @@ export function HealthConcernsCard({ patientId }: Props) {
     Schema,
   )
 
-  if (query.isLoading) return <ClinicalCard title="Health Concerns" status="loading" />
+  if (query.isLoading) return <ClinicalCard title="Health Concerns" icon={<Target size={16} />} accent="amber" status="loading" />
   if (query.error) {
     return (
       <ClinicalCard
-        title="Health Concerns"
+        title="Health Concerns" icon={<Target size={16} />} accent="amber"
         status="error"
         errorMessage="Could not load health concerns."
         errorCorrelationId={query.error.detail.correlationId}
@@ -36,14 +37,14 @@ export function HealthConcernsCard({ patientId }: Props) {
   if (conditions.length === 0) {
     return (
       <ClinicalCard
-        title="Health Concerns"
+        title="Health Concerns" icon={<Target size={16} />} accent="amber"
         status="empty"
         emptyMessage="No health concerns recorded."
       />
     )
   }
   return (
-    <ClinicalCard title="Health Concerns" status="content">
+    <ClinicalCard title="Health Concerns" icon={<Target size={16} />} accent="amber" status="content">
       <ConditionList conditions={conditions} />
     </ClinicalCard>
   )

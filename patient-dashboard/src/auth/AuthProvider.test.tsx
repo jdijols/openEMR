@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { AuthProvider, useAccessToken, useAuth } from './AuthProvider'
+import { AuthProvider, useAccessToken, useAuth, useFhirCredential } from './AuthProvider'
 
 function wrapper({ children }: { children: ReactNode }) {
   return <AuthProvider>{children}</AuthProvider>
@@ -66,6 +66,7 @@ describe('<AuthProvider>', () => {
     expect(sessionStorage.getItem('patient-dashboard:pending-auth')).not.toBeNull()
     act(() => {
       result.current.completeAuthorization({
+        mode: 'bearer',
         accessToken: 'access',
         idToken: 'id',
         refreshToken: 'refresh',
@@ -75,6 +76,7 @@ describe('<AuthProvider>', () => {
     })
     expect(result.current.state.status).toBe('authenticated')
     if (result.current.state.status === 'authenticated') {
+      expect(result.current.state.mode).toBe('bearer')
       expect(result.current.state.accessToken).toBe('access')
       expect(result.current.state.refreshToken).toBe('refresh')
       expect(result.current.state.patientId).toBe('pt-123')
@@ -91,6 +93,7 @@ describe('<AuthProvider>', () => {
     expect(sessionStorage.getItem('patient-dashboard:pending-auth')).not.toBeNull()
     act(() => {
       result.current.completeAuthorization({
+        mode: 'bearer',
         accessToken: 'a',
         idToken: 'i',
         refreshToken: null,
@@ -103,6 +106,32 @@ describe('<AuthProvider>', () => {
     })
     expect(result.current.state.status).toBe('unauthenticated')
     expect(sessionStorage.getItem('patient-dashboard:pending-auth')).toBeNull()
+  })
+
+  it('useFhirCredential returns null when unauthenticated', () => {
+    const { result } = renderHook(() => useFhirCredential(), { wrapper })
+    expect(result.current).toBeNull()
+  })
+
+  it('useFhirCredential returns {mode, token} after completeAuthorization', () => {
+    const { result } = renderHook(
+      () => ({ auth: useAuth(), credential: useFhirCredential() }),
+      { wrapper },
+    )
+    act(() => {
+      result.current.auth.completeAuthorization({
+        mode: 'localApi',
+        accessToken: 'csrf-40-char-token',
+        idToken: '',
+        refreshToken: null,
+        expiresIn: 3600,
+        patientId: 'pt-1',
+      })
+    })
+    expect(result.current.credential).toEqual({
+      mode: 'localApi',
+      token: 'csrf-40-char-token',
+    })
   })
 
   it('useAuth throws outside <AuthProvider>', () => {

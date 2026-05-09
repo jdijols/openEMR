@@ -22,13 +22,17 @@ describe('<PatientHeaderView>', () => {
     expect(screen.getByRole('heading', { name: /Sofia M Reyes/ })).toBeInTheDocument()
   })
 
-  it('renders sex, DOB, age, and MRN in the meta line', () => {
+  it('renders sex, DOB, age, and MRN in the meta row', () => {
     render(<PatientHeaderView patient={sofia} />)
-    const meta = screen.getByText(/Female/)
-    expect(meta).toBeInTheDocument()
-    expect(meta.textContent).toMatch(/Dec 19, 1983/)
-    expect(meta.textContent).toMatch(/MRN 0031/)
-    expect(meta.textContent).toMatch(/yo/)
+    expect(screen.getByText(/Female/)).toBeInTheDocument()
+    expect(screen.getByText(/Dec 19, 1983/)).toBeInTheDocument()
+    expect(screen.getByText(/MRN 0031/)).toBeInTheDocument()
+    expect(screen.getByText(/\d+ yo/)).toBeInTheDocument()
+  })
+
+  it('renders an avatar with the patient initials', () => {
+    const { container } = render(<PatientHeaderView patient={sofia} />)
+    expect(container.textContent).toContain('SR')
   })
 
   it('renders Active pill when patient is active', () => {

@@ -60,6 +60,43 @@ These are the deep-link anchors the grader will need:
 
 ---
 
+## 2b. W2 Surprise Challenge — Patient Dashboard Migration
+
+**Brief:** [Documentation/AgentForge/references/AgentForge_Clinical-Co-Pilot_W2_Surprise-Challenge_Modernize-the-Patient-Dashboard.pdf](references/AgentForge_Clinical-Co-Pilot_W2_Surprise-Challenge_Modernize-the-Patient-Dashboard.pdf). Released 2026-05-06; same Sunday-noon submission deadline as the W2 main brief; graded as a separate deliverable.
+
+| # | Deliverable | Brief requirement | Status | Artifact / link |
+|---|---|---|---|---|
+| 1 | **Working reimplementation in a modern framework** | Port the patient dashboard to a modern framework, consume OpenEMR's REST/FHIR API, no backend changes | ✅ shipped | [`patient-dashboard/`](../../patient-dashboard/) — React 19 + Vite 8 + TypeScript 6 + TanStack Query v5 + Zod v4 + Tailwind CSS v3. **11 cards** rendering live FHIR data: 6 Tier-0 (Patient Header, Allergies, Problem List, Medications, Prescriptions, Care Team, Vitals) + 5 Tier-1 stretch (Demographics, Health Concerns, Immunizations, Appointments, Labs). Embedded inside OpenEMR's chart shell at [`interface/modules/custom_modules/oe-module-agentforge/public/dashboard.php`](../../interface/modules/custom_modules/oe-module-agentforge/public/dashboard.php) (PHP loader) → React bundle in same module's `public/dashboard/`. **114 KB gzipped.** |
+| 2 | **Authentication via OAuth2/OpenID Connect** | Login round-trip works | ✅ shipped (two paths) | **Production (embedded mode):** OpenEMR's existing OAuth2/OIDC login → React inherits the chart session via same-origin cookie + APICSRFTOKEN header (`LocalApiAuthorizationController` strategy, the same auth pathway `interface/main/tabs/main.php:133` uses). **Dev mode (preserved):** standalone OAuth2 + PKCE round-trip via `/login` and `/callback`. Both paths in source; production uses LocalApi. Defense narrative in [PATIENT_DASHBOARD_MIGRATION.md §7 (architecture revision)](../../PATIENT_DASHBOARD_MIGRATION.md) + [Appendix A (auth pathway, in detail)](../../PATIENT_DASHBOARD_MIGRATION.md). |
+| 3 | **Patient header — name, DOB, sex, MRN, active status** | Persistent identity bar | ✅ shipped | [`patient-dashboard/src/patient/PatientHeader.tsx`](../../patient-dashboard/src/patient/PatientHeader.tsx). Sticky-top, all 5 brief-required fields, `<h1>` accessibility landmark. Renders from `Patient/{uuid}` FHIR resource. |
+| 4 | **Required clinical cards (Allergies, Problem List, Medications, Prescriptions, Care Team)** | Each pulling live data from FHIR API | ✅ shipped | [`patient-dashboard/src/cards/`](../../patient-dashboard/src/cards/). Severity color-coding on Allergies (red/amber/emerald by `criticality` — beyond legacy parity which renders yellow regardless). Active-only filter on Medications; sort-by-`authoredOn`-desc on Prescriptions. Empty / loading / error states explicit (typed code + correlation id). |
+| 5 | **One additional section of choice** | Encounter, labs, vitals, immunizations, appointments, or notes | ✅ shipped (Vitals is the brief's "+1"; Tier 1 adds 4 more) | Vitals card matches legacy parity (single most-recent encounter as key/value rows — discovered via PD-00 visual capture; would have shipped 10-row table without Phase 0). Labs card renders LOINC name + value + reference range + abnormal H/L pill in red — most clinically vivid card in the demo. |
+| 6 | **PATIENT_DASHBOARD_MIGRATION.md defense doc** | Defense of framework choice + tradeoffs | ✅ shipped | [`PATIENT_DASHBOARD_MIGRATION.md`](../../PATIENT_DASHBOARD_MIGRATION.md) at repo root — 10 sections + Appendix A (auth pathway in detail) + Appendix B (5-route comparison table). Cross-referenced from PRD, dashboard-recon outputs, and this submission scoreboard. |
+| 7 | **Reverse-engineering output (Phase 0)** | Per Tom Tarpey's reverse-first auditing methodology | ✅ shipped — exceeds | [`Documentation/AgentForge/implementation/dashboard-recon/`](implementation/dashboard-recon/) — 1,599 lines across 16 docs: `manifest.md` (entry-point map of all 22 legacy cards) + `cards/` (12 per-card MDs, 7 Tier-0 + 5 Tier-1) + `PARITY-NOTES.md` (parity catalog) + `MIGRATION-OPTIONS.md` (5-route comparison). 28 manual screenshots. |
+| 8 | **Tab integration into OpenEMR chart shell** | (Implicit in "this page itself should be completely migrated over") | ✅ shipped | `Bootstrap.php` subscribes to `PatientMenuEvent::MENU_UPDATE` → rewrites the existing Dashboard tab URL to point at our `dashboard.php`. Clicking Dashboard from the secondary patient nav loads the React app full-canvas; legacy `demographics.php` no longer reachable from the menu. |
+| 9 | **Visual elevation pass (Phase 7)** | (Implicit in the brief grading the demo video — visual cohesion is what graders see first) | ✅ shipped | [`interface/themes/agentforge-elevated.css`](../../interface/themes/agentforge-elevated.css) — single scoped CSS file using the same `--af-*` design tokens as the React surfaces. Loaded conditionally via two render-event hooks (chart shell + demographics.php). Re-skins the chart-shell top tab strip + the patient secondary nav so the chrome speaks the same visual language as the React app. Reverts in one commented-out line. |
+| 10 | **Test suite + type safety** | (Implicit in framework defense) | ✅ shipped | **116/116 vitest cases passing** across 18 test files (113 from Phases 0–4 + 3 added during the auth refactor for the new mode-aware credential branch). `tsc --noEmit` clean. `npm run lint` clean. |
+| 11 | **Deployed (graders can reach the dashboard)** | Reachable from the deployed app | ⏸ pending operator | Local Docker fully verified: HTTP 200 round-trip on dashboard.php; FHIR endpoints accept APICSRFTOKEN (200) and reject without (401); D6 + D7 audits pass. VPS deploy needs operator action: `git push gitlab master` + `agentforge-enable.php` to refresh module branding (per [project_module_registrar_refresh memory](../../.claude/projects/-Users-jasondijols-Documents-Code-Projects-openEMR/memory/project_module_registrar_refresh.md)) + DB import refresh per [VPS DB deploys via full local-DB import memory](../../.claude/projects/-Users-jasondijols-Documents-Code-Projects-openEMR/memory/project_vps_db_deploy_workflow.md). |
+| 12 | **Demo video segment** | 30-second cut showing the modernized dashboard | ⏸ pending operator | Re-cut FB-C-06 to include 30s of the dashboard load (Phil Belford pid=1 verified locally) — Sunday AM. |
+
+**Dashboard pre-submit (parallel to §3 below):**
+
+- [x] `tsc --noEmit` clean
+- [x] 116/116 vitest passing
+- [x] PHP syntax clean (php -l on dashboard.php + Bootstrap.php)
+- [x] Production build (`npm run build` from `patient-dashboard/`) lands in `interface/modules/custom_modules/oe-module-agentforge/public/dashboard/` — 114 KB gzipped
+- [x] PD-93 dashboard.php loader: session check + CSRF mint + `window.__AGENTFORGE_DASHBOARD__` injection
+- [x] PD-95 PatientMenuEvent rewrite: secondary Dashboard tab URL → dashboard.php
+- [x] PD-97 Phase 7 elevation: agentforge-elevated.css + dual-event injection (chart shell + demographics.php)
+- [x] PD-98 D6 audit: zero PHP/Twig/Smarty in dashboard.php response body
+- [x] PD-98 D7 audit: clinician auth context (authUser=admin, request_user_role=users)
+- [x] PD-100 PATIENT_DASHBOARD_MIGRATION.md at repo root
+- [ ] VPS redeploy + dashboard smoke from cellular — operator
+- [ ] Demo video 30s segment — operator
+- [ ] Submission form fields populated with the dashboard URL — operator
+
+---
+
 ## 3. Pre-submit checklist
 
 Tick each line as it closes. **Do not submit while any line in this section is ❌.**

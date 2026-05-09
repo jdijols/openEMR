@@ -1,8 +1,11 @@
 import { describe, it, expect, vi } from 'vitest'
 import { z } from 'zod'
+import type { FhirCredential } from '../auth/AuthProvider'
 import { fhirGet, FhirRequestError } from './client'
 
 const PatientLite = z.object({ resourceType: z.literal('Patient'), id: z.string() })
+const BEARER: FhirCredential = { mode: 'bearer', token: 't' }
+const LOCAL_API: FhirCredential = { mode: 'localApi', token: 't' }
 
 function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(body), {
@@ -19,30 +22,61 @@ describe('fhirGet', () => {
       expect(String(url)).toContain('foo=bar')
       return jsonResponse({ resourceType: 'Patient', id: 'abc' })
     })
-    const res = await fhirGet('/Patient/abc', { foo: 'bar' }, PatientLite, 'tok', fetchMock as unknown as typeof fetch)
+    const res = await fhirGet(
+      '/Patient/abc',
+      { foo: 'bar' },
+      PatientLite,
+      { mode: 'bearer', token: 'tok' },
+      fetchMock as unknown as typeof fetch,
+    )
     expect(res.id).toBe('abc')
   })
 
-  it('attaches Bearer auth header', async () => {
+  it('attaches Bearer auth header in bearer mode', async () => {
     const fetchMock = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
       const headers = new Headers(init?.headers)
       expect(headers.get('Authorization')).toBe('Bearer my-tok')
+      expect(headers.get('APICSRFTOKEN')).toBeNull()
       return jsonResponse({ resourceType: 'Patient', id: 'p' })
     })
-    await fhirGet('/Patient/p', undefined, PatientLite, 'my-tok', fetchMock as unknown as typeof fetch)
+    await fhirGet(
+      '/Patient/p',
+      undefined,
+      PatientLite,
+      { mode: 'bearer', token: 'my-tok' },
+      fetchMock as unknown as typeof fetch,
+    )
+  })
+
+  it('attaches APICSRFTOKEN header in localApi mode (no Authorization header)', async () => {
+    const fetchMock = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      const headers = new Headers(init?.headers)
+      expect(headers.get('APICSRFTOKEN')).toBe('csrf-tok')
+      expect(headers.get('Authorization')).toBeNull()
+      // Same-origin credentials: cookie carries the OpenEMR session for LocalApi
+      expect(init?.credentials).toBe('same-origin')
+      return jsonResponse({ resourceType: 'Patient', id: 'p' })
+    })
+    await fhirGet(
+      '/Patient/p',
+      undefined,
+      PatientLite,
+      { mode: 'localApi', token: 'csrf-tok' },
+      fetchMock as unknown as typeof fetch,
+    )
   })
 
   it('throws unauthorized on 401', async () => {
     const fetchMock = vi.fn(async () => new Response('', { status: 401 }))
     await expect(
-      fhirGet('/Patient/x', undefined, PatientLite, 't', fetchMock as unknown as typeof fetch),
+      fhirGet('/Patient/x', undefined, PatientLite, BEARER, fetchMock as unknown as typeof fetch),
     ).rejects.toMatchObject({ detail: { kind: 'unauthorized' } })
   })
 
   it('throws http error on non-ok non-401', async () => {
     const fetchMock = vi.fn(async () => new Response('', { status: 500 }))
     try {
-      await fhirGet('/Patient/x', undefined, PatientLite, 't', fetchMock as unknown as typeof fetch)
+      await fhirGet('/Patient/x', undefined, PatientLite, BEARER, fetchMock as unknown as typeof fetch)
       expect.unreachable('should have thrown')
     } catch (e) {
       expect(e).toBeInstanceOf(FhirRequestError)
@@ -56,7 +90,7 @@ describe('fhirGet', () => {
   it('throws parse error on schema mismatch', async () => {
     const fetchMock = vi.fn(async () => jsonResponse({ wrong: 'shape' }))
     await expect(
-      fhirGet('/Patient/x', undefined, PatientLite, 't', fetchMock as unknown as typeof fetch),
+      fhirGet('/Patient/x', undefined, PatientLite, BEARER, fetchMock as unknown as typeof fetch),
     ).rejects.toMatchObject({ detail: { kind: 'parse' } })
   })
 
@@ -65,14 +99,14 @@ describe('fhirGet', () => {
       throw new Error('connection refused')
     })
     await expect(
-      fhirGet('/Patient/x', undefined, PatientLite, 't', fetchMock as unknown as typeof fetch),
+      fhirGet('/Patient/x', undefined, PatientLite, LOCAL_API, fetchMock as unknown as typeof fetch),
     ).rejects.toMatchObject({ detail: { kind: 'network', message: 'connection refused' } })
   })
 
   it('attaches a correlation id to every error', async () => {
     const fetchMock = vi.fn(async () => new Response('', { status: 500 }))
     try {
-      await fhirGet('/x', undefined, PatientLite, 't', fetchMock as unknown as typeof fetch)
+      await fhirGet('/x', undefined, PatientLite, BEARER, fetchMock as unknown as typeof fetch)
     } catch (e) {
       if (e instanceof FhirRequestError) {
         expect(typeof e.detail.correlationId).toBe('string')

@@ -92,6 +92,15 @@ services:
       OPENEMR_SETTING_SMTP_Auth: 'TRUE'
       OPENEMR_SETTING_practice_return_email_path: 'noreply@openemr.local'
       OPENEMR_SETTING_Patient_Reminder_Sender_Name: 'OpenEMR Reminders'
+      # Disables the chart-shell-triggered background-service runner. Under
+      # Apache mod_php (`apache2handler` SAPI), PHP_BINARY resolves to an
+      # empty string — SymfonyBackgroundServiceSpawner then passes "" as
+      # `args[0]` to proc_open, which throws "First element must contain a
+      # non-empty program name" and the runner returns HTTP 500 on every
+      # chart load. Production deployments run background services via
+      # cron rather than the chart-shell trigger anyway, so the right move
+      # in dev is the env flag OpenEMR already exposes for this exact case.
+      OPENEMR__NO_BACKGROUND_TASKS: "true"
     depends_on:
       mysql:
         condition: service_healthy

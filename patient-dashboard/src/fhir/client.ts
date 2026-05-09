@@ -1,4 +1,5 @@
 import type { z } from 'zod'
+import type { FhirCredential } from '../auth/AuthProvider'
 
 export type FhirErrorDetail =
   | { kind: 'unauthorized'; correlationId: string }
@@ -42,7 +43,7 @@ export async function fhirGet<T>(
   path: string,
   params: FhirGetParams | undefined,
   schema: z.ZodType<T>,
-  accessToken: string,
+  credential: FhirCredential,
   fetchImpl: typeof fetch = fetch,
 ): Promise<T> {
   const correlationId =
@@ -50,13 +51,23 @@ export async function fhirGet<T>(
       ? crypto.randomUUID()
       : Math.random().toString(36).slice(2)
 
+  // Two auth wire formats. `bearer`: standalone-dev OAuth2 access token in the
+  // Authorization header. `localApi`: same-origin OpenEMR session cookie + 40-char
+  // CSRF token in the APICSRFTOKEN header — see
+  // src/RestControllers/Authorization/LocalApiAuthorizationController.php.
+  const authHeader: HeadersInit =
+    credential.mode === 'bearer'
+      ? { Authorization: `Bearer ${credential.token}` }
+      : { APICSRFTOKEN: credential.token }
+
   let resp: Response
   try {
     resp = await fetchImpl(buildUrl(path, params), {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        ...authHeader,
         Accept: 'application/json',
       },
+      credentials: 'same-origin',
     })
   } catch (e) {
     throw new FhirRequestError({

@@ -90,6 +90,7 @@ export function Callback() {
         }
 
         completeAuthorization({
+          mode: 'bearer',
           accessToken: tokens.access_token,
           idToken: tokens.id_token,
           refreshToken: tokens.refresh_token ?? null,

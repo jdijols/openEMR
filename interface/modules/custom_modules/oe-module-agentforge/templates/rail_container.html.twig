@@ -684,6 +684,27 @@
             }
         }
 
+        // Re-mint the panel iframe in place — same-origin navigation with a
+        // cache-busted URL so the iframe actually reloads (without the cache
+        // bust the browser would no-op when src is unchanged). Browsers keep
+        // the previous document rendered until the new one parses, so the
+        // user sees a smooth content swap on patient change instead of the
+        // white about:blank flash that the older blankPanelIframe() pattern
+        // caused. If the rail is collapsed, defer the reload — we'll catch
+        // up via ensurePanelLoaded() when the user un-collapses.
+        function reloadPanelFresh() {
+            if (!frame || panelSrc === '') {
+                return;
+            }
+            if (rail.classList.contains('agentforge-rail--collapsed')) {
+                panelLoaded = false;
+                return;
+            }
+            var sep = panelSrc.indexOf('?') >= 0 ? '&' : '?';
+            frame.setAttribute('src', panelSrc + sep + '_=' + Date.now());
+            panelLoaded = true;
+        }
+
         setInterval(function () {
             var cur = readPidProbe();
             var curEnc = readEncounterProbe();
@@ -694,12 +715,64 @@
             if (cur !== prevPid || curEnc !== prevEncounter) {
                 prevPid = cur;
                 prevEncounter = curEnc;
-                blankPanelIframe();
-                if (!rail.classList.contains('agentforge-rail--collapsed')) {
-                    ensurePanelLoaded();
-                }
+                reloadPanelFresh();
             }
         }, 1500);
+
+        // W2 deactivation fix: subscribe directly to the chart-shell's patient
+        // observable so patient-clear (clearPatient() in tabs_view_model.js
+        // → app_view_model.application_data.patient(null)) collapses the rail
+        // back to empty state immediately, not on the next 1500ms poll tick.
+        // The polling above remains the safety net for non-Knockout state
+        // changes (encounter id, DOM-driven pid input).
+        //
+        // RACE GUARD: clearPatient() does TWO things — sets the Knockout
+        // observable to null synchronously AND fires a fire-and-forget AJAX
+        // POST to unset $_SESSION['pid']. The Knockout side fires our
+        // subscription instantly, but if we reload panel.php right then the
+        // AJAX hasn't roundtripped yet and panel.php reads the OLD session
+        // pid, re-minting a launch code for the just-deactivated patient
+        // (the CUI then loads the previous patient's data and the panel
+        // looks "stuck"). Defer the reload by ~350ms — long enough for the
+        // localhost AJAX to land, short enough to feel instant. The blank
+        // fires immediately so the user gets visual feedback right away.
+        try {
+            var topWin = window.top;
+            var patientObs =
+                topWin &&
+                topWin.app_view_model &&
+                topWin.app_view_model.application_data &&
+                topWin.app_view_model.application_data.patient;
+            if (patientObs && typeof patientObs.subscribe === 'function') {
+                var pendingReloadTimer = null;
+                patientObs.subscribe(function (newValue) {
+                    var nextPid =
+                        newValue && typeof newValue.pid === 'function' && newValue.pid() !== null && newValue.pid() !== undefined
+                            ? String(newValue.pid())
+                            : '';
+                    if (nextPid === prevPid) {
+                        return;
+                    }
+                    prevPid = nextPid;
+                    prevEncounter = '';
+                    // Smooth swap (no about:blank flash): keep the old panel
+                    // visible during the AJAX-race wait, then navigate the
+                    // iframe to a fresh panel.php URL. Same-origin nav lets
+                    // the browser hold the old document rendered until the
+                    // new one parses — user sees content replace cleanly.
+                    if (pendingReloadTimer !== null) {
+                        clearTimeout(pendingReloadTimer);
+                    }
+                    pendingReloadTimer = setTimeout(function () {
+                        pendingReloadTimer = null;
+                        reloadPanelFresh();
+                    }, 350);
+                });
+            }
+        } catch (ignored) {
+            // Cross-frame access errors should never break the rail; the
+            // polling setInterval above remains as the fallback path.
+        }
 
         if (frame) {
             frame.addEventListener('load', syncBoundEncounterFromFrame);

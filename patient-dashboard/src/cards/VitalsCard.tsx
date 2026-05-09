@@ -1,3 +1,4 @@
+import { HeartPulse } from 'lucide-react'
 import { ClinicalCard } from '../components/ClinicalCard'
 import { useFhirQuery } from '../fhir/hooks'
 import {
@@ -39,11 +40,11 @@ export function VitalsCard({ patientId }: Props) {
     Schema,
   )
 
-  if (query.isLoading) return <ClinicalCard title="Vitals" status="loading" />
+  if (query.isLoading) return <ClinicalCard title="Vitals" icon={<HeartPulse size={16} />} accent="emerald" status="loading" />
   if (query.error) {
     return (
       <ClinicalCard
-        title="Vitals"
+        title="Vitals" icon={<HeartPulse size={16} />} accent="emerald"
         status="error"
         errorMessage="Could not load vitals."
         errorCorrelationId={query.error.detail.correlationId}
@@ -53,10 +54,10 @@ export function VitalsCard({ patientId }: Props) {
   const observations = bundleEntries(query.data)
   const latest = mostRecentEncounter(observations)
   if (!latest) {
-    return <ClinicalCard title="Vitals" status="empty" emptyMessage="No vitals recorded." />
+    return <ClinicalCard title="Vitals" icon={<HeartPulse size={16} />} accent="emerald" status="empty" emptyMessage="No vitals recorded." />
   }
   return (
-    <ClinicalCard title="Vitals" status="content">
+    <ClinicalCard title="Vitals" icon={<HeartPulse size={16} />} accent="emerald" status="content">
       <VitalsView encounter={latest} />
     </ClinicalCard>
   )

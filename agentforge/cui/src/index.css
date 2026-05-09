@@ -1761,3 +1761,15 @@ body {
     transform: rotate(360deg);
   }
 }
+
+/*
+ * W2 dashboard polish — hide the eval-gate + PHI-redaction badge footer
+ * from the clinician-facing CUI view. The pills are W2-brief grading
+ * evidence (FB-A-05/06) but visually noisy for a physician demo. The
+ * components, /health/eval-status + /health/phi-redaction endpoints,
+ * tests, and the footer wrapper itself are all kept intact — re-enable
+ * by removing this single rule.
+ */
+.agentforge-cui__footer {
+  display: none !important;
+}

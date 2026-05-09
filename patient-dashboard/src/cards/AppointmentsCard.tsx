@@ -1,3 +1,4 @@
+import { CalendarDays } from 'lucide-react'
 import { ClinicalCard } from '../components/ClinicalCard'
 import { useFhirQuery } from '../fhir/hooks'
 import {
@@ -16,11 +17,11 @@ const Schema = FhirBundleSchema(FhirAppointmentSchema)
 export function AppointmentsCard({ patientId }: Props) {
   const query = useFhirQuery('/Appointment', { patient: patientId, _count: 50 }, Schema)
 
-  if (query.isLoading) return <ClinicalCard title="Appointments" status="loading" />
+  if (query.isLoading) return <ClinicalCard title="Appointments" icon={<CalendarDays size={16} />} accent="sky" status="loading" />
   if (query.error) {
     return (
       <ClinicalCard
-        title="Appointments"
+        title="Appointments" icon={<CalendarDays size={16} />} accent="sky"
         status="error"
         errorMessage="Could not load appointments."
         errorCorrelationId={query.error.detail.correlationId}
@@ -31,14 +32,14 @@ export function AppointmentsCard({ patientId }: Props) {
   if (sorted.length === 0) {
     return (
       <ClinicalCard
-        title="Appointments"
+        title="Appointments" icon={<CalendarDays size={16} />} accent="sky"
         status="empty"
         emptyMessage="No upcoming appointments."
       />
     )
   }
   return (
-    <ClinicalCard title="Appointments" status="content">
+    <ClinicalCard title="Appointments" icon={<CalendarDays size={16} />} accent="sky" status="content">
       <AppointmentList appointments={sorted} />
     </ClinicalCard>
   )
@@ -73,7 +74,7 @@ function StatusPill({ status }: { status: string }) {
         : 'bg-af-gray-100 text-af-text-subtle ring-af-border'
   return (
     <span
-      className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${cls}`}
+      className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ring-1 ${cls}`}
     >
       {capitalize(status)}
     </span>

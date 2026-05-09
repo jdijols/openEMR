@@ -1,3 +1,4 @@
+import { Users } from 'lucide-react'
 import { ClinicalCard } from '../components/ClinicalCard'
 import { useFhirQuery } from '../fhir/hooks'
 import {
@@ -14,11 +15,11 @@ const Schema = FhirBundleSchema(FhirCareTeamSchema)
 export function CareTeamCard({ patientId }: Props) {
   const query = useFhirQuery('/CareTeam', { patient: patientId }, Schema)
 
-  if (query.isLoading) return <ClinicalCard title="Care Team" status="loading" />
+  if (query.isLoading) return <ClinicalCard title="Care Team" icon={<Users size={16} />} accent="emerald" status="loading" />
   if (query.error) {
     return (
       <ClinicalCard
-        title="Care Team"
+        title="Care Team" icon={<Users size={16} />} accent="emerald"
         status="error"
         errorMessage="Could not load care team."
         errorCorrelationId={query.error.detail.correlationId}
@@ -30,14 +31,14 @@ export function CareTeamCard({ patientId }: Props) {
   if (populated.length === 0) {
     return (
       <ClinicalCard
-        title="Care Team"
+        title="Care Team" icon={<Users size={16} />} accent="emerald"
         status="empty"
         emptyMessage="No care team members assigned."
       />
     )
   }
   return (
-    <ClinicalCard title="Care Team" status="content">
+    <ClinicalCard title="Care Team" icon={<Users size={16} />} accent="emerald" status="content">
       <CareTeamList teams={populated} />
     </ClinicalCard>
   )
@@ -55,8 +56,8 @@ export function CareTeamList({ teams }: { teams: FhirCareTeam[] }) {
                 <span
                   className={
                     t.status === 'active'
-                      ? 'inline-flex items-center px-2 py-0.5 rounded-full bg-af-success-50 text-af-success-700 text-xs font-medium ring-1 ring-af-success-50'
-                      : 'inline-flex items-center px-2 py-0.5 rounded-full bg-af-gray-100 text-af-text-subtle text-xs font-medium ring-1 ring-af-border'
+                      ? 'inline-flex items-center px-2 py-0.5 rounded-md bg-af-success-50 text-af-success-700 text-xs font-medium ring-1 ring-af-success-50'
+                      : 'inline-flex items-center px-2 py-0.5 rounded-md bg-af-gray-100 text-af-text-subtle text-xs font-medium ring-1 ring-af-border'
                   }
                 >
                   {capitalize(t.status)}

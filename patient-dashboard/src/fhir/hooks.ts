@@ -1,6 +1,6 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import type { z } from 'zod'
-import { useAccessToken } from '../auth/AuthProvider'
+import { useFhirCredential } from '../auth/AuthProvider'
 import { fhirGet, FhirRequestError, type FhirGetParams } from './client'
 
 export function useFhirQuery<T>(
@@ -8,11 +8,11 @@ export function useFhirQuery<T>(
   params: FhirGetParams | undefined,
   schema: z.ZodType<T>,
 ): UseQueryResult<T, FhirRequestError> {
-  const accessToken = useAccessToken()
+  const credential = useFhirCredential()
   return useQuery<T, FhirRequestError>({
-    queryKey: ['fhir', path, params ?? {}],
+    queryKey: ['fhir', credential?.mode ?? 'none', path, params ?? {}],
     queryFn: () => {
-      if (!accessToken) {
+      if (!credential) {
         throw new FhirRequestError({
           kind: 'unauthorized',
           correlationId:
@@ -21,9 +21,9 @@ export function useFhirQuery<T>(
               : Math.random().toString(36).slice(2),
         })
       }
-      return fhirGet(path, params, schema, accessToken)
+      return fhirGet(path, params, schema, credential)
     },
-    enabled: !!accessToken,
+    enabled: !!credential,
     retry: (failureCount, error) => {
       if (error.detail.kind === 'unauthorized') return false
       return failureCount < 1

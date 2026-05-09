@@ -1,3 +1,4 @@
+import { FlaskConical } from 'lucide-react'
 import { ClinicalCard } from '../components/ClinicalCard'
 import { useFhirQuery } from '../fhir/hooks'
 import {
@@ -26,11 +27,11 @@ export function LabsCard({ patientId }: Props) {
     Schema,
   )
 
-  if (query.isLoading) return <ClinicalCard title="Labs" status="loading" />
+  if (query.isLoading) return <ClinicalCard title="Labs" icon={<FlaskConical size={16} />} accent="violet" status="loading" />
   if (query.error) {
     return (
       <ClinicalCard
-        title="Labs"
+        title="Labs" icon={<FlaskConical size={16} />} accent="violet"
         status="error"
         errorMessage="Could not load labs."
         errorCorrelationId={query.error.detail.correlationId}
@@ -39,10 +40,10 @@ export function LabsCard({ patientId }: Props) {
   }
   const labs = bundleEntries(query.data).slice(0, MAX_ROWS)
   if (labs.length === 0) {
-    return <ClinicalCard title="Labs" status="empty" emptyMessage="No labs recorded." />
+    return <ClinicalCard title="Labs" icon={<FlaskConical size={16} />} accent="violet" status="empty" emptyMessage="No labs recorded." />
   }
   return (
-    <ClinicalCard title="Labs" status="content">
+    <ClinicalCard title="Labs" icon={<FlaskConical size={16} />} accent="violet" status="content">
       <LabList labs={labs} />
     </ClinicalCard>
   )

@@ -1,3 +1,4 @@
+import { AlertTriangle } from 'lucide-react'
 import { ClinicalCard } from '../components/ClinicalCard'
 import { useFhirQuery } from '../fhir/hooks'
 import {
@@ -15,13 +16,15 @@ export function AllergiesCard({ patientId }: Props) {
   const query = useFhirQuery('/AllergyIntolerance', { patient: patientId }, Schema)
 
   if (query.isLoading) {
-    return <ClinicalCard title="Allergies" status="loading" />
+    return <ClinicalCard title="Allergies" status="loading" icon={<AlertTriangle size={16} />} accent="rose" />
   }
   if (query.error) {
     return (
       <ClinicalCard
         title="Allergies"
         status="error"
+        icon={<AlertTriangle size={16} />}
+        accent="rose"
         errorMessage="Could not load allergies."
         errorCorrelationId={query.error.detail.correlationId}
       />
@@ -30,10 +33,10 @@ export function AllergiesCard({ patientId }: Props) {
   const all = bundleEntries(query.data).filter(isActive)
   const sorted = sortBySeverity(all)
   if (sorted.length === 0) {
-    return <ClinicalCard title="Allergies" status="empty" emptyMessage="No active allergies on file." />
+    return <ClinicalCard title="Allergies" status="empty" icon={<AlertTriangle size={16} />} accent="rose" emptyMessage="No active allergies on file." />
   }
   return (
-    <ClinicalCard title="Allergies" status="content">
+    <ClinicalCard title="Allergies" status="content" icon={<AlertTriangle size={16} />} accent="rose">
       <AllergiesList allergies={sorted} />
     </ClinicalCard>
   )
@@ -58,7 +61,7 @@ function SeverityPill({ allergy }: { allergy: FhirAllergyIntolerance }) {
   const cls = severityClass(label)
   return (
     <span
-      className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${cls}`}
+      className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ring-1 ${cls}`}
     >
       {capitalize(label)}
     </span>

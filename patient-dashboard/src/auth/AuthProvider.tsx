@@ -1,11 +1,19 @@
 import { createContext, useCallback, useContext, useState } from 'react'
 import type { ReactNode } from 'react'
 
+// `bearer` is the standalone-dev path (OAuth2 + PKCE → access token in memory).
+// `localApi` is the module-embedded production path: same-origin session cookie
+// + APICSRFTOKEN header against OpenEMR's LocalApi auth strategy. Both produce
+// authorized FHIR calls; the wire format differs (Authorization: Bearer vs
+// APICSRFTOKEN). The `token` field carries the credential under either mode.
+export type FhirAuthMode = 'bearer' | 'localApi'
+
 export type AuthState =
   | { status: 'unauthenticated' }
   | { status: 'authenticating'; pkceVerifier: string; csrfState: string }
   | {
       status: 'authenticated'
+      mode: FhirAuthMode
       accessToken: string
       idToken: string
       refreshToken: string | null
@@ -14,6 +22,7 @@ export type AuthState =
     }
 
 export type AuthorizedTokens = {
+  mode: FhirAuthMode
   accessToken: string
   idToken: string
   refreshToken: string | null
@@ -66,12 +75,13 @@ function clearPending(): void {
 }
 
 function initialState(initialAuth: AuthorizedTokens | undefined): AuthState {
-  // Module-embedded mode: PHP loader injects an access token + patient context
+  // Module-embedded mode: PHP loader injects a credential + patient context
   // before the React app boots, so we start in `authenticated` immediately —
   // no OAuth round-trip in the browser, no patient picker, no consent screen.
   if (initialAuth) {
     return {
       status: 'authenticated',
+      mode: initialAuth.mode,
       accessToken: initialAuth.accessToken,
       idToken: initialAuth.idToken,
       refreshToken: initialAuth.refreshToken,
@@ -108,6 +118,7 @@ export function AuthProvider({
     clearPending()
     setState({
       status: 'authenticated',
+      mode: tokens.mode,
       accessToken: tokens.accessToken,
       idToken: tokens.idToken,
       refreshToken: tokens.refreshToken,
@@ -137,6 +148,14 @@ export function useAuth(): AuthContextValue {
 export function useAccessToken(): string | null {
   const { state } = useAuth()
   return state.status === 'authenticated' ? state.accessToken : null
+}
+
+export type FhirCredential = { mode: FhirAuthMode; token: string }
+
+export function useFhirCredential(): FhirCredential | null {
+  const { state } = useAuth()
+  if (state.status !== 'authenticated') return null
+  return { mode: state.mode, token: state.accessToken }
 }
 
 export function usePendingAuth(): { pkceVerifier: string; csrfState: string } | null {

@@ -1,3 +1,4 @@
+import { Syringe } from 'lucide-react'
 import { ClinicalCard } from '../components/ClinicalCard'
 import { useFhirQuery } from '../fhir/hooks'
 import {
@@ -15,11 +16,11 @@ const Schema = FhirBundleSchema(FhirImmunizationSchema)
 export function ImmunizationsCard({ patientId }: Props) {
   const query = useFhirQuery('/Immunization', { patient: patientId, _sort: '-date' }, Schema)
 
-  if (query.isLoading) return <ClinicalCard title="Immunizations" status="loading" />
+  if (query.isLoading) return <ClinicalCard title="Immunizations" icon={<Syringe size={16} />} accent="violet" status="loading" />
   if (query.error) {
     return (
       <ClinicalCard
-        title="Immunizations"
+        title="Immunizations" icon={<Syringe size={16} />} accent="violet"
         status="error"
         errorMessage="Could not load immunizations."
         errorCorrelationId={query.error.detail.correlationId}
@@ -31,14 +32,14 @@ export function ImmunizationsCard({ patientId }: Props) {
   if (sorted.length === 0) {
     return (
       <ClinicalCard
-        title="Immunizations"
+        title="Immunizations" icon={<Syringe size={16} />} accent="violet"
         status="empty"
         emptyMessage="No immunizations recorded."
       />
     )
   }
   return (
-    <ClinicalCard title="Immunizations" status="content">
+    <ClinicalCard title="Immunizations" icon={<Syringe size={16} />} accent="violet" status="content">
       <ImmunizationList immunizations={sorted} />
     </ClinicalCard>
   )

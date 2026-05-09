@@ -1,3 +1,4 @@
+import { IdCard } from 'lucide-react'
 import { ClinicalCard } from '../components/ClinicalCard'
 import { useFhirQuery } from '../fhir/hooks'
 import { FhirPatientSchema, type FhirPatient } from '../fhir/schemas'
@@ -9,11 +10,11 @@ export function DemographicsCard({ patientId }: Props) {
   // (no additional network round-trip).
   const query = useFhirQuery(`/Patient/${patientId}`, undefined, FhirPatientSchema)
 
-  if (query.isLoading) return <ClinicalCard title="Demographics" status="loading" />
+  if (query.isLoading) return <ClinicalCard title="Demographics" icon={<IdCard size={16} />} status="loading" />
   if (query.error) {
     return (
       <ClinicalCard
-        title="Demographics"
+        title="Demographics" icon={<IdCard size={16} />}
         status="error"
         errorMessage="Could not load demographics."
         errorCorrelationId={query.error.detail.correlationId}
@@ -21,10 +22,10 @@ export function DemographicsCard({ patientId }: Props) {
     )
   }
   if (!query.data) {
-    return <ClinicalCard title="Demographics" status="empty" emptyMessage="No demographics on file." />
+    return <ClinicalCard title="Demographics" icon={<IdCard size={16} />} status="empty" emptyMessage="No demographics on file." />
   }
   return (
-    <ClinicalCard title="Demographics" status="content">
+    <ClinicalCard title="Demographics" icon={<IdCard size={16} />} status="content">
       <DemographicsView patient={query.data} />
     </ClinicalCard>
   )

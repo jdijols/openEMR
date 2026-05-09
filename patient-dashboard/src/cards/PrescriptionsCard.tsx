@@ -1,3 +1,4 @@
+import { ScrollText } from 'lucide-react'
 import { ClinicalCard } from '../components/ClinicalCard'
 import { useFhirQuery } from '../fhir/hooks'
 import {
@@ -16,11 +17,11 @@ const Schema = FhirBundleSchema(FhirMedicationRequestSchema)
 export function PrescriptionsCard({ patientId }: Props) {
   const query = useFhirQuery('/MedicationRequest', { patient: patientId, intent: 'order' }, Schema)
 
-  if (query.isLoading) return <ClinicalCard title="Prescriptions" status="loading" />
+  if (query.isLoading) return <ClinicalCard title="Prescriptions" icon={<ScrollText size={16} />} accent="sky" status="loading" />
   if (query.error) {
     return (
       <ClinicalCard
-        title="Prescriptions"
+        title="Prescriptions" icon={<ScrollText size={16} />} accent="sky"
         status="error"
         errorMessage="Could not load prescriptions."
         errorCorrelationId={query.error.detail.correlationId}
@@ -32,14 +33,14 @@ export function PrescriptionsCard({ patientId }: Props) {
   if (sorted.length === 0) {
     return (
       <ClinicalCard
-        title="Prescriptions"
+        title="Prescriptions" icon={<ScrollText size={16} />} accent="sky"
         status="empty"
         emptyMessage="No prescriptions on record."
       />
     )
   }
   return (
-    <ClinicalCard title="Prescriptions" status="content">
+    <ClinicalCard title="Prescriptions" icon={<ScrollText size={16} />} accent="sky" status="content">
       <PrescriptionList prescriptions={sorted} />
     </ClinicalCard>
   )
