@@ -23,10 +23,24 @@
 # behavior preserved for any environment not opted in to OpenEMR-via-Caddy.
 {$OPENEMR_PUBLIC_HOSTNAME} {
     encode gzip
-    reverse_proxy openemr:80 {
-        header_up X-Forwarded-Proto https
-        header_up X-Forwarded-Host {host}
+
+    # Patient Dashboard SPA — built artifact served by a sibling nginx container.
+    # `handle_path` strips the `/dashboard` prefix before forwarding so nginx serves
+    # `dist/index.html` and assets from its document root. SPA fallback in nginx.conf
+    # ensures client-side routes (e.g., `/dashboard/patient/<uuid>`) resolve correctly.
+    handle_path /dashboard/* {
+        reverse_proxy patient-dashboard:80
     }
+
+    # Everything else on this hostname goes to OpenEMR. X-Forwarded-Proto tells
+    # OpenEMR to emit HTTPS-scheme URLs in redirects.
+    handle {
+        reverse_proxy openemr:80 {
+            header_up X-Forwarded-Proto https
+            header_up X-Forwarded-Host {host}
+        }
+    }
+
     log {
         output stdout
         format console

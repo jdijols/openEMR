@@ -29,6 +29,21 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+    depends_on:
+      - patient-dashboard
+
+  # Patient Dashboard SPA — static files served by nginx. Internal-only:
+  # never published to the host. Caddy proxies /dashboard/* requests to it.
+  # Build artifact must exist before `up`: run `npm run build` from
+  # patient-dashboard/ first.
+  patient-dashboard:
+    image: nginx:alpine
+    volumes:
+      - ../../patient-dashboard/dist:/usr/share/nginx/html:ro
+      - ../../patient-dashboard/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - agentforge_internal
+    # Intentionally NO `ports:` — internal-only.
 
 volumes:
   caddy_data:

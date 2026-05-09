@@ -26,42 +26,53 @@
     "Lato", "Helvetica Neue", Helvetica, Arial, sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 
-  /* Brand — OpenEMR Bootstrap 4.6 ($blue / $green / $yellow / $red / $cyan).
-     `*-50` and `*-600` are tinted/shaded peers used for subtle backgrounds and
-     hover states; they're derived from the primary swatch, not Tailwind. */
-  --af-primary: #007bff;
-  --af-primary-600: #0069d9;
-  --af-primary-700: #0056b3;
-  --af-primary-50: #e7f1ff;
+  /* Brand — Tailwind-derived (slate + sky + emerald + amber + red), evolved
+     from OpenEMR Bootstrap 4.6's warmer palette. The `--af-*` token NAMES are
+     unchanged; only the values shift to a cooler, more refined family that
+     reads as the same brand as the dark-mode marketing surface (OG image at
+     branding/og-image.png — deep navy plate #0A2540 + bright accent #4EA3FF).
+     Light-mode product, dark-mode brand, same family. */
 
-  --af-success: #28a745;
-  --af-success-600: #218838;
-  --af-success-700: #1e7e34;
-  --af-success-50: #e6f4ea;
+  /* Brand accents — reserved for emphasis. `accent-deep` matches the OG
+     plate; `accent-bright` matches the OG bright-blue C-glyph. Use sparingly
+     (logos, signature moments). */
+  --af-accent-bright: #4ea3ff;
+  --af-accent-deep: #0a2540;
 
-  --af-warning: #ffc107;
-  --af-warning-700: #806100;
-  --af-warning-50: #fff8e1;
+  --af-primary: #0284c7;        /* Tailwind sky-600 */
+  --af-primary-600: #0369a1;    /* sky-700 */
+  --af-primary-700: #075985;    /* sky-800 */
+  --af-primary-50: #f0f9ff;     /* sky-50 */
 
-  --af-danger: #dc3545;
-  --af-danger-600: #c82333;
-  --af-danger-700: #842029;
-  --af-danger-50: #fdecea;
+  --af-success: #059669;        /* emerald-600 */
+  --af-success-600: #047857;    /* emerald-700 */
+  --af-success-700: #065f46;    /* emerald-800 */
+  --af-success-50: #ecfdf5;     /* emerald-50 */
 
-  --af-info: #17a2b8;
-  --af-info-700: #0c5460;
-  --af-info-50: #e3f4f7;
+  --af-warning: #d97706;        /* amber-600 */
+  --af-warning-700: #b45309;    /* amber-700 */
+  --af-warning-50: #fffbeb;     /* amber-50 */
 
-  /* Grays — Bootstrap 4.6 gray scale. */
-  --af-gray-100: #f8f9fa;
-  --af-gray-200: #e9ecef;
-  --af-gray-300: #dee2e6;
-  --af-gray-400: #ced4da;
-  --af-gray-500: #adb5bd;
-  --af-gray-600: #6c757d;
-  --af-gray-700: #495057;
-  --af-gray-800: #343a40;
-  --af-gray-900: #212529;
+  --af-danger: #dc2626;         /* red-600 */
+  --af-danger-600: #b91c1c;     /* red-700 */
+  --af-danger-700: #991b1b;     /* red-800 */
+  --af-danger-50: #fef2f2;      /* red-50 */
+
+  --af-info: #0891b2;           /* cyan-600 */
+  --af-info-700: #155e75;       /* cyan-800 */
+  --af-info-50: #ecfeff;        /* cyan-50 */
+
+  /* Grays — Tailwind slate scale (cooler than Bootstrap's warm gray scale,
+     resonant with the OG navy plate). */
+  --af-gray-100: #f8fafc;       /* slate-50 */
+  --af-gray-200: #f1f5f9;       /* slate-100 */
+  --af-gray-300: #e2e8f0;       /* slate-200 */
+  --af-gray-400: #cbd5e1;       /* slate-300 */
+  --af-gray-500: #94a3b8;       /* slate-400 */
+  --af-gray-600: #64748b;       /* slate-500 */
+  --af-gray-700: #475569;       /* slate-600 */
+  --af-gray-800: #334155;       /* slate-700 */
+  --af-gray-900: #0f172a;       /* slate-900 — same family as the OG plate */
 
   /* Semantic surfaces. */
   --af-surface: #ffffff;
@@ -107,8 +118,9 @@
      footer earns a shadow. */
   --af-shadow-footer: 0 -1px 4px rgba(0, 0, 0, 0.04);
 
-  /* Focus ring — OpenEMR uses Bootstrap's default outline; we mirror it. */
-  --af-focus-ring: 0 0 0 3px rgba(0, 123, 255, 0.25);
+  /* Focus ring — sky-600 at 25% (matches the new --af-primary). WCAG-AA visible
+     across light + dark contexts. */
+  --af-focus-ring: 0 0 0 3px rgba(2, 132, 199, 0.3);
 
   font-family: var(--af-font);
   line-height: 1.45;
