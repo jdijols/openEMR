@@ -7,11 +7,13 @@ import {
   createAttachAndExtractTool,
   type AttachAndExtractDeps,
   type DocumentBytesFetcher,
+  type DocumentReclassifier,
   type ObservationPersister,
 } from '../tools/attach_and_extract.js';
 import { postModuleJson } from '../openemr/client.js';
 import { createEvidenceRetrieveTool, type EvidenceRetrieveDeps } from '../tools/evidence_retrieve.js';
 import type { IntakeExtractorDeps } from '../workers/intake_extractor.js';
+import type { RoutingEmitter } from './handoff.js';
 
 /**
  * §7 / G2-MVP-36 — W2 supervisor-tool factory.
@@ -123,6 +125,13 @@ export type W2ToolsDeps = {
   readonly sessionToken: string;
   readonly correlationId: string;
   readonly observability: Observability;
+  /**
+   * Optional live-routing emitter. Threaded into both worker tools so each
+   * fires its routing event the moment the supervisor's call begins
+   * executing. The HTTP layer wires this to the SSE stream's `routing`
+   * event; tests omit it.
+   */
+  readonly onRouting?: RoutingEmitter;
 };
 
 export async function createW2Tools(deps: W2ToolsDeps) {
@@ -139,6 +148,8 @@ export async function createW2Tools(deps: W2ToolsDeps) {
       pdfParseFn: clients.pdfParseFn,
     },
     persistObservations: makeObservationPersister(deps.env, deps.sessionToken, deps.correlationId),
+    reclassifyDocument: makeDocumentReclassifier(deps.env, deps.sessionToken, deps.correlationId),
+    ...(deps.onRouting !== undefined ? { onRouting: deps.onRouting } : {}),
   };
 
   const evidenceDeps: EvidenceRetrieveDeps = {
@@ -147,6 +158,7 @@ export async function createW2Tools(deps: W2ToolsDeps) {
     cohere: clients.cohere,
     observability: deps.observability,
     correlationId: deps.correlationId,
+    ...(deps.onRouting !== undefined ? { onRouting: deps.onRouting } : {}),
   };
 
   return {
@@ -180,6 +192,34 @@ function makeObservationPersister(env: Env, sessionToken: string, correlationId:
     const updated = typeof o['updated'] === 'number' ? (o['updated'] as number) : 0;
     const failed = Array.isArray(o['failed']) ? (o['failed'] as readonly unknown[]).length : 0;
     return { inserted, updated, failed };
+  };
+}
+
+/**
+ * Production reclassify-hook adapter. POSTs to `document/reclassify.php`
+ * (service-to-service path that requires the shared-secret X-Internal-Auth
+ * header agentforge-api already sends to /document/bytes.php). Best-effort:
+ * the caller in attach_and_extract.ts swallows any rejection so a hung-up
+ * reclassify never breaks extraction.
+ */
+function makeDocumentReclassifier(env: Env, sessionToken: string, correlationId: string): DocumentReclassifier {
+  return async ({ patientUuidCanonical, docrefUuid, targetCategory }) => {
+    const body = await postModuleJson(
+      env,
+      'document/reclassify.php',
+      { sessionToken, correlationId },
+      {
+        session_token: sessionToken,
+        patient_uuid: patientUuidCanonical,
+        docref_uuid: docrefUuid,
+        target_category: targetCategory,
+      },
+    );
+    const o = body as Record<string, unknown>;
+    const reclassified = o['reclassified'] === true;
+    const idRaw = o['target_category_id'];
+    const targetCategoryId = typeof idRaw === 'number' && Number.isFinite(idRaw) ? idRaw : null;
+    return { reclassified, targetCategoryId };
   };
 }
 

@@ -4,7 +4,7 @@ import { Composer } from './Composer.js';
 import { ErrorBanner } from './ErrorBanner.js';
 import { ExtractionAcknowledgment } from './ExtractionAcknowledgment.js';
 import { IntakeProposalCard, type IntakeProposalData } from './IntakeProposalCard.js';
-import { TypingIndicator } from './TypingIndicator.js';
+import { StatusLabel } from './StatusLabel.js';
 import { CitationLink } from '../citations/CitationLink.js';
 
 /**
@@ -21,15 +21,29 @@ describe('§9 G2-MVP-63 — ErrorBanner', () => {
   });
 });
 
-describe('§9 G2-MVP-67 — TypingIndicator', () => {
-  it('mounts when visible=true', () => {
-    render(<TypingIndicator visible={true} />);
-    expect(screen.getByTestId('typing-indicator')).toBeInTheDocument();
+describe('§9 G2-MVP-67 — StatusLabel (replaces TypingIndicator)', () => {
+  it('renders dots-only state when no label is provided', () => {
+    render(<StatusLabel />);
+    const pill = screen.getByTestId('status-label');
+    expect(pill).toBeInTheDocument();
+    expect(pill).toHaveAttribute('data-has-label', 'false');
+    // SR-only fallback announces working state in the dots-only render.
+    expect(pill).toHaveTextContent(/Clinical Copilot is typing/);
   });
 
-  it('returns null when visible=false', () => {
-    const { container } = render(<TypingIndicator visible={false} />);
-    expect(container.firstChild).toBeNull();
+  it('renders sparkle + label + dots when a label is provided', () => {
+    render(<StatusLabel label="Reading file" />);
+    const pill = screen.getByTestId('status-label');
+    expect(pill).toHaveAttribute('data-has-label', 'true');
+    expect(pill).toHaveTextContent('Reading file');
+    // The sparkle SVG is decorative — `aria-hidden` keeps it out of the
+    // accessible name so screen readers only announce the label text.
+    expect(pill.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('treats empty-string label as the dots-only state', () => {
+    render(<StatusLabel label="" />);
+    expect(screen.getByTestId('status-label')).toHaveAttribute('data-has-label', 'false');
   });
 });
 

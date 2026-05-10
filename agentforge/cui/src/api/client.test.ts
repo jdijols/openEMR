@@ -80,17 +80,33 @@ describe('redeemHandshake (G2-11 / PRD §6.2)', () => {
   });
 });
 
+/**
+ * Build a `Response` whose body is a Server-Sent Events stream made up of
+ * the given `event:` / `data:` tuples — same shape Hono's `streamSSE`
+ * emits server-side. Used by the postChat suite below so each test only
+ * has to spell out the SSE events it cares about.
+ */
+function sseResponse(events: ReadonlyArray<{ readonly event: string; readonly data: string }>): Response {
+  const text = events.map((e) => `event: ${e.event}\ndata: ${e.data}\n\n`).join('');
+  return new Response(text, {
+    status: 200,
+    headers: { 'Content-Type': 'text/event-stream' },
+  });
+}
+
 describe('postChat (G2-11 / PRD §6.2)', () => {
-  it('POSTs /chat with session+patient+message and returns blocks + correlation id', async () => {
+  it('POSTs /chat with session+patient+message and returns blocks + correlation id from the SSE final event', async () => {
     const fetchMock = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          ok: true,
-          blocks: [{ type: 'text', text: 'No allergies on file.' }],
-          correlation_id: 'server-echo-id',
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
+      sseResponse([
+        {
+          event: 'final',
+          data: JSON.stringify({
+            ok: true,
+            blocks: [{ type: 'text', text: 'No allergies on file.' }],
+            correlation_id: 'server-echo-id',
+          }),
+        },
+      ]),
     );
     globalThis.fetch = fetchMock as typeof fetch;
 
@@ -105,6 +121,7 @@ describe('postChat (G2-11 / PRD §6.2)', () => {
     expect(url).toBe('http://api.local/chat');
     const headers = new Headers(init.headers as Record<string, string>);
     expect(headers.get('X-Correlation-Id')).toBe('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
+    expect(headers.get('Accept')).toBe('text/event-stream');
     expect(JSON.parse(init.body as string)).toEqual({
       session_token: 'tok',
       patient_uuid: 'pat-1',
@@ -114,15 +131,17 @@ describe('postChat (G2-11 / PRD §6.2)', () => {
 
   it('round-trips conversation_id when provided and echoes back from Agent API', async () => {
     const fetchMock = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          ok: true,
-          blocks: [{ type: 'text', text: 'Echo.' }],
-          correlation_id: 'c2',
-          conversation_id: '00000000-0000-4000-a000-0000000000cc',
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
+      sseResponse([
+        {
+          event: 'final',
+          data: JSON.stringify({
+            ok: true,
+            blocks: [{ type: 'text', text: 'Echo.' }],
+            correlation_id: 'c2',
+            conversation_id: '00000000-0000-4000-a000-0000000000cc',
+          }),
+        },
+      ]),
     );
     globalThis.fetch = fetchMock as typeof fetch;
 
@@ -142,17 +161,19 @@ describe('postChat (G2-11 / PRD §6.2)', () => {
 
   it('parses citation_navigation map when returned by Agent API', async () => {
     globalThis.fetch = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          ok: true,
-          blocks: [{ type: 'text', text: 'See chart.' }],
-          correlation_id: 'cmap-id',
-          citation_navigation: {
-            'eu-u': { kind: 'encounter', params: { encounter_id: 9 } },
-          },
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
+      sseResponse([
+        {
+          event: 'final',
+          data: JSON.stringify({
+            ok: true,
+            blocks: [{ type: 'text', text: 'See chart.' }],
+            correlation_id: 'cmap-id',
+            citation_navigation: {
+              'eu-u': { kind: 'encounter', params: { encounter_id: 9 } },
+            },
+          }),
+        },
+      ]),
     ) as typeof fetch;
 
     const out = await postChat('http://api.local', 'tok', 'pat-1', 'x');
@@ -162,23 +183,53 @@ describe('postChat (G2-11 / PRD §6.2)', () => {
     });
   });
 
-  it('throws AgentForgeDeliveryError misconfigured_llm on 501 from server', async () => {
+  it('forwards SSE routing events to the onRouting callback before the final event', async () => {
     globalThis.fetch = vi.fn(async () =>
-      new Response(JSON.stringify({ error: 'misconfigured' }), { status: 501 }),
+      sseResponse([
+        { event: 'routing', data: JSON.stringify({ worker: 'intake_extractor', label: 'Reading file' }) },
+        {
+          event: 'final',
+          data: JSON.stringify({
+            ok: true,
+            blocks: [{ type: 'text', text: 'Done.' }],
+            correlation_id: 'route-id',
+          }),
+        },
+      ]),
+    ) as typeof fetch;
+
+    const seen: Array<{ worker: string; label: string }> = [];
+    const out = await postChat('http://api.local', 'tok', 'pat-1', 'extract', {
+      docref_uuid: 'doc-uuid-1',
+      doc_type: 'lab_pdf',
+      onRouting: (e) => {
+        seen.push({ worker: e.worker, label: e.label });
+      },
+    });
+
+    expect(seen).toEqual([{ worker: 'intake_extractor', label: 'Reading file' }]);
+    expect(out.correlationId).toBe('route-id');
+  });
+
+  it('throws AgentForgeDeliveryError misconfigured_llm on `error` SSE event with kind=misconfigured', async () => {
+    globalThis.fetch = vi.fn(async () =>
+      sseResponse([
+        { event: 'error', data: JSON.stringify({ error: 'misconfigured', correlation_id: 'mc-id' }) },
+      ]),
     ) as typeof fetch;
 
     await expect(postChat('http://api.local', 't', 'p', 'm')).rejects.toMatchObject({
       name: 'AgentForgeDeliveryError',
       kind: 'misconfigured_llm',
+      correlationId: 'mc-id',
     });
   });
 
-  it('throws AgentForgeDeliveryError backend_error with correlation id on generic 5xx', async () => {
+  it('throws AgentForgeDeliveryError backend_error with correlation id on generic SSE error event', async () => {
     globalThis.fetch = vi.fn(async () =>
-      new Response(
-        JSON.stringify({ error: 'internal_error', correlation_id: 'abc-uuid' }),
-        { status: 500 },
-      ),
+      sseResponse([
+        { event: 'error', data: JSON.stringify({ error: 'internal_error', correlation_id: 'abc-uuid' }) },
+      ]),
     ) as typeof fetch;
 
     const errUnknown = await postChat('http://api.local', 't', 'p', 'm').catch((e): unknown => e);
@@ -186,6 +237,16 @@ describe('postChat (G2-11 / PRD §6.2)', () => {
     const err = errUnknown as AgentForgeDeliveryError;
     expect(err.kind).toBe('backend_error');
     expect(err.correlationId).toBe('abc-uuid');
+  });
+
+  it('throws bad_request on pre-stream HTTP 400 (request never reached SSE)', async () => {
+    globalThis.fetch = vi.fn(async () =>
+      new Response(JSON.stringify({ error: 'invalid_request' }), { status: 400 }),
+    ) as typeof fetch;
+
+    const errUnknown = await postChat('http://api.local', 't', 'p', 'm').catch((e): unknown => e);
+    expect(errUnknown).toBeInstanceOf(AgentForgeDeliveryError);
+    expect((errUnknown as AgentForgeDeliveryError).kind).toBe('bad_request');
   });
 
   it('throws network_unreachable when fetch rejects', async () => {

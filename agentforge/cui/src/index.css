@@ -386,18 +386,16 @@ body {
   color: var(--af-text);
 }
 
-/* Floating banners (presenting hint, send/mic error) live as flex children
-   of `.agentforge-cui` between the messages region and the form. They need
-   their own horizontal inset now that the outer container has none. */
-.agentforge-cui__hint,
+/* Send/mic error banner. Lives as a flex child of `.agentforge-cui`
+   between the messages region and the form, with its own horizontal
+   inset since the outer container has none. The previous `__hint`
+   companion ("Preparing case presentation…") was replaced by the
+   shared `<StatusLabel>` so the brief and chat-routing affordances
+   share one design language. */
 .agentforge-cui__error {
   margin: 0;
   padding: var(--af-s2) var(--af-s4);
   font-size: var(--af-text-body);
-  color: var(--af-text-muted);
-}
-
-.agentforge-cui__error {
   color: var(--af-danger-700);
 }
 
@@ -1165,6 +1163,134 @@ body {
   vertical-align: -2px;
 }
 
+/* ── Above-composer affordance (Phase 1) ───────────────────────────────
+ * Renders the FIFO head of the unresolved-proposal queue, pinned just
+ * above the chat composer. Hosts a `ProposalCardShell` so the visual
+ * language matches the in-chat proposal card — amber-on-cream wash that
+ * reads as "decision needed". The state-driven washes from the shell
+ * (green for accepted, red for failed) still apply unchanged.
+ *
+ * Layout: a vertical stack (counter on top, card below) so the "1 of N"
+ * indicator sits just above-and-right of the card rather than inside its
+ * header. Counter is hidden when N <= 1.
+ *
+ * Body click reopens the bound modal (allergy etc.) or navigates to the
+ * encounter view (vitals etc., Phase 3). The cursor:pointer here covers
+ * the whole card; the shell's buttons restore their own default cursor.
+ *
+ * Fade-in keyframe runs once per mount; the consumer (App.tsx) re-keys
+ * this wrapper on `proposalId` so a queue advance produces a fresh
+ * mount + fresh fade rather than a content swap in place. */
+.agentforge-cui__above-composer-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 var(--af-s2) 0;
+}
+
+.agentforge-cui__above-composer-counter {
+  align-self: flex-end;
+  padding: 0 var(--af-s1);
+  font-size: var(--af-text-micro);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--af-text-muted);
+}
+
+.agentforge-cui__above-composer {
+  cursor: pointer;
+  animation: agentforge-affordance-fade-in 180ms ease both;
+}
+
+/* Affordance lives in the rail context (narrow, always-visible), so trim
+ * the in-chat card's vertical breathing room without losing the amber
+ * pending-state language. */
+.agentforge-cui__above-composer .agentforge-msg__proposal-card {
+  margin: 0;
+  padding: var(--af-s2) var(--af-s3);
+}
+
+.agentforge-cui__above-composer .agentforge-msg__proposal-header {
+  margin-bottom: var(--af-s1);
+}
+
+.agentforge-cui__above-composer .agentforge-msg__proposal-actions {
+  margin-top: var(--af-s2);
+}
+
+.agentforge-cui__above-composer-preview {
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--af-text);
+  font-size: var(--af-text-body);
+}
+
+/* Symmetric, equal-weight Confirm / Reject buttons for the rail.
+ *
+ * In-chat proposal cards lean asymmetric (filled-success Confirm vs
+ * outlined Reject) because the in-chat card is bigger and the green
+ * fill reads as "the agent is asking — pick one" within a wide thread.
+ * In the rail, both buttons share one tight horizontal slot, so equal
+ * weight (matched fill + matched border treatment, just different
+ * accent colors) avoids pulling the eye toward Confirm and producing
+ * accidental confirmations. The two buttons read as a single action
+ * pair, not a primary-with-bailout pair. */
+.agentforge-cui__above-composer .agentforge-msg__proposal-btn {
+  padding: 6px var(--af-s3);
+  font-size: var(--af-text-small);
+  border-width: 1px;
+  border-style: solid;
+}
+
+.agentforge-cui__above-composer .agentforge-msg__proposal-btn--primary {
+  background: var(--af-warning);
+  border-color: var(--af-warning-700);
+  color: #ffffff;
+}
+
+.agentforge-cui__above-composer .agentforge-msg__proposal-btn--primary:hover:not(:disabled) {
+  background: var(--af-warning-700);
+  border-color: var(--af-warning-700);
+}
+
+.agentforge-cui__above-composer .agentforge-msg__proposal-btn--secondary {
+  background: var(--af-surface);
+  border-color: var(--af-warning-700);
+  color: var(--af-warning-700);
+}
+
+.agentforge-cui__above-composer .agentforge-msg__proposal-btn--secondary:hover:not(:disabled) {
+  background: var(--af-warning-50);
+  border-color: var(--af-warning-700);
+  color: var(--af-warning-700);
+}
+
+@keyframes agentforge-affordance-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Respect reduced-motion: skip the slide-in but keep the opacity fade
+ * so the queue-advance still reads as a transition rather than a flash. */
+@media (prefers-reduced-motion: reduce) {
+  .agentforge-cui__above-composer {
+    animation-duration: 80ms;
+  }
+  @keyframes agentforge-affordance-fade-in {
+    from { opacity: 0; transform: none; }
+    to { opacity: 1; transform: none; }
+  }
+}
+
 /* ── Tool call / result blocks ───────────────────────────────────────── */
 
 /* Tool call/result band — quiet by design (these are dev-mode breadcrumbs,
@@ -1337,43 +1463,114 @@ body {
   justify-content: flex-end;
 }
 
-/* G2-MVP-99 — three-dot "assistant is typing" indicator. Mounted by
- * App.tsx between the message list and the compose form whenever a
- * /chat request is in flight. Animation is a sequential opacity pulse
- * (not a bounce / scale) so it reads as "thinking" rather than
- * "loading," and stays subtle against the rail's neutral surface. */
-.agentforge-cui__typing {
+/* Live "AI is doing X" status pill — single growable affordance.
+ *
+ * Two render states served by one DOM node:
+ *   • No label  → bare ⋯ dots (turn started, supervisor hasn't dispatched
+ *     a worker yet — or won't, for plain Q&A turns).
+ *   • With label → sparkle + label + ⋯ dots, all in one pill. The leading
+ *     sparkle/text fades + slides in from the left when the SSE `routing`
+ *     event lands so the pill *grows* in place rather than two pills
+ *     swapping.
+ *
+ * Pill geometry is constant across both states so the height never
+ * changes when the label appears — what was a dots-only pill simply
+ * gains content on the left. The dots' line-height locks the pill to
+ * the same height as a label-bearing pill (matches body text) so any
+ * standalone-dots state visually matches the labelled state.
+ *
+ * Pulse rhythm: sparkle and all three dots share one 1.2s keyframe;
+ * dots stagger via animation-delay (0 / 0.15s / 0.3s) so the wave
+ * sweeps left→right starting at the sparkle. Same period everywhere
+ * so the whole pill reads as one unified rhythm. */
+.agentforge-cui__status-label {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: var(--af-s2);
   padding: var(--af-s2) var(--af-s3);
   margin: 0 var(--af-cui-inline-rhythm) var(--af-s2);
   background: var(--af-surface-alt);
   border: 1px solid var(--af-border);
   border-radius: 999px;
+  font-size: var(--af-text-body);
+  /* Fixed line-height locks the pill height regardless of which state
+   * (dots-only vs labelled) is rendered — keeps the indicator visually
+   * stable as the supervisor's routing event lands mid-turn. */
+  line-height: 1.2;
+  color: var(--af-text-muted);
   align-self: flex-start;
   width: fit-content;
+  /* Pin the pill to the same geometry in both states. The labelled state
+   * gets its height naturally from the text line; the dots-only state
+   * has only `position: absolute` SR-only text + 0.4rem dots, which would
+   * otherwise collapse the pill ~10px shorter. `1.2em` matches the
+   * `line-height: 1.2 * font-size` of a labelled pill exactly, so the
+   * two states are pixel-identical regardless of token theming. */
+  min-height: 1.2em;
 }
 
-.agentforge-cui__typing-dot {
+/* Brief-case spacing only: when the pill sits as a direct child of the
+ * rail (during the case-presentation auto-trigger, directly under the
+ * patient header), give it breathing room from the header. The in-chat
+ * usage is nested inside MessageList's scroll container and rides the
+ * existing message-flow rhythm, so it doesn't need this extra buffer. */
+.agentforge-cui > .agentforge-cui__status-label {
+  margin-top: var(--af-s3);
+}
+
+/* Sparkle + label — the optional leading content. Mounts when a routing
+ * event lands; absent in the dots-only initial state. Wrapping both into
+ * one inline-flex with its own appear keyframe gives a single smooth
+ * fade+slide as the pill grows, instead of the sparkle and the text
+ * popping in independently. */
+.agentforge-cui__status-label-leading {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--af-s2);
+  animation: agentforge-cui-status-label-leading-in 200ms ease-out both;
+}
+
+.agentforge-cui__status-label-icon {
+  display: block;
+  flex-shrink: 0;
+  /* Same 1.2s period as the dots so the whole pill pulses on one
+   * rhythm. No animation-delay → the sparkle leads the wave that then
+   * sweeps through the staggered dots. */
+  animation: agentforge-cui-status-label-pulse 1.2s infinite ease-in-out;
+}
+
+.agentforge-cui__status-label-text {
+  white-space: nowrap;
+}
+
+/* Trailing dot stack — anchored to the right of the pill regardless of
+ * whether a label is present. When the label fades in on the left, the
+ * dots stay put and the pill simply widens leftward. */
+.agentforge-cui__status-label-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.agentforge-cui__status-label-dot {
   display: inline-block;
   width: 0.4rem;
   height: 0.4rem;
   border-radius: 50%;
   background: var(--af-text-muted, var(--af-text));
-  opacity: 0.35;
-  animation: agentforge-cui-typing-pulse 1.2s infinite ease-in-out;
+  opacity: 0.4;
+  animation: agentforge-cui-status-label-pulse 1.2s infinite ease-in-out;
 }
 
-.agentforge-cui__typing-dot:nth-child(2) {
+.agentforge-cui__status-label-dot:nth-child(2) {
   animation-delay: 0.15s;
 }
 
-.agentforge-cui__typing-dot:nth-child(3) {
+.agentforge-cui__status-label-dot:nth-child(3) {
   animation-delay: 0.3s;
 }
 
-.agentforge-cui__typing-sr-only {
+.agentforge-cui__status-label-sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -1382,14 +1579,24 @@ body {
   white-space: nowrap;
 }
 
-@keyframes agentforge-cui-typing-pulse {
-  0%, 80%, 100% {
-    opacity: 0.25;
-    transform: translateY(0);
+@keyframes agentforge-cui-status-label-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
   }
-  40% {
+  50% {
     opacity: 1;
-    transform: translateY(-1px);
+  }
+}
+
+@keyframes agentforge-cui-status-label-leading-in {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 

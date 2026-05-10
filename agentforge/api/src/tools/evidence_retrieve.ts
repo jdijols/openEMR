@@ -4,7 +4,12 @@ import type { Pool } from 'pg';
 import type { CohereClient } from 'cohere-ai';
 import type { Observability } from '../observability/index.js';
 import { runEvidenceRetriever, type EvidenceRetrieverDeps } from '../workers/evidence_retriever.js';
-import { recordSupervisorHandoff, summarizeEvidenceRetrieverHandoff } from '../agent/handoff.js';
+import {
+  recordSupervisorHandoff,
+  summarizeEvidenceRetrieverHandoff,
+  WORKER_LABEL,
+  type RoutingEmitter,
+} from '../agent/handoff.js';
 
 /**
  * §8 / G2-MVP-56 — `evidence_retrieve` Vercel AI SDK tool. Supervisor calls
@@ -18,6 +23,12 @@ export type EvidenceRetrieveDeps = {
   readonly cohere: Pick<CohereClient, 'rerank'>;
   readonly observability: Observability;
   readonly correlationId: string;
+  /**
+   * Optional live-routing emitter. Fired alongside `recordSupervisorHandoff`
+   * so the CUI surfaces "Searching evidence" the moment the supervisor's
+   * call to this tool begins executing.
+   */
+  readonly onRouting?: RoutingEmitter;
 };
 
 const InputSchema = z.object({
@@ -38,6 +49,18 @@ export function createEvidenceRetrieveTool(deps: EvidenceRetrieveDeps) {
         'evidence_retriever',
         summarizeEvidenceRetrieverHandoff({ query, maxChunks: max_chunks }),
       );
+
+      // Live-routing wire signal — fires on the SSE stream so the CUI can
+      // swap the typing indicator's bare ellipsis for a "Searching evidence"
+      // affordance before the retrieval funnel runs. Failure-isolated: a
+      // thrown emitter must not prevent retrieval.
+      if (deps.onRouting !== undefined) {
+        try {
+          await deps.onRouting({ worker: 'evidence_retriever', label: WORKER_LABEL.evidence_retriever });
+        } catch {
+          /* emitter failure must not prevent retrieval */
+        }
+      }
 
       // G2-Final-FB-A-02 — capture wall-clock so the orchestrator can
       // synthesize an `agent_step` block carrying `duration_ms` for the

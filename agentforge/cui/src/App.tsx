@@ -6,9 +6,10 @@ import { broadcast as broadcastProposalEvent, subscribe as subscribeProposalEven
 import { readCachedBrief, writeCachedBrief } from './chat/brief_cache.js';
 import { readCachedConversation, writeCachedConversation } from './chat/conversation_cache.js';
 import { MessageList, type ChatMessage, type ProposalApiEnv } from './chat/MessageList.js';
+import { StatusLabel } from './chat/StatusLabel.js';
 import { AttachmentPreview } from './chat/AttachmentPreview.js';
 import { validateFileBasic } from './chat/useFileValidation.js';
-import { findLatestOpenProposalId } from './chat/proposal_lookup.js';
+import { findProposalQueue } from './chat/proposal_lookup.js';
 import { tryConfirmProposalFromDictation } from './chat/voice_confirm_proposal.js';
 import { useHandshake } from './chat/useHandshake.js';
 import MicControl from './recording/MicControl.js';
@@ -240,6 +241,12 @@ export default function App(): ReactElement {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationExternalId, setConversationExternalId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  // Live routing affordance during a /chat turn. Set when the SSE stream
+  // delivers a `routing` event (the supervisor's call to a worker tool just
+  // began), cleared when the turn ends. The CUI shows this label above the
+  // typing indicator's bare ellipsis so the physician sees what the agent
+  // is mid-doing rather than waiting in silence for the response.
+  const [routingLabel, setRoutingLabel] = useState<string | null>(null);
   const [briefStatus, setBriefStatus] = useState<BriefStatus>({ kind: 'idle' });
   const [sendFailure, setSendFailure] = useState<AgentForgeDeliveryError | null>(null);
   const [micError, setMicError] = useState<string | null>(null);
@@ -251,7 +258,14 @@ export default function App(): ReactElement {
   // G2-Final — above-composer affordance state for the hybrid agent/manual proposal flow.
   const [affordanceState, setAffordanceState] = useState<AboveComposerState>('idle');
   const [affordanceError, setAffordanceError] = useState<string | null>(null);
-  const broadcastedProposalsRef = useRef<Set<string>>(new Set<string>());
+  // Phase 1 — head-only broadcast tracking. `lastBroadcastedHeadIdRef` holds
+  // the head id we most recently registered (broadcast or initial-mount
+  // suppress). `initialHeadCheckedRef` flips to true on first observation so
+  // a chart that mounts with a cached unresolved proposal does NOT auto-pop
+  // its modal — the user sees the affordance and clicks into it. New head
+  // transitions after that DO broadcast.
+  const lastBroadcastedHeadIdRef = useRef<string | null>(null);
+  const initialHeadCheckedRef = useRef<boolean>(false);
 
   // Loading hint is a derivation of the state machine, not an independent
   // boolean — the two used to drift apart on transient failures.
@@ -500,64 +514,67 @@ export default function App(): ReactElement {
   );
 
   /**
-   * G2-Final — find the latest unresolved proposal block in thread order.
-   * The above-composer affordance renders for whichever pending proposal
-   * is freshest; once `resolved` is stamped (via onProposalResolved), the
-   * affordance hides.
+   * Phase 1 — FIFO queue of unresolved proposals. `head` is the oldest
+   * unresolved proposal (the one the affordance renders + voice confirm
+   * targets); `count` drives the "1 of N" indicator. Replaces the prior
+   * inline LIFO useMemo that returned the freshest proposal regardless
+   * of order, and that didn't filter `b.resolved` — both bugs fixed by
+   * `findProposalQueue` (see proposal_lookup.ts).
    */
-  const activeProposal = useMemo<{ proposalId: string; writeTarget: string; preview: string } | null>(() => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const m = messages[i];
-      if (m === undefined || m.role !== 'assistant') {
-        continue;
-      }
-      for (const b of m.blocks) {
-        if (b.type === 'proposal' && b.resolved === undefined) {
-          return { proposalId: b.proposal_id, writeTarget: b.write_target, preview: b.preview };
-        }
-      }
-    }
-    return null;
-  }, [messages]);
+  const proposalQueue = useMemo(() => findProposalQueue(messages), [messages]);
+  const activeProposal = proposalQueue.head;
+  const queueCount = proposalQueue.count;
 
   /**
-   * G2-Final — broadcast `proposal:open_modal` to the dashboard iframe via
-   * BroadcastChannel when a new allergy proposal lands. The dashboard's
-   * AllergyModal listens and opens itself pre-filled with the proposal
-   * payload (fetched from the API).
+   * Phase 1 — head-only `proposal:open_modal` broadcast.
    *
-   * We only broadcast for write_target='allergy' because that's the only
-   * card with a hybrid-modal experience in MVP. Other targets keep the
-   * legacy in-chat proposal card.
+   * The previous effect iterated every unresolved proposal and broadcast
+   * for each, gated only by a per-id dedup set. With multiple allergy
+   * proposals in flight that meant two `proposal:open_modal` events fired
+   * with two different proposal_ids; the dashboard's `setAgentProposalId`
+   * overwrites on the second event, leaving the modal pinned to the wrong
+   * proposal even though the FIRST is still at the head of the queue.
+   *
+   * The new contract: fire once per head transition, only when the new
+   * head is a target with a dashboard modal.
+   *
+   * Auto-open invariant: do not fire on the initial mount / cache replay.
+   * The first run after mount registers the current head id without
+   * broadcasting so the user sees the affordance and clicks into it
+   * deliberately. Subsequent head changes (a new proposal arrives, or a
+   * confirm/reject advances the queue) DO broadcast, so the modal opens
+   * automatically as the queue progresses — matching the round-11 UX.
    */
   useEffect(() => {
     if (patientUuid === null || patientUuid === '') {
       return;
     }
-    for (const m of messages) {
-      if (m.role !== 'assistant') {
-        continue;
-      }
-      for (const b of m.blocks) {
-        if (b.type !== 'proposal' || b.resolved !== undefined) {
-          continue;
-        }
-        if (b.write_target !== 'allergy') {
-          continue;
-        }
-        if (broadcastedProposalsRef.current.has(b.proposal_id)) {
-          continue;
-        }
-        broadcastedProposalsRef.current.add(b.proposal_id);
-        broadcastProposalEvent({
-          type: 'proposal:open_modal',
-          proposal_id: b.proposal_id,
-          write_target: b.write_target,
-          patient_uuid: patientUuid,
-        });
-      }
+    const headId = activeProposal?.proposalId ?? null;
+    const headTarget = activeProposal?.writeTarget ?? null;
+
+    if (!initialHeadCheckedRef.current) {
+      initialHeadCheckedRef.current = true;
+      lastBroadcastedHeadIdRef.current = headId;
+      return;
     }
-  }, [messages, patientUuid]);
+    if (headId === null) {
+      lastBroadcastedHeadIdRef.current = null;
+      return;
+    }
+    if (lastBroadcastedHeadIdRef.current === headId) {
+      return;
+    }
+    lastBroadcastedHeadIdRef.current = headId;
+    if (headTarget !== 'allergy') {
+      return;
+    }
+    broadcastProposalEvent({
+      type: 'proposal:open_modal',
+      proposal_id: headId,
+      write_target: headTarget,
+      patient_uuid: patientUuid,
+    });
+  }, [activeProposal, patientUuid]);
 
   /**
    * G2-Final — listen for `proposal:resolved` from the dashboard's
@@ -672,7 +689,11 @@ export default function App(): ReactElement {
       }
 
       const prev = messagesRef.current;
-      const proposalId = findLatestOpenProposalId(prev);
+      // Voice confirm targets the FIFO head of the unresolved queue (oldest
+      // first, resolved blocks skipped), not whichever proposal arrived most
+      // recently. Voice confirm with an empty queue is a no-op — the proposalId
+      // is null and `tryConfirmProposalFromDictation` short-circuits.
+      const proposalId = findProposalQueue(prev).head?.proposalId ?? null;
       const env = proposalEnv;
 
       // Paint the user turn immediately. The `[dictation]` prefix is gone — the
@@ -713,18 +734,25 @@ export default function App(): ReactElement {
       // this, dictating "BP 125/60" previously produced no proposal card while
       // typing the same string did.
       setSending(true);
+      setRoutingLabel(null);
       setSendFailure(null);
 
       try {
+        const onRouting = (event: { label: string }): void => {
+          setRoutingLabel(event.label);
+        };
         const chatOpts =
           conversationExternalId !== null && conversationExternalId.trim() !== '' ?
-            { conversation_id: conversationExternalId }
-          : undefined;
+            { conversation_id: conversationExternalId, onRouting }
+          : { onRouting };
 
-        const { blocks, citation_navigation, conversationId } =
-          chatOpts !== undefined ?
-            await postChat(apiBase, handshake.sessionToken, patientUuid ?? '', t, chatOpts)
-          : await postChat(apiBase, handshake.sessionToken, patientUuid ?? '', t);
+        const { blocks, citation_navigation, conversationId } = await postChat(
+          apiBase,
+          handshake.sessionToken,
+          patientUuid ?? '',
+          t,
+          chatOpts,
+        );
 
         if (conversationId !== null && conversationId !== '') {
           setConversationExternalId(conversationId);
@@ -735,6 +763,7 @@ export default function App(): ReactElement {
         setSendFailure(toDeliveryFailure(err));
       } finally {
         setSending(false);
+        setRoutingLabel(null);
       }
 
       await voicePromise;
@@ -761,6 +790,7 @@ export default function App(): ReactElement {
     }
 
     setSending(true);
+    setRoutingLabel(null);
     setSendFailure(null);
 
     // Clear composer immediately so the user sees their turn paint
@@ -824,7 +854,12 @@ export default function App(): ReactElement {
         conversation_id?: string;
         docref_uuid?: string;
         doc_type?: 'lab_pdf' | 'intake_form';
-      } = {};
+        onRouting?: (event: { worker: 'intake_extractor' | 'evidence_retriever'; label: string }) => void;
+      } = {
+        onRouting: (event) => {
+          setRoutingLabel(event.label);
+        },
+      };
       if (conversationExternalId !== null && conversationExternalId.trim() !== '') {
         chatOpts.conversation_id = conversationExternalId;
       }
@@ -847,7 +882,7 @@ export default function App(): ReactElement {
         handshake.sessionToken,
         patientUuid ?? '',
         messageForChat,
-        Object.keys(chatOpts).length > 0 ? chatOpts : undefined,
+        chatOpts,
       );
 
       if (conversationId !== null && conversationId !== '') {
@@ -859,6 +894,7 @@ export default function App(): ReactElement {
       setSendFailure(toDeliveryFailure(err));
     } finally {
       setSending(false);
+      setRoutingLabel(null);
     }
   }
 
@@ -1146,7 +1182,7 @@ export default function App(): ReactElement {
   return (
     <main className="agentforge-cui">
       {renderPanelHeader(true)}
-      {presenting ? <p className="agentforge-cui__hint">Preparing case presentation…</p> : null}
+      {presenting ? <StatusLabel label="Generating summary" /> : null}
       <MessageList
         messages={messages}
         boundPatientUuid={patientUuid}
@@ -1156,6 +1192,7 @@ export default function App(): ReactElement {
         onProposalResolved={onProposalResolved}
         onOpenDocument={onOpenDocument}
         typing={sending}
+        routingLabel={routingLabel}
       />
       {briefStatus.kind === 'failed' ? (
         <div className="agentforge-cui__brief-failed" role="alert">
@@ -1189,16 +1226,31 @@ export default function App(): ReactElement {
         </p>
       ) : null}
       {activeProposal !== null && proposalEnv !== undefined ? (
-        <AboveComposerAffordance
-          proposalId={activeProposal.proposalId}
-          writeTarget={activeProposal.writeTarget}
-          preview={activeProposal.preview}
-          state={affordanceState}
-          {...(affordanceError !== null ? { errorMessage: affordanceError } : {})}
-          onConfirm={onAffordanceConfirm}
-          onReject={onAffordanceReject}
-          onReopen={onAffordanceReopen}
-        />
+        <div className="agentforge-cui__above-composer-stack">
+          {queueCount > 1 ? (
+            <div
+              className="agentforge-cui__above-composer-counter"
+              data-testid="above-composer-counter"
+              aria-live="polite"
+            >
+              1 of {queueCount}
+            </div>
+          ) : null}
+          <AboveComposerAffordance
+            /* Phase 1 — keying on `proposalId` triggers a fresh mount on head
+               change, so the next head fades in via the affordance's CSS
+               animation rather than swapping content in place. */
+            key={activeProposal.proposalId}
+            proposalId={activeProposal.proposalId}
+            writeTarget={activeProposal.writeTarget}
+            preview={activeProposal.preview}
+            state={affordanceState}
+            {...(affordanceError !== null ? { errorMessage: affordanceError } : {})}
+            onConfirm={onAffordanceConfirm}
+            onReject={onAffordanceReject}
+            onReopen={onAffordanceReopen}
+          />
+        </div>
       ) : null}
       <form
         className={`agentforge-cui__form agentforge-cui__compose${dragOver ? ' agentforge-cui__compose--drag' : ''}`}

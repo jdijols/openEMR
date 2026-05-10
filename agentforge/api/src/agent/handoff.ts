@@ -77,6 +77,36 @@ export const HANDOFF_REASONS: Readonly<Record<WorkerName, string>> = {
 };
 
 /**
+ * Physician-facing label per worker. Surfaced live above the CUI typing
+ * indicator while the worker runs (akin to Claude's "Reading file…" /
+ * "Editing file…" affordance — verb + concrete object). Centralized here
+ * so the supervisor's two routing decisions and the CUI's two labels stay
+ * in lockstep; if a third worker is added the label travels with it.
+ */
+export const WORKER_LABEL: Readonly<Record<WorkerName, string>> = {
+  intake_extractor: 'Reading file',
+  evidence_retriever: 'Searching evidence',
+};
+
+/**
+ * Live-routing emitter. Invoked by each worker tool the moment the
+ * supervisor's tool call begins executing — co-located with the
+ * `recordSupervisorHandoff` call so the wire signal and the trace event
+ * fire from the same point. The orchestrator passes a function bound to
+ * the SSE stream's `routing` event; tests pass a no-op.
+ *
+ * Failure isolation: like `recordSupervisorHandoff`, this is fire-and-
+ * forget. Worker tools `await` it so emission ordering is deterministic,
+ * but a thrown emitter must never prevent the worker from running.
+ */
+export type RoutingEvent = {
+  readonly worker: WorkerName;
+  readonly label: string;
+};
+
+export type RoutingEmitter = (event: RoutingEvent) => void | Promise<void>;
+
+/**
  * Emit a handoff event to the observability layer. The event name follows
  * the `handoff.<workerName>` convention so it's filterable in Langfuse.
  *

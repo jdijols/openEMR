@@ -142,6 +142,71 @@ export function redeemHandshake(apiBase: string, launchCode: string): Promise<Re
   return p;
 }
 
+/**
+ * Parse a Server-Sent Events stream into discrete `{ event, data }`
+ * tuples. Implementation handles the shape Hono's `streamSSE` emits:
+ *
+ *     event: <name>\n
+ *     data: <json>\n
+ *     \n
+ *
+ * Events are separated by a double-LF (also tolerates CRLF). Multi-line
+ * `data:` blocks are joined with `\n` per the SSE spec — the API never
+ * sends multi-line `data:` today, but the fallback keeps us spec-correct.
+ */
+async function readSSEStream(
+  body: ReadableStream<Uint8Array>,
+  onEvent: (event: { readonly event: string; readonly data: string }) => void,
+): Promise<void> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+
+  const flushBlock = (block: string): void => {
+    if (block === '') {
+      return;
+    }
+    let eventName = 'message';
+    const dataLines: string[] = [];
+    for (const rawLine of block.split('\n')) {
+      const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
+      if (line.startsWith('event:')) {
+        eventName = line.slice(6).trim();
+      } else if (line.startsWith('data:')) {
+        dataLines.push(line.slice(5).replace(/^ /, ''));
+      }
+    }
+    onEvent({ event: eventName, data: dataLines.join('\n') });
+  };
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (value !== undefined) {
+      buf += decoder.decode(value, { stream: true });
+      // SSE event boundaries are blank lines. Tolerate \r\n\r\n as well.
+      let boundary = buf.search(/\r?\n\r?\n/);
+      while (boundary !== -1) {
+        const block = buf.slice(0, boundary);
+        const matchLen = buf[boundary] === '\r' ? 4 : 2;
+        buf = buf.slice(boundary + matchLen);
+        flushBlock(block);
+        boundary = buf.search(/\r?\n\r?\n/);
+      }
+    }
+    if (done) {
+      // Flush a trailing event with no terminating blank line.
+      flushBlock(buf.trim());
+      buf = '';
+      return;
+    }
+  }
+}
+
+export type ChatRoutingEvent = Readonly<{
+  worker: 'intake_extractor' | 'evidence_retriever';
+  label: string;
+}>;
+
 export async function postChat(
   apiBase: string,
   sessionToken: string,
@@ -151,6 +216,15 @@ export async function postChat(
     conversation_id?: string;
     docref_uuid?: string;
     doc_type?: 'lab_pdf' | 'intake_form';
+    /**
+     * Live routing callback. Fired once per worker invocation, the moment
+     * the supervisor's tool call begins executing on the server. The CUI
+     * uses this to swap the typing indicator's bare ellipsis for a
+     * worker-specific affordance ("Reading file" / "Searching evidence")
+     * before the backend I/O lands. Optional — when absent, the function
+     * still resolves with the same final payload.
+     */
+    onRouting?: (event: ChatRoutingEvent) => void;
   }>,
 ): Promise<{
   blocks: ChatBlock[];
@@ -166,6 +240,7 @@ export async function postChat(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
         'X-Correlation-Id': correlationId,
       },
       body: JSON.stringify({
@@ -185,22 +260,87 @@ export async function postChat(
     throw new AgentForgeDeliveryError('network_unreachable');
   }
 
-  const json: unknown = await res.json().catch(() => null);
-
+  // Pre-stream failures still come back as JSON 4xx (parse failure,
+  // invalid_request) — the server gates on those before entering streamSSE.
+  // Once the SSE body opens the response is committed to 200 + SSE events,
+  // so any failure surfaces as an `error` event in the stream below.
   if (!res.ok) {
+    const json: unknown = await res.json().catch(() => null);
     throw deliveryErrorFromAgentResponse(res.status, json);
   }
 
+  if (res.body === null) {
+    throw new AgentForgeDeliveryError('invalid_success_response', correlationId);
+  }
+
+  let finalPayload: ChatResponse | null = null;
+  let errorPayload: { error?: string; correlation_id?: string } | null = null;
+
+  try {
+    await readSSEStream(res.body, ({ event, data }) => {
+      if (event === 'routing') {
+        if (opts?.onRouting === undefined) {
+          return;
+        }
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(data);
+        } catch {
+          return;
+        }
+        if (parsed === null || typeof parsed !== 'object') {
+          return;
+        }
+        const r = parsed as { worker?: unknown; label?: unknown };
+        const worker =
+          r.worker === 'intake_extractor' || r.worker === 'evidence_retriever' ? r.worker : null;
+        const label = typeof r.label === 'string' && r.label !== '' ? r.label : null;
+        if (worker !== null && label !== null) {
+          opts.onRouting({ worker, label });
+        }
+        return;
+      }
+      if (event === 'final') {
+        try {
+          const parsed = JSON.parse(data) as ChatResponse;
+          finalPayload = parsed;
+        } catch {
+          /* fall through — finalPayload stays null, caller throws below */
+        }
+        return;
+      }
+      if (event === 'error') {
+        try {
+          errorPayload = JSON.parse(data) as { error?: string; correlation_id?: string };
+        } catch {
+          errorPayload = { error: 'internal_error' };
+        }
+      }
+    });
+  } catch {
+    throw new AgentForgeDeliveryError('network_unreachable', correlationId);
+  }
+
+  if (errorPayload !== null) {
+    const e = errorPayload as { error?: string; correlation_id?: string };
+    const cid = typeof e.correlation_id === 'string' && e.correlation_id !== '' ? e.correlation_id : correlationId;
+    const serverError = typeof e.error === 'string' ? e.error : undefined;
+    if (serverError === 'misconfigured') {
+      throw new AgentForgeDeliveryError('misconfigured_llm', cid, serverError);
+    }
+    throw new AgentForgeDeliveryError('backend_error', cid, serverError);
+  }
+
+  const body = finalPayload as ChatResponse | null;
   if (
-    !json ||
-    typeof json !== 'object' ||
-    (json as { ok?: unknown }).ok !== true ||
-    !Array.isArray((json as ChatResponse).blocks)
+    body === null ||
+    typeof body !== 'object' ||
+    body.ok !== true ||
+    !Array.isArray(body.blocks)
   ) {
     throw new AgentForgeDeliveryError('invalid_success_response', correlationId);
   }
 
-  const body = json as ChatResponse;
   const citation_navigation =
     body.citation_navigation !== undefined &&
     typeof body.citation_navigation === 'object' &&

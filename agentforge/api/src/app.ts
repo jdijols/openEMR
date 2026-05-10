@@ -401,6 +401,12 @@ export function buildApp(
   });
 
   app.post('/chat', async (c) => {
+    // Parse + validate BEFORE entering streamSSE so malformed requests still
+    // return a 400 with a JSON body (the CUI's existing transport-error path
+    // depends on HTTP-status discrimination for these). Once we enter the SSE
+    // body the response is committed to 200 + text/event-stream and every
+    // outcome — success, misconfigured, internal_error — is communicated via
+    // SSE events.
     let body: unknown;
     try {
       body = await c.req.json();
@@ -417,37 +423,58 @@ export function buildApp(
     const obs = c.get('observability');
     const pool = c.get('pgPool');
 
-    try {
-      const { blocks, citation_navigation, conversation_id } = await runChatTurn(
-        env,
-        obs,
-        {
-          sessionToken: parsed.data.session_token,
-          patientUuid: parsed.data.patient_uuid,
-          userMessage: parsed.data.message,
-          conversation_id: parsed.data.conversation_id,
-          docrefUuid: parsed.data.docref_uuid,
-          docType: parsed.data.doc_type,
-        },
-        correlationId,
-        { pool },
-      );
-      return c.json({
-        ok: true,
-        blocks,
-        citation_navigation,
-        correlation_id: correlationId,
-        conversation_id,
-      });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'error';
-      // Print the underlying exception so dev tail can debug without a Langfuse round-trip.
-      console.error('chat_internal_error', { correlation_id: correlationId, error: e });
-      if (isLlmConfigError(msg)) {
-        return c.json({ error: 'misconfigured', correlation_id: correlationId }, 501);
+    return streamSSE(c, async (stream) => {
+      try {
+        const { blocks, citation_navigation, conversation_id } = await runChatTurn(
+          env,
+          obs,
+          {
+            sessionToken: parsed.data.session_token,
+            patientUuid: parsed.data.patient_uuid,
+            userMessage: parsed.data.message,
+            conversation_id: parsed.data.conversation_id,
+            docrefUuid: parsed.data.docref_uuid,
+            docType: parsed.data.doc_type,
+          },
+          correlationId,
+          {
+            pool,
+            // Wire the supervisor's routing decisions to the SSE stream the
+            // moment a worker tool begins executing. Each event arrives with
+            // worker name + physician-facing label so the CUI swaps the
+            // typing indicator's bare ellipsis for "Reading file" /
+            // "Searching evidence" before the I/O lands. The post-hoc
+            // `agent_step` blocks in the final payload are the audit shadow;
+            // they're hidden in the UI but preserved on the wire.
+            onRouting: async (event) => {
+              await stream.writeSSE({
+                event: 'routing',
+                data: JSON.stringify(event),
+              });
+            },
+          },
+        );
+        await stream.writeSSE({
+          event: 'final',
+          data: JSON.stringify({
+            ok: true,
+            blocks,
+            citation_navigation,
+            correlation_id: correlationId,
+            conversation_id,
+          }),
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'error';
+        // Print the underlying exception so dev tail can debug without a Langfuse round-trip.
+        console.error('chat_internal_error', { correlation_id: correlationId, error: e });
+        const errorKind = isLlmConfigError(msg) ? 'misconfigured' : 'internal_error';
+        await stream.writeSSE({
+          event: 'error',
+          data: JSON.stringify({ error: errorKind, correlation_id: correlationId }),
+        });
       }
-      return c.json({ error: 'internal_error', correlation_id: correlationId }, 500);
-    }
+    });
   });
 
   app.post('/conversations/:conversationId/confirm', async (c) => {

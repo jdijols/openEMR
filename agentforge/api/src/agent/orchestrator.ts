@@ -24,7 +24,7 @@ import {
 } from './toolEvidence.js';
 import { verifyClinicalBlocks } from './verification.js';
 import { type AiToolResultLike, isToolResultLike } from './tool_results.js';
-import { HANDOFF_REASONS } from './handoff.js';
+import { HANDOFF_REASONS, type RoutingEmitter } from './handoff.js';
 import { finalizeStructuredEnvelope } from './finalizeStructured.js';
 
 const blocksEnvelopeSchema = z.object({
@@ -735,7 +735,18 @@ export function coerceProposalChatBlocks(toolResults: AiToolResultLike[]): ChatB
   return out;
 }
 
-export type ChatTurnDeps = Readonly<{ pool: Pool }>;
+export type ChatTurnDeps = Readonly<{
+  pool: Pool;
+  /**
+   * Optional live-routing emitter. The HTTP layer binds this to the SSE
+   * stream's `routing` event so the CUI can swap the typing indicator's
+   * bare ellipsis for a worker-specific affordance ("Reading file" /
+   * "Searching evidence") the moment the supervisor's tool call begins.
+   * Tests omit it — the post-hoc `agent_step` blocks already exercise the
+   * synthesized shape on the response side.
+   */
+  onRouting?: RoutingEmitter;
+}>;
 
 export type ChatTurnInput = {
   sessionToken: string;
@@ -813,6 +824,7 @@ export async function runChatTurn(
     sessionToken: input.sessionToken,
     correlationId,
     observability,
+    ...(deps.onRouting !== undefined ? { onRouting: deps.onRouting } : {}),
   });
 
   const tools = {

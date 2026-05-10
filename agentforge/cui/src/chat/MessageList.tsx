@@ -9,12 +9,12 @@ import type {
 } from '../types/chat.js';
 import AssistantMarkdown from './AssistantMarkdown.js';
 import { AgentStepStrip } from './AgentStepStrip.js';
+import { StatusLabel } from './StatusLabel.js';
 import { AttachmentPreview } from './AttachmentPreview.js';
 import { ExtractionAcknowledgment } from './ExtractionAcknowledgment.js';
 import { IntakeProposalCard } from './IntakeProposalCard.js';
 import type { IntakeDispatchEnv } from './intake_dispatch.js';
 import { ProposalCardShell, type ProposalCardActionsConfig, type ProposalCardState } from './ProposalCardShell.js';
-import { TypingIndicator } from './TypingIndicator.js';
 import { broadcast as broadcastProposalEvent } from '../proposals/proposalBus.js';
 
 /**
@@ -630,7 +630,7 @@ function renderBlock(
     readonly onProposalResolved?: OnProposalResolved;
     readonly onOpenDocument?: (docrefUuid: string, page?: number) => void;
   },
-): ReactElement {
+): ReactElement | null {
   switch (block.type) {
     case 'proposal':
       // G2-Final — allergy proposals own a richer two-surface UX: the
@@ -947,19 +947,16 @@ function renderBlock(
       );
     }
     case 'agent_step':
-      return (
-        <AgentStepStrip
-          key={key}
-          block={{
-            worker: block.worker,
-            reason: block.reason,
-            input_summary: block.input_summary,
-            duration_ms: block.duration_ms,
-            outcome: block.outcome,
-            ...(block.stats !== undefined ? { stats: block.stats } : {}),
-          }}
-        />
-      );
+      // The supervisor's routing decisions are now surfaced *live* via the
+      // /chat SSE stream's `routing` event (App.tsx → StatusLabel above the
+      // typing indicator). The post-hoc `agent_step` block stays in the
+      // wire payload — graders / debuggers / Langfuse traces still see the
+      // full handoff metadata — but it no longer renders inline in the
+      // physician's chat view, where the after-the-fact strip read as
+      // engineering noise. `AgentStepStrip` and `synthesizeAgentSteps` are
+      // intentionally preserved (hide-don't-delete) so the data path is
+      // intact and the strip can be re-enabled without re-wiring.
+      return null;
     default:
       return (
         <p key={key} className="agentforge-msg__unknown">
@@ -1024,6 +1021,15 @@ export function MessageList(props: {
    * message. App.tsx flips this on while a /chat request is in flight.
    */
   readonly typing?: boolean;
+  /**
+   * Live routing affordance. When the SSE stream delivers a `routing`
+   * event during a /chat turn, App.tsx sets this to the worker's label
+   * ("Reading file" / "Searching evidence"). Renders as a `<StatusLabel>`
+   * directly above the typing indicator so the physician sees what the
+   * agent is mid-doing rather than waiting in silence. Cleared on turn
+   * completion.
+   */
+  readonly routingLabel?: string | null;
 }): ReactElement {
   const [notice, setNotice] = useState<string | null>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
@@ -1165,11 +1171,22 @@ export function MessageList(props: {
           </Fragment>
         );
       })}
-      {/* G2-MVP-99 — typing indicator lives inside the scroll container
-          so it appears as the next-message-coming-in (left-aligned,
-          beneath the most recent assistant/user turn) instead of
-          floating above the compose form. */}
-      <TypingIndicator visible={props.typing === true} />
+      {/* Single activity pill — lives inside the scroll container so it
+          appears as the next-message-coming-in (left-aligned, beneath the
+          most recent turn). Goes up the instant `typing` flips true with
+          just the dots; when the SSE `routing` event arrives mid-turn the
+          pill *grows* a sparkle + label on the left without remounting,
+          so the user sees the indicator expand in place rather than two
+          pills swapping. See `StatusLabel.tsx` for the morph mechanics. */}
+      {props.typing === true ?
+        <StatusLabel
+          label={
+            typeof props.routingLabel === 'string' && props.routingLabel !== '' ?
+              props.routingLabel
+            : null
+          }
+        />
+      : null}
     </div>
   );
 }

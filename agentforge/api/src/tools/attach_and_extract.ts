@@ -4,7 +4,12 @@ import type { Env } from '../env.js';
 import type { Observability } from '../observability/index.js';
 import { assertBoundPatient } from './_binding.js';
 import { runIntakeExtractor, type IntakeExtractorDeps, type IntakeExtractorResult } from '../workers/intake_extractor.js';
-import { recordSupervisorHandoff, summarizeIntakeExtractorHandoff } from '../agent/handoff.js';
+import {
+  recordSupervisorHandoff,
+  summarizeIntakeExtractorHandoff,
+  WORKER_LABEL,
+  type RoutingEmitter,
+} from '../agent/handoff.js';
 
 /**
  * §5 / §7 / G2-MVP-35 — `attach_and_extract` tool surface (brief signature).
@@ -45,6 +50,22 @@ export type ObservationPersister = (args: {
   readonly results: ReadonlyArray<Readonly<Record<string, unknown>>>;
 }) => Promise<{ readonly inserted: number; readonly updated: number; readonly failed: number }>;
 
+/**
+ * Post-extraction reclassify hook. After extraction returns with a
+ * confident verdict (schema valid, cross-check not failed), the document
+ * should move out of the "Clinical Copilot" inbox and into the
+ * stock-OpenEMR folder that matches the parsed content. The hook is
+ * best-effort: a thrown / rejecting reclassifier never blocks extraction
+ * from returning ok.
+ *
+ * Production wires this to `document/reclassify.php`; tests omit it.
+ */
+export type DocumentReclassifier = (args: {
+  readonly patientUuidCanonical: string;
+  readonly docrefUuid: string;
+  readonly targetCategory: 'lab_report' | 'patient_information' | 'clinical_copilot';
+}) => Promise<{ readonly reclassified: boolean; readonly targetCategoryId: number | null }>;
+
 export type AttachAndExtractDeps = {
   readonly env: Env;
   readonly sessionToken: string;
@@ -54,6 +75,18 @@ export type AttachAndExtractDeps = {
   readonly extractorDeps: IntakeExtractorDeps;
   /** Optional — when absent, persistence is skipped (test convenience). */
   readonly persistObservations?: ObservationPersister;
+  /**
+   * Optional reclassify hook fired after extraction returns with a
+   * confident verdict. Skipped silently when absent (tests, eval runs).
+   */
+  readonly reclassifyDocument?: DocumentReclassifier;
+  /**
+   * Optional live-routing emitter. Fired alongside `recordSupervisorHandoff`
+   * so the CUI surfaces "Reading file" the moment the supervisor's call to
+   * this tool begins executing. Absent in unit tests — the strip-level
+   * `agent_step` block already exercises the synthesized post-hoc shape.
+   */
+  readonly onRouting?: RoutingEmitter;
 };
 
 export type PersistenceOutcome = {
@@ -126,6 +159,18 @@ export async function runAttachAndExtract(
     summarizeIntakeExtractorHandoff({ docrefUuid: input.docref_uuid, docType: input.doc_type }),
   );
 
+  // Live-routing wire signal — fires on the SSE stream so the CUI can swap
+  // the typing indicator's bare ellipsis for a "Reading file" affordance
+  // *before* the worker's I/O begins. Wrapped so a thrown emitter never
+  // breaks extraction (mirrors recordSupervisorHandoff's failure isolation).
+  if (deps.onRouting !== undefined) {
+    try {
+      await deps.onRouting({ worker: 'intake_extractor', label: WORKER_LABEL.intake_extractor });
+    } catch {
+      /* emitter failure must not prevent extraction */
+    }
+  }
+
   const span = await deps.observability.recordToolCall({
     correlationId: deps.correlationId,
     toolName: 'attach_and_extract',
@@ -165,6 +210,13 @@ export async function runAttachAndExtract(
     // refusal path via `persistence.skipped_reason` — orchestrator
     // synthesizes the user-facing refusal block from this.
     const persistence = await maybePersistObservations(input, result, deps);
+
+    // Phase-2 of the "inbox + reclassify" pattern — once the agent's
+    // parsed-content verdict is in, move the document out of the Clinical
+    // Copilot inbox and into the matching stock OpenEMR folder. Best-effort:
+    // a failure here NEVER changes the extraction return shape; the file
+    // simply stays in the inbox and a clinician can move it manually.
+    void maybeReclassifyDocument(input, result, deps);
 
     await span.end({
       meta: {
@@ -388,5 +440,65 @@ async function maybePersistObservations(
       failed: rows.length,
       ...(rowsDroppedUnverified > 0 ? { rows_dropped_unverified: rowsDroppedUnverified } : {}),
     };
+  }
+}
+
+/**
+ * Decide which stock OpenEMR category the document belongs in, based on
+ * the agent's parsed-content verdict (NOT the client's filename heuristic).
+ * Returns null when extraction wasn't confident enough to move the file —
+ * the caller leaves it in the Clinical Copilot inbox.
+ */
+function decideReclassifyTarget(
+  input: AttachAndExtractInput,
+  result: IntakeExtractorResult,
+): 'lab_report' | 'patient_information' | null {
+  if (!result.schemaValid || result.extraction === null) {
+    return null;
+  }
+  if (result.crossCheckStatus === 'unverified') {
+    return null;
+  }
+  if (input.doc_type === 'lab_pdf') {
+    return 'lab_report';
+  }
+  if (input.doc_type === 'intake_form') {
+    return 'patient_information';
+  }
+  return null;
+}
+
+/**
+ * Best-effort reclassify hook. Fire-and-forget — any rejection logs and
+ * resolves; never propagates back into the extraction return path. The
+ * inbox category is the safe default, so a missed reclassify is at most
+ * a UX wart (clinician sees the file under "Clinical Copilot" instead of
+ * "Lab Report") never a correctness issue.
+ */
+async function maybeReclassifyDocument(
+  input: AttachAndExtractInput,
+  result: IntakeExtractorResult,
+  deps: AttachAndExtractDeps,
+): Promise<void> {
+  if (deps.reclassifyDocument === undefined) {
+    return;
+  }
+  const target = decideReclassifyTarget(input, result);
+  if (target === null) {
+    return;
+  }
+  try {
+    await deps.reclassifyDocument({
+      patientUuidCanonical: input.patient_uuid,
+      docrefUuid: input.docref_uuid,
+      targetCategory: target,
+    });
+  } catch (e) {
+    console.error('attach_and_extract_reclassify_threw', {
+      doc_type: input.doc_type,
+      target_category: target,
+      docref_uuid_prefix: input.docref_uuid.slice(0, 8),
+      error_name: e instanceof Error ? e.name : 'unknown',
+    });
   }
 }
