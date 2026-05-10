@@ -490,6 +490,19 @@ export default function App(): ReactElement {
           source: 'cui',
         });
       }
+      // Phase 4 follow-up — tell any open dashboard modal (BundleReviewModal /
+      // AllergyModal) bound to this proposal to dismiss. Without this, a
+      // physician who confirms via the affordance leaves the modal open
+      // because the modal only learned to listen via this BroadcastChannel
+      // event and the affordance path was never wired to fire it. Mirrors
+      // the broadcast the modal itself makes on its own Confirm/Reject path.
+      if (resolution.phase === 'accepted' || resolution.phase === 'declined') {
+        broadcastProposalEvent({
+          type: 'proposal:resolved',
+          proposal_id: proposalId,
+          outcome: resolution.phase === 'accepted' ? 'confirmed' : 'rejected',
+        });
+      }
     },
     [patientUuid],
   );
@@ -999,20 +1012,30 @@ export default function App(): ReactElement {
    * projection (legacy `agentforge_w2/`-only uploads).
    */
   const onViewInDocuments = useCallback((docrefUuid: string): void => {
-    const match = messages.find(
-      (m) => m.attachment?.docrefUuid === docrefUuid && m.attachment?.oeDocumentId !== undefined,
-    );
+    // Loosen the lookup — match any user message with this docref, regardless
+    // of whether `oeDocumentId` was stamped. The previous tighter condition
+    // silently fell back to `onOpenDocument` (the bbox preview modal) when
+    // either id was missing, but the button text is "View in documents", not
+    // "Preview". Misfiring the bbox modal on click is worse UX than a silent
+    // no-op — the rail container's NAV_REQUEST handler already short-circuits
+    // when `document_id` parses to NaN, so a click without the OpenEMR ids
+    // becomes a clean no-op rather than the wrong action.
+    const match = messages.find((m) => m.attachment?.docrefUuid === docrefUuid);
     const oeDocId = match?.attachment?.oeDocumentId;
     const pid = match?.attachment?.oePatientPid;
-    if (oeDocId === undefined || pid === undefined) {
-      onOpenDocument(docrefUuid, 1);
-      return;
-    }
     if (typeof window.parent === 'undefined' || window.parent === null) {
       return;
     }
     if (patientUuid === null || patientUuid === '') {
       return;
+    }
+    if (oeDocId === undefined || pid === undefined) {
+      console.warn('agentforge.view_in_documents.missing_ids', {
+        docrefUuid,
+        hasMatch: match !== undefined,
+        hasOeDocId: oeDocId !== undefined,
+        hasPid: pid !== undefined,
+      });
     }
     window.parent.postMessage(
       {
@@ -1025,7 +1048,7 @@ export default function App(): ReactElement {
       },
       window.location.origin,
     );
-  }, [messages, onOpenDocument, patientUuid]);
+  }, [messages, patientUuid]);
 
   // G2-MVP-99 — file attachment plumbing. Validation matches the W2
   // brief: PDF/PNG/JPEG only, 10 MB cap. Errors surface as `attachError`

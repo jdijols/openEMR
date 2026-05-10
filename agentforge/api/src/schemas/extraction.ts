@@ -174,6 +174,24 @@ const IntakeFamilyHistorySchema = z.object({
   citation: SourceCitationSchema,
 });
 
+// Active problem list — lists.type='medical_problem' via the canonical OpenEMR "Issues
+// → Medical Problem" surface. Intake forms commonly carry a "current medical conditions",
+// "past medical history", "problem list", or "active diagnoses" section that lists chronic
+// conditions the patient is being treated for (hypertension, diabetes, asthma, etc.). The
+// dispatcher maps each row to a `lists` insert:
+//   condition   → lists.title (the condition name)
+//   onset_date  → lists.begdate (ISO YYYY-MM-DD when extractable)
+//   status      → lists.activity (1 active / 0 inactive) + lists.enddate when 'resolved'
+//   comments    → lists.comments (free-text qualifier — severity, well-controlled, etc.)
+const ProblemStatusEnum = z.enum(['active', 'inactive', 'resolved']);
+const IntakeProblemSchema = z.object({
+  condition: z.string(),                           // lists.title (e.g., "Hypertension", "Type 2 diabetes")
+  onset_date: z.string().nullable(),               // ISO YYYY-MM-DD → lists.begdate
+  status: ProblemStatusEnum.nullable(),            // active/inactive/resolved; null = default to active
+  comments: z.string().nullable(),                 // free-text qualifier → lists.comments
+  citation: SourceCitationSchema,
+});
+
 export const IntakeFormSchema = z.object({
   document_type: z.literal('intake_form'),
   patient_uuid: z.string().uuid(),
@@ -183,6 +201,7 @@ export const IntakeFormSchema = z.object({
   current_medications: z.array(IntakeMedicationSchema),
   allergies: z.array(IntakeAllergySchema),
   family_history: z.array(IntakeFamilyHistorySchema),
+  problem_list: z.array(IntakeProblemSchema),
   extraction_metadata: z.object({
     pages_processed: z.number().int().positive(),
     overall_confidence: z.enum(['high', 'medium', 'low']),
@@ -196,3 +215,4 @@ export type IntakeDemographics = z.infer<typeof IntakeDemographicsSchema>;
 export type IntakeMedication = z.infer<typeof IntakeMedicationSchema>;
 export type IntakeAllergy = z.infer<typeof IntakeAllergySchema>;
 export type IntakeFamilyHistoryEntry = z.infer<typeof IntakeFamilyHistorySchema>;
+export type IntakeProblem = z.infer<typeof IntakeProblemSchema>;

@@ -319,6 +319,7 @@ function summarizeExtractionConfidence(
     for (const m of result.extraction.current_medications) visit(m.citation);
     for (const a of result.extraction.allergies) visit(a.citation);
     for (const f of result.extraction.family_history) visit(f.citation);
+    for (const p of result.extraction.problem_list) visit(p.citation);
   }
 
   return {

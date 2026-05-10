@@ -549,6 +549,20 @@ function summarizeItemPayload(payload: Record<string, unknown> | undefined, writ
       if (cond === '') return capitalize(rel)
       return `${capitalize(rel)}: ${cond}`
     }
+    case 'problem_add': {
+      const cond = typeof payload['condition'] === 'string' ? (payload['condition'] as string) : ''
+      const status = typeof payload['status'] === 'string' ? (payload['status'] as string) : ''
+      const onset = typeof payload['onset_date'] === 'string' ? (payload['onset_date'] as string) : ''
+      const comments = typeof payload['comments'] === 'string' ? (payload['comments'] as string) : ''
+      if (cond === '') return 'Medical problem'
+      const parts: string[] = [cond]
+      const meta: string[] = []
+      if (status !== '' && status !== 'active') meta.push(status)
+      if (onset !== '') meta.push(`onset ${onset}`)
+      if (comments !== '') meta.push(comments)
+      if (meta.length > 0) parts.push(`(${meta.join(' · ')})`)
+      return parts.join(' ')
+    }
     default:
       return writeTarget ?? '—'
   }

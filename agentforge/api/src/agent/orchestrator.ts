@@ -1664,6 +1664,47 @@ function buildIntakeBundleSections(
     sections.push({ section_id: 'family_history', title: 'Family history', items: familyItems });
   }
 
+  // Problem list — chronic conditions / diagnoses captured under "Medical
+  // Problems", "Past Medical History", "Active Diagnoses", etc. Each row writes
+  // to OpenEMR `lists` with `type='medical_problem'` via `write/problem_add.php`.
+  // Status defaults to active when the LLM didn't classify; the PHP adapter
+  // maps active → activity=1, inactive/resolved → activity=0 (resolved also
+  // stamps enddate). Comments preserve the free-text qualifier (well-controlled,
+  // mild, since 2018, etc.) so the row carries the same nuance the form did.
+  const problemRaw = Array.isArray((ext as { problem_list?: unknown })['problem_list']) ?
+    ((ext as { problem_list: ReadonlyArray<Record<string, unknown>> })['problem_list'])
+  : [];
+  const problemItems: IntakeBundleItem[] = [];
+  problemRaw.forEach((p, idx) => {
+    const condition = typeof p['condition'] === 'string' ? (p['condition'] as string).trim() : '';
+    if (condition === '') {
+      return;
+    }
+    const itemPayload: Record<string, unknown> = { condition };
+    const onsetRaw = typeof p['onset_date'] === 'string' ? (p['onset_date'] as string).trim() : '';
+    if (onsetRaw !== '' && /^\d{4}-\d{2}-\d{2}$/.test(onsetRaw)) {
+      itemPayload['onset_date'] = onsetRaw;
+    }
+    const statusRaw = typeof p['status'] === 'string' ? (p['status'] as string).trim().toLowerCase() : '';
+    if (statusRaw === 'active' || statusRaw === 'inactive' || statusRaw === 'resolved') {
+      itemPayload['status'] = statusRaw;
+    }
+    const commentsRaw = typeof p['comments'] === 'string' ? (p['comments'] as string).trim() : '';
+    if (commentsRaw !== '') {
+      itemPayload['comments'] = commentsRaw;
+    }
+    problemItems.push({
+      item_id: `prob-${idx + 1}`,
+      write_target: 'problem_add',
+      encounter_id: null,
+      payload: itemPayload,
+      rejected: false,
+    });
+  });
+  if (problemItems.length > 0) {
+    sections.push({ section_id: 'problem_list', title: 'Medical problems', items: problemItems });
+  }
+
   return sections;
 }
 

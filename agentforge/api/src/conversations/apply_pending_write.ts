@@ -19,6 +19,7 @@ const WRITE_TARGETS = [
   'medication_discontinue',
   'allergy_delete',
   'family_history_add',
+  'problem_add',
   'document_delete',
   'demographics_update',
 ] as const;
@@ -42,6 +43,7 @@ const RELATIVE_PATH: Record<WriteTarget, string> = {
   medication_discontinue: 'write/medication_discontinue.php',
   allergy_delete: 'write/allergy_delete.php',
   family_history_add: 'write/family_history_add.php',
+  problem_add: 'write/problem_add.php',
   document_delete: 'document/delete.php',
   demographics_update: 'write/demographics_update.php',
 };

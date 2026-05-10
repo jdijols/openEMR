@@ -366,6 +366,15 @@ function buildPromptForDocType(docType: 'lab_pdf' | 'intake_form'): string {
     '      "citation": { ... }',
     '    }',
     '  ],',
+    '  "problem_list": [',
+    '    {',
+    '      "condition": "<condition or diagnosis verbatim, e.g. \\"Hypertension\\", \\"Type 2 diabetes\\", \\"Asthma\\">",',
+    '      "onset_date": "<YYYY-MM-DD>" | null,',
+    '      "status": "active" | "inactive" | "resolved" | null,',
+    '      "comments": "<extra qualifier verbatim, e.g. \\"well-controlled on metformin\\", \\"diagnosed 2018\\", \\"mild\\">" | null,',
+    '      "citation": { ...same shape as above, page_or_section: "Medical Problems" / "Past Medical History" / "Active Diagnoses" / etc. }',
+    '    }',
+    '  ],',
     '  "extraction_metadata": {',
     '    "pages_processed": <int>,',
     '    "overall_confidence": "high" | "medium" | "low",',
@@ -375,9 +384,11 @@ function buildPromptForDocType(docType: 'lab_pdf' | 'intake_form'): string {
     '}',
     '```',
     'Use EXACTLY these JSON keys — do not rename, do not nest under additional wrappers like `personal_details`, `legal_name`, `date_of_birth`, `phone`. Use `null` (not omission) for unknown values; an explicit `null` tells the dispatcher "field not in source," whereas an empty string would clobber existing chart data on a re-run. Every leaf observation MUST include `citation` with `quote_or_value` as a verbatim substring of the form. Empty arrays (`[]`) are fine when a section has no entries.',
-    '**Comprehensive extraction rule (CRITICAL):** for each row in `current_medications`, `allergies`, and `family_history`, populate EVERY listed field if any hint is visible in the source. Do not skip optional fields just because a stronger field is present. Examples: a medication line "Lisinopril 10 mg PO daily for hypertension since 2020" should populate `name`, `dose`, `frequency`, `indication`, AND `begdate`. An allergy line "Penicillin — hives, moderate, since childhood" should populate `substance`, `reaction`, `severity`, AND `onset_date` (if extractable as a date) plus `comments` if extra notes exist. A family history line "Father — MI age 52, deceased" should populate `relation`, `condition`, `age_of_onset`, AND `deceased: true`. The chart write only persists what you extract — partial extraction loses fields the physician would otherwise have to enter manually.',
+    '**Comprehensive extraction rule (CRITICAL):** for each row in `current_medications`, `allergies`, `family_history`, and `problem_list`, populate EVERY listed field if any hint is visible in the source. Do not skip optional fields just because a stronger field is present. Examples: a medication line "Lisinopril 10 mg PO daily for hypertension since 2020" should populate `name`, `dose`, `frequency`, `indication`, AND `begdate`. An allergy line "Penicillin — hives, moderate, since childhood" should populate `substance`, `reaction`, `severity`, AND `onset_date` (if extractable as a date) plus `comments` if extra notes exist. A family history line "Father — MI age 52, deceased" should populate `relation`, `condition`, `age_of_onset`, AND `deceased: true`. A problem-list line "Hypertension — diagnosed 2018, well-controlled on lisinopril" should populate `condition: "Hypertension"`, `onset_date: "2018-01-01"` (if only a year is given, pick Jan 1 of that year), `status: "active"`, and `comments: "well-controlled on lisinopril"`. The chart write only persists what you extract — partial extraction loses fields the physician would otherwise have to enter manually.',
+    '**Demographics completeness rule (CRITICAL):** the demographics block on intake forms is almost always populated densely — patient identifiers PLUS a full contact block. Capture EVERY visible field, not just `legal_name_first/last` and `dob`. Specifically scan for: `contact_phone` (look for any of "Phone", "Cell", "Mobile", "Home phone", "Best phone"), `street`, `city`, `state`, `postal_code` (split a single "Address" line into the four parts — e.g. "123 Main St, Austin TX 78701" → street="123 Main St", city="Austin", state="TX", postal_code="78701"), `email`, `occupation`. These are typically labelled rows on the form; do NOT skip a labelled row whose value is clearly visible. Emit `null` only when a field is genuinely blank or marked N/A. Forms commonly include 6-10 demographic fields beyond name + DOB — capture all of them.',
+    '**Pre-emit completeness pass (CRITICAL — final check before output):** before returning the JSON, scan the source one more time. For each section (`demographics`, `chief_concern`, `current_medications`, `allergies`, `family_history`, `problem_list`), confirm you have not missed: (a) a visible value that you emitted as `null`, (b) a row in a table that you did not extract, (c) an optional field (dose, frequency, indication, begdate, age_of_onset, deceased, onset_date, status, severity, etc.) that has a hint in the source but you did not populate. If you find any missed value, fix the JSON before emitting. The downstream chart-write UX depends on the extraction being thorough; under-extraction forces the physician to re-type fields the form already shows.',
     '**Table reading (CRITICAL — most extraction failures come from misreading tables):**',
-    '  - Medications, allergies, and family-history sections are usually rendered as tables with column headers (e.g. `Medication | Dose | Frequency | Indication`). READ EACH ROW HORIZONTALLY across columns; do NOT treat the column headers as a row of data.',
+    '  - Medications, allergies, family-history, and problem-list sections are usually rendered as tables with column headers (e.g. `Medication | Dose | Frequency | Indication`, or `Condition | Onset | Status`). READ EACH ROW HORIZONTALLY across columns; do NOT treat the column headers as a row of data.',
     '  - Visually align cells before extracting: a medication name in column 1 belongs with the dose / frequency / indication on the SAME row, not the row above or below.',
     '  - Blank cells, dashes ("—", "-"), "N/A", "n/a", "none", or whitespace mean **null** for that cell. Do not invent values to fill blanks.',
     '  - If a table has a header row but ZERO data rows (every row is blank), emit `[]` for that section.',
@@ -386,6 +397,7 @@ function buildPromptForDocType(docType: 'lab_pdf' | 'intake_form'): string {
     '  - Allergies: "NKDA", "NKA", "no known drug allergies", "no known allergies", "no allergies", "denies allergies", "patient denies any allergies", or a checked "No allergies" box → emit `"allergies": []`. Do NOT create a phantom entry with substance "NKDA" or "no known drug allergies".',
     '  - Medications: "no current medications", "denies medications", "none", an empty meds list with a checked "No" box → emit `"current_medications": []`.',
     '  - Family history: "non-contributory", "no significant family history", "denies", "negative" → emit `"family_history": []`.',
+    '  - Problem list: "no chronic conditions", "no past medical history", "denies", "none", "healthy" → emit `"problem_list": []`. Do NOT invent a phantom problem entry.',
     '  - Chief concern: "annual physical", "well visit", "preventive care" — these ARE valid chief concerns; capture them verbatim. Only return null if the field is genuinely blank.',
     '**Conservative extraction rule:**',
     '  - When uncertain about a field, emit `null`. NEVER guess a value to fill a slot. A null cell is correct; a hallucinated cell is a chart-correctness incident.',
@@ -398,7 +410,8 @@ function buildPromptForDocType(docType: 'lab_pdf' | 'intake_form'): string {
     '**Sex enum**: capitalize first letter — `"Male"`, `"Female"`, or `"Unknown"`. Do not use `"male"` or `"other"`.',
     '**Severity enum**: `"life_threatening"` (with underscore) is valid for anaphylaxis-grade allergies; reserve `"severe"` for grades that did not require emergency intervention.',
     '**Date fields**: emit ISO `YYYY-MM-DD` only. If the form says "since 2020" or "5 years ago," set the date field to `null` and capture the verbatim phrase in `comments` (allergies) or as part of the citation `quote_or_value`. Do NOT compute relative dates.',
-    'Do NOT include `document_type`, `patient_uuid`, or `source_document_id` — the caller injects those. Do NOT include extra top-level keys like `emergency_contact`, `health_insurance`, `treating_physicians`, `past_medical_surgical_history`, `social_history` — they are out of scope. Emit ONLY the raw JSON object, no markdown fences.',
+    '**Problem list vs. past medical/surgical history:** the `problem_list` field captures the patient\'s currently-active and historical chronic medical conditions / diagnoses (hypertension, diabetes, asthma, prior MI, etc.) — whatever a "Medical Problems", "Past Medical History", "Active Diagnoses", or "Current Conditions" section on the form enumerates as discrete conditions. Surgical history (prior procedures), hospitalizations, and narrative-only PMHx that is not a list of conditions remain out of scope. When in doubt: if the form gives a discrete condition name that a physician would enter on the patient\'s problem list, it belongs in `problem_list`.',
+    'Do NOT include `document_type`, `patient_uuid`, or `source_document_id` — the caller injects those. Do NOT include extra top-level keys like `emergency_contact`, `health_insurance`, `treating_physicians`, `past_surgical_history`, `hospitalizations`, `social_history` — they are out of scope. Emit ONLY the raw JSON object, no markdown fences.',
   ].join('\n');
 }
 
@@ -569,6 +582,9 @@ export function countQuoteMatches(
     }
     for (const fam of extraction.family_history) {
       visit(fam.citation);
+    }
+    for (const prob of extraction.problem_list) {
+      visit(prob.citation);
     }
   }
 
