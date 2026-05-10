@@ -7,6 +7,19 @@
 
 ---
 
+## Week 2 submission — start here
+
+Graders reviewing the Week 2 milestone should read in this order:
+
+- **[W2_ARCHITECTURE.md](W2_ARCHITECTURE.md)** — full Week 2 architecture: hybrid retrieval pipeline (FTS5 + dense + Cohere Rerank), citation schema, FHIR persistence path, observability and PHI redaction.
+- **[PATIENT_DASHBOARD_MIGRATION.md](PATIENT_DASHBOARD_MIGRATION.md)** — defense doc for the W2 surprise challenge: PHP patient dashboard ported to React (11 cards, FHIR R4), embedded inside the OpenEMR chart shell.
+- **[EVALUATION.md](EVALUATION.md)** — eval suite covering all five W2 categories (`schema_valid`, `citation_present`, `factually_consistent`, `safe_refusal`, `no_phi_in_logs`) across **88 curated cases**. Pinned baseline: `w2-consolidated-2026-05-07`. Latest committed run lives under [`agentforge/api/eval/reports/`](agentforge/api/eval/reports/); the `/agentforge/api/health/eval-status` endpoint surfaces a PHI-safe summary at runtime.
+- **Setup** — Docker Compose extension at [`docker/agentforge/`](docker/agentforge/) sits on top of [`docker/development-easy/`](docker/development-easy/). Required environment variables are documented in [`docker/agentforge/secrets.env.example`](docker/agentforge/secrets.env.example); the live ones (LLM, Cohere Rerank, Langfuse, Azure STT) are listed at the top of that file.
+
+The Week 1 submission and its architecture are preserved in **[W1_ARCHITECTURE.md](W1_ARCHITECTURE.md)** for reference.
+
+---
+
 ## Doctors don't need medical advice from an AI
 
 At least not today. What they need is their time back.
@@ -91,7 +104,7 @@ Two services on one Linux VPS, glued together through Docker Compose:
 
 The CUI never holds LLM API keys; only the Agent API talks to the model and STT providers, both under BAA-class egress. The agent never touches the database directly — chart writes flow through the PHP module under the physician's existing OpenEMR session and ACL.
 
-[ARCHITECTURE.md](ARCHITECTURE.md) has the full system diagram, the for-instructors decision table, the trust-boundary discussion, and per-component detail.
+[W2_ARCHITECTURE.md](W2_ARCHITECTURE.md) has the Week 2 architecture (hybrid retrieval, citation enforcement, FHIR persistence path, eval gating). [W1_ARCHITECTURE.md](W1_ARCHITECTURE.md) covers the V1 system diagram, the for-instructors decision table, trust boundaries, and per-component detail.
 
 ---
 
@@ -111,13 +124,14 @@ The submission package and project context, in the order a reader should approac
 | Document                             | What it covers                                                                                                                                                                                                                                                                                                                                               |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | [USERS.md](USERS.md)                 | Target user (Dr. Maya Reynolds, adult PCP, new or returning patients), the ten V1 use cases (UC-A through UC-J: pre-room case presentation, single- and cross-domain Q&A, four confirmed-write surfaces, refusal posture, documentary med reconciliation, documentary abnormal lab surfacing), CRUD matrix, explicit non-goals, refusals, degraded behavior. |
-| [ARCHITECTURE.md](ARCHITECTURE.md)   | Technical integration plan: framework choices, system diagram, trust boundaries, deployment model, known tradeoffs.                                                                                                                                                                                                                                          |
+| [W2_ARCHITECTURE.md](W2_ARCHITECTURE.md) | **Week 2 architecture (current).** Hybrid retrieval (FTS5 + dense + Cohere Rerank), citation schema and enforcement, FHIR persistence path, eval suite gating, PHI redaction, observability. |
+| [W1_ARCHITECTURE.md](W1_ARCHITECTURE.md) | Week 1 architecture: framework choices, V1 system diagram, trust boundaries, deployment model, V1 known tradeoffs.                                                                                                                                                                                                                                          |
 | [AUDIT.md](AUDIT.md)                 | Stage 3 OpenEMR audit findings — the security, performance, architecture, data-quality, and compliance constraints that shaped the build.                                                                                                                                                                                                                    |
 | [VERIFICATION.md](VERIFICATION.md)   | Chart-fidelity gate: citation enforcement, negative-claim backing, range guard, med-status warnings — and what verification *does not* catch.                                                                                                                                                                                                                |
 | [EVALUATION.md](EVALUATION.md)       | Eval suite: ten deterministic check rules (stop-the-line invariants + instructor-named failure modes + the constraint-boundary "automation, not advice" gate), 39 curated cases, defense of scope.                                                                                                                                                           |
 | [OBSERVABILITY.md](OBSERVABILITY.md) | Langfuse tracing: per-turn forensic reconstruction, the four required questions answered from logs, PHI redaction.                                                                                                                                                                                                                                           |
 | [COSTS.md](COSTS.md)                 | Actual dev spend (~$258 build total of which $3.34 is variable LLM), per-encounter unit economics, projections at 100 / 1K / 10K / 100K clinicians, architectural inflection points per tier, shipped cost mitigations.                                                                                                                                      |
-| [PRD.md](PRD.md)                     | Engineer-facing implementation spec, mapped 1:1 to gates and acceptance criteria.                                                                                                                                                                                                                                                                            |
+| [PRD.md](Documentation/AgentForge/archive/PRD.md) | Engineer-facing implementation spec, mapped 1:1 to gates and acceptance criteria. Archived after W1 close once the spec was fully reflected in the W1/W2 architecture docs.                                                                                                                                                                                                                                                                          |
 | [JOURNEY.md](JOURNEY.md)             | Physician's-eye narrative of one full visit through the shipped CUI.                                                                                                                                                                                                                                                                                         |
 | [TASKS.md](TASKS.md)                 | Gate-by-gate implementation tracking, dependency-ordered.                                                                                                                                                                                                                                                                                                    |
 | [PATIENT_DASHBOARD_MIGRATION.md](PATIENT_DASHBOARD_MIGRATION.md) | Defense doc for the W2 surprise challenge. The patient dashboard ported from PHP to React (11 cards, FHIR R4, embedded inside the OpenEMR chart shell). Covers framework choice, reverse-engineering findings, parity catalog, architecture revision (standalone-SPA → embedded module), tradeoffs, UX rationale, auth pathway in detail, 5-route comparison. The ported app lives under [`patient-dashboard/`](patient-dashboard/); the PHP loader at [`interface/modules/custom_modules/oe-module-agentforge/public/dashboard.php`](interface/modules/custom_modules/oe-module-agentforge/public/dashboard.php). |

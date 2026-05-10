@@ -13,13 +13,17 @@
             src="about:blank"
             data-panel-src="{{ panel_src|e('html_attr') }}"
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>
+    {# Splitter lives inside the rail and is absolute-positioned over the
+       rail's left border. Keeping it out of the flex track means the dashboard
+       content abuts the 1px boundary directly — no constant visible gap —
+       while the drag handle still has a 7px hit area for resize. #}
+    <div id="agentforge-rail-splitter"
+         class="agentforge-rail-splitter"
+         role="separator"
+         aria-orientation="vertical"
+         aria-label="{{ 'Resize Clinical Copilot panel'|xla }}"
+         tabindex="0"></div>
 </div>
-<div id="agentforge-rail-splitter"
-     class="agentforge-rail-splitter"
-     role="separator"
-     aria-orientation="vertical"
-     aria-label="{{ 'Resize Clinical Copilot panel'|xla }}"
-     tabindex="0"></div>
 <style>
     /* #mainFrames_div is .d-flex.flex-row; we live as flex children alongside #framesDisplay. */
     #mainFrames_div #framesDisplay {
@@ -33,11 +37,11 @@
         max-width: 600px;
         background: #fff;
         border-inline-start: 1px solid #d0d0d8;
-        box-shadow: -1px 0 6px rgba(0, 0, 0, 0.06);
         display: flex;
         flex-direction: column;
         min-height: 0;
         align-self: stretch;
+        position: relative;
     }
 
     .agentforge-rail--collapsed,
@@ -149,17 +153,20 @@
     }
 
     .agentforge-rail-splitter {
-        flex: 0 0 4px;
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        inset-inline-start: -3px;
+        width: 7px;
+        z-index: 1;
         cursor: col-resize;
         background: transparent;
-        position: relative;
         user-select: none;
-        align-self: stretch;
     }
 
     .agentforge-rail-splitter:hover,
     .agentforge-rail-splitter--dragging {
-        background: #c0c4cc;
+        background: rgba(192, 196, 204, 0.4);
     }
 
     .agentforge-rail-splitter:focus-visible {
@@ -1055,8 +1062,7 @@
             if (!mainFrames || !framesDisplay) {
                 return false;
             }
-            if (rail.parentNode !== mainFrames || splitter.parentNode !== mainFrames) {
-                mainFrames.appendChild(splitter);
+            if (rail.parentNode !== mainFrames) {
                 mainFrames.appendChild(rail);
             }
             return true;

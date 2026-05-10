@@ -1,6 +1,8 @@
 import type { ChangeEvent, DragEvent, FormEvent, ReactElement } from 'react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { AgentForgeDeliveryError, postChat, postPresentPatient, postUploadDocument } from './api/client.js';
+import { AgentForgeDeliveryError, postChat, postPresentPatient, postProposalConfirm, postProposalReject, postUploadDocument } from './api/client.js';
+import { AboveComposerAffordance, type AboveComposerState } from './proposals/AboveComposerAffordance.js';
+import { broadcast as broadcastProposalEvent, subscribe as subscribeProposalEvents } from './proposals/proposalBus.js';
 import { readCachedBrief, writeCachedBrief } from './chat/brief_cache.js';
 import { readCachedConversation, writeCachedConversation } from './chat/conversation_cache.js';
 import { MessageList, type ChatMessage, type ProposalApiEnv } from './chat/MessageList.js';
@@ -246,6 +248,10 @@ export default function App(): ReactElement {
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [attachError, setAttachError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  // G2-Final — above-composer affordance state for the hybrid agent/manual proposal flow.
+  const [affordanceState, setAffordanceState] = useState<AboveComposerState>('idle');
+  const [affordanceError, setAffordanceError] = useState<string | null>(null);
+  const broadcastedProposalsRef = useRef<Set<string>>(new Set<string>());
 
   // Loading hint is a derivation of the state machine, not an independent
   // boolean — the two used to drift apart on transient failures.
@@ -479,9 +485,184 @@ export default function App(): ReactElement {
           return { ...m, blocks: nextBlocks };
         }),
       );
+      // G2-Final — tell the dashboard iframe to refresh its FHIR cache.
+      // Only fires on accepted writes (declined / failed / openemr_denied
+      // never landed in the chart so there's nothing to refresh).
+      if (resolution.phase === 'accepted' && patientUuid !== null && patientUuid !== '') {
+        broadcastProposalEvent({
+          type: 'chart:updated',
+          patient_uuid: patientUuid,
+          source: 'cui',
+        });
+      }
     },
-    [],
+    [patientUuid],
   );
+
+  /**
+   * G2-Final — find the latest unresolved proposal block in thread order.
+   * The above-composer affordance renders for whichever pending proposal
+   * is freshest; once `resolved` is stamped (via onProposalResolved), the
+   * affordance hides.
+   */
+  const activeProposal = useMemo<{ proposalId: string; writeTarget: string; preview: string } | null>(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m === undefined || m.role !== 'assistant') {
+        continue;
+      }
+      for (const b of m.blocks) {
+        if (b.type === 'proposal' && b.resolved === undefined) {
+          return { proposalId: b.proposal_id, writeTarget: b.write_target, preview: b.preview };
+        }
+      }
+    }
+    return null;
+  }, [messages]);
+
+  /**
+   * G2-Final — broadcast `proposal:open_modal` to the dashboard iframe via
+   * BroadcastChannel when a new allergy proposal lands. The dashboard's
+   * AllergyModal listens and opens itself pre-filled with the proposal
+   * payload (fetched from the API).
+   *
+   * We only broadcast for write_target='allergy' because that's the only
+   * card with a hybrid-modal experience in MVP. Other targets keep the
+   * legacy in-chat proposal card.
+   */
+  useEffect(() => {
+    if (patientUuid === null || patientUuid === '') {
+      return;
+    }
+    for (const m of messages) {
+      if (m.role !== 'assistant') {
+        continue;
+      }
+      for (const b of m.blocks) {
+        if (b.type !== 'proposal' || b.resolved !== undefined) {
+          continue;
+        }
+        if (b.write_target !== 'allergy') {
+          continue;
+        }
+        if (broadcastedProposalsRef.current.has(b.proposal_id)) {
+          continue;
+        }
+        broadcastedProposalsRef.current.add(b.proposal_id);
+        broadcastProposalEvent({
+          type: 'proposal:open_modal',
+          proposal_id: b.proposal_id,
+          write_target: b.write_target,
+          patient_uuid: patientUuid,
+        });
+      }
+    }
+  }, [messages, patientUuid]);
+
+  /**
+   * G2-Final — listen for `proposal:resolved` from the dashboard's
+   * AllergyModal. When the physician saves (or the modal observes a
+   * status_changed: rejected SSE event), the dashboard broadcasts this
+   * event so the CUI can mark the matching proposal block as resolved.
+   * Without it, the above-composer affordance kept rendering after a
+   * dashboard-side save because the CUI had no other way to know the
+   * proposal had landed (it never went through the CUI's own confirm
+   * path).
+   */
+  useEffect(() => {
+    return subscribeProposalEvents((event) => {
+      if (event.type !== 'proposal:resolved') {
+        return;
+      }
+      onProposalResolved(
+        event.proposal_id,
+        event.outcome === 'confirmed' ? { phase: 'accepted' } : { phase: 'declined' },
+      );
+    });
+  }, [onProposalResolved]);
+
+  /**
+   * G2-Final — above-composer Confirm. Routes through the same
+   * `postProposalConfirm` the in-chat ProposalBlock uses, so the server
+   * path is identical (apply_pending_write.ts → write/allergy.php → addList).
+   */
+  const onAffordanceConfirm = useCallback((): void => {
+    if (activeProposal === null || proposalEnv === undefined) {
+      return;
+    }
+    setAffordanceState('submitting');
+    setAffordanceError(null);
+    void (async () => {
+      try {
+        const result = await postProposalConfirm(
+          proposalEnv.apiBase,
+          proposalEnv.sessionToken,
+          proposalEnv.patientUuid,
+          proposalEnv.conversationId,
+          activeProposal.proposalId,
+        );
+        if (result.accepted) {
+          onProposalResolved(activeProposal.proposalId, { phase: 'accepted' });
+          setAffordanceState('idle');
+        } else {
+          setAffordanceState('failed');
+          setAffordanceError(result.reason ?? 'OpenEMR rejected the write.');
+          onProposalResolved(activeProposal.proposalId, {
+            phase: 'openemr_denied',
+            ...(result.reason !== undefined ? { openemrReason: result.reason } : {}),
+          });
+        }
+      } catch (e) {
+        setAffordanceState('failed');
+        const msg = e instanceof AgentForgeDeliveryError ? e.kind : 'Save failed.';
+        setAffordanceError(msg);
+      }
+    })();
+  }, [activeProposal, proposalEnv, onProposalResolved]);
+
+  const onAffordanceReject = useCallback((): void => {
+    if (activeProposal === null || proposalEnv === undefined) {
+      return;
+    }
+    setAffordanceState('submitting');
+    setAffordanceError(null);
+    void (async () => {
+      try {
+        await postProposalReject(
+          proposalEnv.apiBase,
+          proposalEnv.sessionToken,
+          proposalEnv.patientUuid,
+          proposalEnv.conversationId,
+          activeProposal.proposalId,
+        );
+        onProposalResolved(activeProposal.proposalId, { phase: 'declined' });
+        setAffordanceState('idle');
+      } catch (e) {
+        setAffordanceState('failed');
+        const msg = e instanceof AgentForgeDeliveryError ? e.kind : 'Reject failed.';
+        setAffordanceError(msg);
+      }
+    })();
+  }, [activeProposal, proposalEnv, onProposalResolved]);
+
+  /**
+   * G2-Final — clicking the affordance body re-broadcasts `proposal:open_modal`
+   * so the dashboard reopens the modal if the physician X-ed it out earlier.
+   */
+  const onAffordanceReopen = useCallback((): void => {
+    if (activeProposal === null || patientUuid === null || patientUuid === '') {
+      return;
+    }
+    if (activeProposal.writeTarget !== 'allergy') {
+      return;
+    }
+    broadcastProposalEvent({
+      type: 'proposal:open_modal',
+      proposal_id: activeProposal.proposalId,
+      write_target: activeProposal.writeTarget,
+      patient_uuid: patientUuid,
+    });
+  }, [activeProposal, patientUuid]);
 
   const onDictationFinal = useCallback(
     async (text: string): Promise<void> => {
@@ -1006,6 +1187,18 @@ export default function App(): ReactElement {
         <p className="agentforge-cui__error" role="alert">
           {attachError}
         </p>
+      ) : null}
+      {activeProposal !== null && proposalEnv !== undefined ? (
+        <AboveComposerAffordance
+          proposalId={activeProposal.proposalId}
+          writeTarget={activeProposal.writeTarget}
+          preview={activeProposal.preview}
+          state={affordanceState}
+          {...(affordanceError !== null ? { errorMessage: affordanceError } : {})}
+          onConfirm={onAffordanceConfirm}
+          onReject={onAffordanceReject}
+          onReopen={onAffordanceReopen}
+        />
       ) : null}
       <form
         className={`agentforge-cui__form agentforge-cui__compose${dragOver ? ' agentforge-cui__compose--drag' : ''}`}

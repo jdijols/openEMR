@@ -306,6 +306,69 @@ export async function fetchPendingProposal(
   }
 }
 
+/**
+ * Shallow-merge `payloadPatch` onto the existing `pending_proposals.payload`
+ * JSON via Postgres `||` concatenation (last-write-wins per top-level key).
+ * Only applies when the row is still `pending`; returns the merged row, or
+ * `null` if the proposal does not exist or is already finalized.
+ */
+export async function updatePendingProposalPayload(
+  pool: Pool,
+  proposalId: string,
+  payloadPatch: Record<string, unknown>,
+  client?: PoolClient,
+): Promise<PendingProposalRow | null> {
+  const { client: db, release } = await maybeClient(pool, client);
+  try {
+    const r = await db.query<{
+      proposal_id: string;
+      conversation_internal_id: string;
+      patient_uuid: string;
+      encounter_id: string | null;
+      write_target: string;
+      payload: unknown;
+      status: PendingProposalRow['status'];
+    }>(
+      `UPDATE agentforge.pending_proposals
+       SET payload = COALESCE(payload, '{}'::jsonb) || $2::jsonb
+       WHERE proposal_id = $1 AND status = 'pending'
+       RETURNING proposal_id, conversation_internal_id, patient_uuid, encounter_id, write_target, payload, status`,
+      [proposalId, JSON.stringify(payloadPatch)],
+    );
+
+    const row = r.rows[0];
+    if (row === undefined) {
+      return null;
+    }
+
+    const payload =
+      row.payload !== null && typeof row.payload === 'object' && !Array.isArray(row.payload) ?
+        (row.payload as Record<string, unknown>)
+      : {};
+
+    let encounterId: number | null = null;
+    const encRaw = row.encounter_id;
+    if (encRaw !== null && encRaw !== undefined && `${encRaw}`.trim() !== '') {
+      const n = Number.parseInt(`${encRaw}`, 10);
+      encounterId = Number.isFinite(n) && n > 0 ? n : null;
+    }
+
+    return {
+      proposalId: row.proposal_id,
+      conversationInternalId: Number.parseInt(String(row.conversation_internal_id), 10),
+      patientUuid: typeof row.patient_uuid === 'string' ? row.patient_uuid.toLowerCase() : '',
+      encounterId,
+      writeTarget: row.write_target,
+      payload,
+      status: row.status,
+    };
+  } finally {
+    if (release) {
+      db.release();
+    }
+  }
+}
+
 export async function markProposalFinal(
   pool: Pool,
   proposalId: string,

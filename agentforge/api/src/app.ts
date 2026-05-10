@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { streamSSE } from 'hono/streaming';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -10,6 +11,14 @@ import { runCasePresentation } from './agent/case_presentation.js';
 import { runChatTurn } from './agent/orchestrator.js';
 import type { AgentForgeVariables } from './appTypes.js';
 import { confirmPendingProposal, rejectPendingProposal } from './conversations/apply_pending_write.js';
+import { broadcast, subscribe } from './conversations/proposal_bus.js';
+import {
+  fetchConversationByExternalId,
+  fetchPendingProposal,
+  insertConversationRow,
+  insertPendingProposal,
+  updatePendingProposalPayload,
+} from './conversations/store.js';
 import { corsAllowlistMiddleware } from './cors.js';
 import type { Env } from './env.js';
 import { normalizeErrorHandler } from './errors/normalize.js';
@@ -151,6 +160,60 @@ const proposalDecisionSchema = z.object({
   patient_uuid: z.string().min(1),
   proposal_id: z.string().min(1),
 });
+
+// /proposals lifecycle — used by the React modal in the patient dashboard
+// AND the CUI rail to read/write the same pending row. Schema deliberately
+// stays loose on `payload` because the same surface serves every write_target
+// (allergy / medication / vitals / …) and Zod validation lives in the agent
+// tools that own the canonical shape.
+const proposalCreateBodySchema = z
+  .object({
+    session_token: z.string().min(1).optional(),
+    patient_uuid: z.string().min(1),
+    write_target: z.literal('allergy'),
+    payload: z.record(z.string(), z.unknown()),
+    conversation_external_id: z.string().min(1).optional(),
+  })
+  .strict();
+
+const proposalPatchBodySchema = z
+  .object({
+    session_token: z.string().min(1).optional(),
+    patient_uuid: z.string().min(1).optional(),
+    payload: z.record(z.string(), z.unknown()),
+  })
+  .strict();
+
+const proposalDecisionBodySchema = z
+  .object({
+    session_token: z.string().min(1).optional(),
+    patient_uuid: z.string().min(1),
+  })
+  .strict();
+
+/**
+ * Session token comes from `Authorization: Bearer <token>`, an
+ * `x-agentforge-session: <token>` header, or a `session_token` body field
+ * (POST/PATCH only). Returns null when no token is present so the handler can
+ * 401 without further parsing.
+ */
+function readSessionToken(req: Request, bodyToken: string | undefined): string | null {
+  const auth = req.headers.get('authorization');
+  if (auth !== null && auth !== '') {
+    const m = /^Bearer\s+(.+)$/i.exec(auth);
+    if (m !== null && typeof m[1] === 'string' && m[1] !== '') {
+      return m[1];
+    }
+  }
+  const headerToken = req.headers.get('x-agentforge-session');
+  if (typeof headerToken === 'string' && headerToken !== '') {
+    return headerToken;
+  }
+  if (typeof bodyToken === 'string' && bodyToken !== '') {
+    return bodyToken;
+  }
+  return null;
+}
 
 export function buildApp(
   env: Env,
@@ -463,6 +526,402 @@ export function buildApp(
     const pool = c.get('pgPool');
 
     const out = await rejectPendingProposal(pool, parsed.data.proposal_id, parsed.data.patient_uuid);
+    if (!out.ok) {
+      if (out.error === 'proposal_not_found') {
+        return c.json({ error: 'proposal_not_found', correlation_id: correlationId }, 404);
+      }
+      if (out.error === 'patient_mismatch') {
+        return c.json({ error: 'patient_mismatch', correlation_id: correlationId }, 403);
+      }
+      if (out.error === 'not_pending') {
+        return c.json({ error: 'not_pending', correlation_id: correlationId }, 409);
+      }
+      return c.json({ error: 'internal_error', correlation_id: correlationId }, 500);
+    }
+
+    return c.json({ ok: true, rejected: true, correlation_id: correlationId });
+  });
+
+  // -------------------------------------------------------------------------
+  // /proposals lifecycle (PRD §5.4 — dashboard modal + CUI rail share rows)
+  //
+  // The dashboard opens the modal with NO agent involvement (just a session
+  // token + patient_uuid + draft payload), so we mint a row directly. The CUI
+  // path keeps using its existing `propose_*_write` agent tools — those
+  // continue to write through `insertPendingProposal` with a real conversation
+  // id. Both surfaces converge on `/proposals/:id` for read / patch / SSE /
+  // confirm / reject.
+  //
+  // pending_proposals.conversation_internal_id is BIGINT NOT NULL today, so a
+  // dashboard-initiated proposal still needs a conversation row. When
+  // `conversation_external_id` is supplied we look it up; otherwise we mint a
+  // synthetic conversation (same shape as the chat orchestrator's fallback).
+  // No DB migration required.
+  // -------------------------------------------------------------------------
+
+  app.post('/proposals', async (c) => {
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid_request' }, 400);
+    }
+
+    const parsed = proposalCreateBodySchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ error: 'invalid_request' }, 400);
+    }
+
+    const sessionToken = readSessionToken(c.req.raw, parsed.data.session_token);
+    if (sessionToken === null) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+
+    const claims = verifySessionToken(sessionToken, env.SESSION_TOKEN_SECRET);
+    if (claims === null) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    if (claims.patient_uuid !== null && claims.patient_uuid !== parsed.data.patient_uuid) {
+      return c.json({ error: 'patient_mismatch' }, 403);
+    }
+
+    const correlationId = c.get('correlationId');
+    const pool = c.get('pgPool');
+
+    let conversationInternalId: number;
+    try {
+      if (parsed.data.conversation_external_id !== undefined) {
+        const conv = await fetchConversationByExternalId(pool, parsed.data.conversation_external_id);
+        if (conv === null) {
+          return c.json({ error: 'conversation_not_found', correlation_id: correlationId }, 404);
+        }
+        if (conv.patientUuid.toLowerCase() !== parsed.data.patient_uuid.toLowerCase()) {
+          return c.json({ error: 'patient_mismatch', correlation_id: correlationId }, 403);
+        }
+        conversationInternalId = conv.internalId;
+      } else {
+        // Dashboard-only path: mint a synthetic conversation so the NOT NULL
+        // FK constraint on pending_proposals is satisfied without a DB
+        // migration. Mirrors the existing runChatTurn fallback (orchestrator.ts).
+        const synthetic = await insertConversationRow(pool, randomUUID(), parsed.data.patient_uuid);
+        conversationInternalId = synthetic.internalId;
+      }
+    } catch (e) {
+      const code = typeof e === 'object' && e !== null ? (e as { code?: unknown }).code : undefined;
+      if (code === 'conversation_patient_mismatch') {
+        return c.json({ error: 'patient_mismatch', correlation_id: correlationId }, 403);
+      }
+      console.error('proposals_create_internal_error', { correlation_id: correlationId, error: e });
+      return c.json({ error: 'internal_error', correlation_id: correlationId }, 500);
+    }
+
+    const proposalId = randomUUID();
+    try {
+      await insertPendingProposal(pool, {
+        proposalId,
+        conversationInternalId,
+        patientUuid: parsed.data.patient_uuid.toLowerCase(),
+        encounterId: null,
+        writeTarget: parsed.data.write_target,
+        payload: parsed.data.payload,
+      });
+    } catch (e) {
+      console.error('proposals_create_internal_error', { correlation_id: correlationId, error: e });
+      return c.json({ error: 'internal_error', correlation_id: correlationId }, 500);
+    }
+
+    return c.json(
+      {
+        proposal_id: proposalId,
+        payload: parsed.data.payload,
+        status: 'pending' as const,
+        correlation_id: correlationId,
+      },
+      201,
+    );
+  });
+
+  app.get('/proposals/:id', async (c) => {
+    const proposalId = c.req.param('id');
+    const requestedPatientUuid = c.req.query('patient_uuid');
+    const correlationId = c.get('correlationId');
+    const pool = c.get('pgPool');
+
+    const row = await fetchPendingProposal(pool, proposalId);
+    if (row === null) {
+      return c.json({ error: 'proposal_not_found', correlation_id: correlationId }, 404);
+    }
+
+    if (
+      typeof requestedPatientUuid === 'string' &&
+      requestedPatientUuid !== '' &&
+      row.patientUuid.toLowerCase() !== requestedPatientUuid.toLowerCase()
+    ) {
+      return c.json({ error: 'patient_mismatch', correlation_id: correlationId }, 403);
+    }
+
+    return c.json({
+      proposal_id: row.proposalId,
+      patient_uuid: row.patientUuid,
+      write_target: row.writeTarget,
+      payload: row.payload,
+      status: row.status,
+      correlation_id: correlationId,
+    });
+  });
+
+  app.patch('/proposals/:id', async (c) => {
+    const proposalId = c.req.param('id');
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid_request' }, 400);
+    }
+
+    const parsed = proposalPatchBodySchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ error: 'invalid_request' }, 400);
+    }
+
+    const sessionToken = readSessionToken(c.req.raw, parsed.data.session_token);
+    if (sessionToken === null) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+
+    const claims = verifySessionToken(sessionToken, env.SESSION_TOKEN_SECRET);
+    if (claims === null) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+
+    const correlationId = c.get('correlationId');
+    const pool = c.get('pgPool');
+
+    const existing = await fetchPendingProposal(pool, proposalId);
+    if (existing === null) {
+      return c.json({ error: 'proposal_not_found', correlation_id: correlationId }, 404);
+    }
+    if (claims.patient_uuid !== null && claims.patient_uuid !== existing.patientUuid) {
+      return c.json({ error: 'patient_mismatch', correlation_id: correlationId }, 403);
+    }
+    if (
+      parsed.data.patient_uuid !== undefined &&
+      parsed.data.patient_uuid.toLowerCase() !== existing.patientUuid.toLowerCase()
+    ) {
+      return c.json({ error: 'patient_mismatch', correlation_id: correlationId }, 403);
+    }
+    if (existing.status !== 'pending') {
+      return c.json({ error: 'not_pending', correlation_id: correlationId }, 409);
+    }
+
+    const updated = await updatePendingProposalPayload(pool, proposalId, parsed.data.payload);
+    if (updated === null) {
+      // Race: row finalized between fetch and update.
+      return c.json({ error: 'not_pending', correlation_id: correlationId }, 409);
+    }
+
+    broadcast(proposalId, 'payload_updated', {
+      proposal_id: updated.proposalId,
+      payload: updated.payload,
+    });
+
+    return c.json({
+      proposal_id: updated.proposalId,
+      payload: updated.payload,
+      correlation_id: correlationId,
+    });
+  });
+
+  app.get('/proposals/:id/stream', (c) => {
+    const proposalId = c.req.param('id');
+    const pool = c.get('pgPool');
+
+    return streamSSE(c, async (stream) => {
+      const initial = await fetchPendingProposal(pool, proposalId);
+      if (initial === null) {
+        await stream.writeSSE({
+          event: 'error',
+          data: JSON.stringify({ error: 'proposal_not_found', proposal_id: proposalId }),
+        });
+        return;
+      }
+
+      // Fan-in queue: subscriber.write enqueues, the SSE loop dequeues. Keeps
+      // the bus's synchronous broadcast simple while still serializing writes
+      // onto the streaming response.
+      const queue: Array<{ event: string; data: string }> = [];
+      let waker: (() => void) | null = null;
+      let closed = false;
+
+      const wake = (): void => {
+        const w = waker;
+        waker = null;
+        if (w !== null) {
+          w();
+        }
+      };
+
+      const unsubscribe = subscribe(proposalId, {
+        write: (event, data) => {
+          queue.push({ event, data: JSON.stringify(data) });
+          wake();
+        },
+        close: () => {
+          closed = true;
+          wake();
+        },
+      });
+
+      // Initial snapshot.
+      await stream.writeSSE({
+        event: 'snapshot',
+        data: JSON.stringify({
+          proposal_id: initial.proposalId,
+          payload: initial.payload,
+          status: initial.status,
+        }),
+      });
+
+      // If the proposal was already finalized when we connected, surface the
+      // terminal state immediately and let the stream close.
+      if (initial.status !== 'pending') {
+        await stream.writeSSE({
+          event: 'status_changed',
+          data: JSON.stringify({ proposal_id: initial.proposalId, status: initial.status }),
+        });
+        unsubscribe();
+        return;
+      }
+
+      stream.onAbort(() => {
+        closed = true;
+        unsubscribe();
+        wake();
+      });
+
+      try {
+        // Drain loop. When `closed` flips and the queue is empty, the stream
+        // ends. closeProposal() in apply_pending_write triggers this.
+        while (!closed) {
+          while (queue.length > 0) {
+            const next = queue.shift();
+            if (next === undefined) {
+              break;
+            }
+            await stream.writeSSE({ event: next.event, data: next.data });
+          }
+          if (closed) {
+            break;
+          }
+          await new Promise<void>((resolve) => {
+            waker = resolve;
+          });
+        }
+        // Flush any events that landed after `close()` fired.
+        while (queue.length > 0) {
+          const next = queue.shift();
+          if (next === undefined) {
+            break;
+          }
+          await stream.writeSSE({ event: next.event, data: next.data });
+        }
+      } finally {
+        unsubscribe();
+      }
+    });
+  });
+
+  app.post('/proposals/:id/confirm', async (c) => {
+    const proposalId = c.req.param('id');
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid_request' }, 400);
+    }
+
+    const parsed = proposalDecisionBodySchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ error: 'invalid_request' }, 400);
+    }
+
+    const sessionToken = readSessionToken(c.req.raw, parsed.data.session_token);
+    if (sessionToken === null) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+
+    const correlationId = c.get('correlationId');
+    const pool = c.get('pgPool');
+    const envLocal = c.get('env');
+
+    const out = await confirmPendingProposal(
+      envLocal,
+      pool,
+      proposalId,
+      parsed.data.patient_uuid,
+      sessionToken,
+      correlationId,
+    );
+
+    if (!out.ok) {
+      if (out.error === 'proposal_not_found') {
+        return c.json({ error: 'proposal_not_found', correlation_id: correlationId }, 404);
+      }
+      if (out.error === 'patient_mismatch') {
+        return c.json({ error: 'patient_mismatch', correlation_id: correlationId }, 403);
+      }
+      if (out.error === 'not_pending') {
+        return c.json({ error: 'not_pending', correlation_id: correlationId }, 409);
+      }
+      if (out.error === 'missing_encounter_id') {
+        return c.json({ error: 'missing_encounter_id', correlation_id: correlationId }, 400);
+      }
+      if (out.error === 'openemr_error') {
+        let code = typeof out.status === 'number' && Number.isFinite(out.status) ? Math.trunc(out.status) : 502;
+        if (code < 400 || code > 599) code = 502;
+        const status = code as ContentfulStatusCode;
+        return c.json(
+          { error: 'openemr_error', correlation_id: correlationId, detail: out.detail },
+          status,
+        );
+      }
+      return c.json({ error: 'unsupported_target', correlation_id: correlationId }, 500);
+    }
+
+    return c.json({
+      ok: true,
+      accepted: out.accepted,
+      ...(out.reason !== undefined ? { reason: out.reason } : {}),
+      correlation_id: correlationId,
+    });
+  });
+
+  app.post('/proposals/:id/reject', async (c) => {
+    const proposalId = c.req.param('id');
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid_request' }, 400);
+    }
+
+    const parsed = proposalDecisionBodySchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ error: 'invalid_request' }, 400);
+    }
+
+    const sessionToken = readSessionToken(c.req.raw, parsed.data.session_token);
+    if (sessionToken === null) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+
+    const correlationId = c.get('correlationId');
+    const pool = c.get('pgPool');
+
+    const out = await rejectPendingProposal(pool, proposalId, parsed.data.patient_uuid);
     if (!out.ok) {
       if (out.error === 'proposal_not_found') {
         return c.json({ error: 'proposal_not_found', correlation_id: correlationId }, 404);

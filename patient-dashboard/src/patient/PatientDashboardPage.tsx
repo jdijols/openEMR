@@ -77,7 +77,7 @@ export function PatientDashboardPage() {
         {/*
           Layout mirrors the legacy demographics.php structure with our reduced
           card set:
-            - Top row: 3-col (Allergies / Problem List / Medications)
+            - Top row: 3-col (Allergies / Medical Problems / Medications)
             - Middle: full-width Prescriptions + Care Team
             - Bottom: 2-col (Demographics + Appointments / Labs + Health Concerns
               / Vitals + Immunizations)

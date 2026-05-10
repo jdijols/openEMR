@@ -16,6 +16,7 @@
     "dev:host": "dotenv -e ../../docker/agentforge/secrets.dev.env -v POSTGRES_URL=postgresql://agentforge:agentforge@127.0.0.1:15432/agentforge -- tsx watch src/index.ts",
     "test": "vitest run",
     "eval": "tsx eval/runner.ts",
+    "eval:judge": "dotenv -e ../../docker/agentforge/secrets.dev.env -v EVAL_RUN_JUDGE=1 -- tsx eval/runner.ts",
     "test:watch": "vitest"
   },
   "dependencies": {

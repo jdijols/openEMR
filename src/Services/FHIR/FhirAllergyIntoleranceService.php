@@ -189,10 +189,24 @@ class FhirAllergyIntoleranceService extends FhirServiceBase implements IResource
                 $reactionConcept->addCoding($reactionCoding);
             }
             $reaction->addManifestation($reactionConcept);
+            // OpenEMR-AgentForge — surface the lists.severity_al option_id
+            // (mild/moderate/severe/fatal/unassigned/etc.) on the reaction
+            // so consumers that need the granular label keep it. The
+            // top-level criticality (FHIR-spec mandated low/high/unable-to-
+            // assess) below is preserved unchanged for spec compliance.
+            if (!empty($dataRecord['severity_al'])) {
+                $reaction->setSeverity($dataRecord['severity_al']);
+            }
             $allergyIntoleranceResource->addReaction($reaction);
-        } else {
+        } elseif (!empty($dataRecord['severity_al'])) {
+            // Reaction is empty/unassigned but severity_al is set — emit a
+            // bare reaction entry that carries severity only, so the
+            // dashboard can still render the granular label even when the
+            // reaction itself is blank.
             $reaction = new FHIRAllergyIntoleranceReaction();
             $reaction->addManifestation(UtilsService::createDataAbsentUnknownCodeableConcept());
+            $reaction->setSeverity($dataRecord['severity_al']);
+            $allergyIntoleranceResource->addReaction($reaction);
         }
 
         if (!empty($dataRecord['diagnosis'])) {

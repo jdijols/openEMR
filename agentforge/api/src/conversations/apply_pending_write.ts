@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 import type { Env } from '../env.js';
 import { OpenEmrCallError, postModuleJson, type OpenEmrClientContext } from '../openemr/client.js';
+import { broadcast, closeProposal } from './proposal_bus.js';
 import { fetchPendingProposal, markProposalFinal } from './store.js';
 
 const WRITE_TARGETS = [
@@ -181,6 +182,11 @@ export async function confirmPendingProposal(
 
   await markProposalFinal(pool, proposalId, 'confirmed');
 
+  // Notify any SSE subscribers (dashboard modal, CUI rail) that the proposal
+  // has been finalized. Best-effort — broadcast errors never fail the apply.
+  broadcast(proposalId, 'status_changed', { proposal_id: proposalId, status: 'confirmed' });
+  closeProposal(proposalId);
+
   const reason =
     raw !== null && typeof raw === 'object' && typeof (raw as { reason?: unknown }).reason === 'string' ?
       (raw as { reason: string }).reason
@@ -212,6 +218,9 @@ export async function rejectPendingProposal(
   if (!ok) {
     return { ok: false, error: 'not_pending' };
   }
+
+  broadcast(proposalId, 'status_changed', { proposal_id: proposalId, status: 'rejected' });
+  closeProposal(proposalId);
 
   return { ok: true, accepted: false, reason: 'rejected_by_clinician' };
 }

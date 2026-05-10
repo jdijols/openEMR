@@ -34,10 +34,24 @@ final class AllergyWriteAction
 
         $outcome = match ($payload->action()) {
             'add' => $this->add($patientUuidCanonical, $payload),
+            // Substance lives in `lists.title`. The legacy add/edit-issue
+            // form stores it there and the FHIR encoder pulls it back as
+            // the resource narrative; updating it in place is parity with
+            // that flow.
+            'update_substance' => $this->allergyPort->updateAllergy(
+                $patientUuidCanonical,
+                (string) $payload->allergyUuid(),
+                ['title' => (string) $payload->substance()],
+            ),
+            // `lists.reaction` (option_id from list_options.list_id='reaction')
+            // is what the legacy form stores and what the FHIR encoder reads.
+            // Writing to `comments` instead silently broke the round-trip:
+            // the value persisted but never surfaced through FHIR, so the
+            // dashboard modal couldn't read it back on edit.
             'update_reaction' => $this->allergyPort->updateAllergy(
                 $patientUuidCanonical,
                 (string) $payload->allergyUuid(),
-                ['comments' => (string) $payload->reactionText()],
+                ['reaction' => (string) $payload->reactionText()],
             ),
             'update_severity' => $this->allergyPort->updateAllergy(
                 $patientUuidCanonical,
@@ -59,11 +73,17 @@ final class AllergyWriteAction
             'title' => $payload->substance(),
         ];
 
-        // Schema-expansion: combine reaction + extra comments into a single comments body
-        // (preserves both fields when both are present; either alone when only one).
-        $comments = $payload->combinedCommentsBody();
-        if ($comments !== null && $comments !== '') {
-            $fields['comments'] = $comments;
+        // Reaction lands in `lists.reaction` (option_id) so the FHIR encoder
+        // emits it on read. Free-text annotations not part of the reaction
+        // dropdown go into `lists.comments` separately.
+        $reaction = $payload->reactionText();
+        if ($reaction !== null && $reaction !== '') {
+            $fields['reaction'] = $reaction;
+        }
+
+        $extraComments = $payload->extraComments();
+        if ($extraComments !== null && $extraComments !== '') {
+            $fields['comments'] = $extraComments;
         }
 
         $sev = $payload->severityAlOptionId();

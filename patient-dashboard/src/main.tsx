@@ -29,6 +29,16 @@ declare global {
       fhirBase?: string
       webroot?: string
       authUser?: string
+      // AgentForge proposal API (Hono service, separate auth from FHIR).
+      // `apiBase` and `launchCode` are injected by dashboard.php on every
+      // page load; `afSessionToken` is set by the JS bootstrap below after
+      // redeeming the single-use launch code. The modal in
+      // proposals/session.ts gates on `afSessionToken` and degrades to an
+      // explicit error state when redemption fails or the agentforge env
+      // var is unset. Mirrors panel.php's CUI handshake flow.
+      apiBase?: string
+      launchCode?: string
+      afSessionToken?: string
     }
   }
 }
@@ -88,10 +98,58 @@ const RouterTree = injected ? (
   </BrowserRouter>
 )
 
-createRoot(rootEl).render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider initialAuth={initialAuth}>{RouterTree}</AuthProvider>
-    </QueryClientProvider>
-  </StrictMode>,
-)
+/**
+ * G2-Final — redeem the agentforge launch code for a session token before
+ * the React app boots. Mirrors the CUI's `useHandshake` redemption: the
+ * launch code is single-use, server-issued (dashboard.php), and time-bound;
+ * the resulting session token is what the proposal-lifecycle API requires.
+ *
+ * Failure modes degrade rather than throw — the dashboard's read-only cards
+ * (FHIR fetched via the OpenEMR LocalApi pathway) are unaffected. The
+ * AllergyModal's `proposals/session.ts` returns null when `afSessionToken`
+ * is missing, which surfaces as an explicit "AgentForge session not
+ * available. Reload the chart to continue." inside the modal.
+ */
+async function redeemAgentforgeSession(): Promise<void> {
+  if (injected === undefined) {
+    return
+  }
+  const code = injected.launchCode
+  const base = injected.apiBase
+  if (typeof code !== 'string' || code === '' || typeof base !== 'string' || base === '') {
+    return
+  }
+  const apiBase = base.replace(/\/+$/, '')
+  try {
+    const res = await fetch(`${apiBase}/handshake/redeem`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ launch_code: code }),
+    })
+    if (!res.ok) {
+      // Single-use code may have been consumed by a duplicate fetch under
+      // StrictMode dev double-mount. Don't fail the boot; the modal will
+      // surface its degraded state and the user can reload.
+      // eslint-disable-next-line no-console
+      console.warn('agentforge handshake redeem failed:', res.status)
+      return
+    }
+    const json = (await res.json()) as { session_token?: unknown }
+    if (typeof json.session_token === 'string' && json.session_token !== '') {
+      injected.afSessionToken = json.session_token
+    }
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn('agentforge handshake redeem error:', e)
+  }
+}
+
+void redeemAgentforgeSession().finally(() => {
+  createRoot(rootEl).render(
+    <StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider initialAuth={initialAuth}>{RouterTree}</AuthProvider>
+      </QueryClientProvider>
+    </StrictMode>,
+  )
+})

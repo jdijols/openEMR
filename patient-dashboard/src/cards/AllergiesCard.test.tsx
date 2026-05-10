@@ -14,14 +14,23 @@ const ibuprofen: FhirAllergyIntolerance = {
 }
 
 describe('<AllergiesList>', () => {
-  it('renders allergen name', () => {
+  it('renders allergen name and reaction with arrow separator', () => {
     render(<AllergiesList allergies={[ibuprofen]} />)
-    expect(screen.getByText('Ibuprofen')).toBeInTheDocument()
+    // Substance and reaction render in the same row text node, separated
+    // by a directional arrow — the legacy single-string render is gone.
+    const row = screen.getByRole('listitem')
+    expect(row.textContent).toContain('Ibuprofen')
+    expect(row.textContent).toContain('→')
+    expect(row.textContent).toContain('GI bleed')
   })
 
-  it('renders capitalized severity pill', () => {
+  it('renders severity pill with the granular label (severity_al wins over criticality)', () => {
+    // The PHP transform now emits `reaction[0].severity` carrying the
+    // severity_al option_id, which the dashboard prefers over the coarse
+    // FHIR criticality bucket. ibuprofen has reaction.severity='severe',
+    // which wins over criticality='high' → display "Severe".
     render(<AllergiesList allergies={[ibuprofen]} />)
-    expect(screen.getByText('High')).toBeInTheDocument()
+    expect(screen.getByText('Severe')).toBeInTheDocument()
   })
 
   it('renders multiple allergies in sorted order (high before moderate before mild)', () => {
@@ -36,12 +45,15 @@ describe('<AllergiesList>', () => {
 })
 
 describe('severityLabel', () => {
-  it('prefers criticality over reaction severity', () => {
-    expect(severityLabel(ibuprofen)).toBe('high')
+  it('prefers reaction[0].severity (granular severity_al option_id) over the coarse FHIR criticality', () => {
+    // Round-trip preservation: severity_al → reaction.severity in PHP →
+    // here in the dashboard. Old behavior preferred criticality, but that
+    // discarded the precise grade (mild/fatal/etc.) the physician picked.
+    expect(severityLabel(ibuprofen)).toBe('severe')
   })
 
-  it('falls back to reaction[0].severity when criticality is missing', () => {
-    expect(severityLabel({ ...ibuprofen, criticality: undefined })).toBe('severe')
+  it('falls back to FHIR criticality when reaction.severity is missing (legacy rows)', () => {
+    expect(severityLabel({ ...ibuprofen, reaction: undefined })).toBe('high')
   })
 
   it('returns null when both are missing', () => {

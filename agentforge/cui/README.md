@@ -1,5 +1,9 @@
 Conversational UI (React + Vite). Build: `npm run build` → `dist/` for Caddy `/cui/` (Gate 6).
 
+## Week 2 deliverables
+
+Graders: this is the conversational iframe SPA — the conversational surface of Week 2, distinct from the W2 surprise challenge (the React patient dashboard, defended separately in [`PATIENT_DASHBOARD_MIGRATION.md`](../../PATIENT_DASHBOARD_MIGRATION.md)). The CUI's role inside W2 — citation rendering, propose/confirm UI, transcript thread — is described in [`W2_ARCHITECTURE.md`](../../W2_ARCHITECTURE.md) at the repo root, alongside the eval suite ([`EVALUATION.md`](../../EVALUATION.md)) that gates citation and refusal behavior end-to-end. Compose setup is at [`docker/agentforge/`](../../docker/agentforge/) (extends [`docker/development-easy/`](../../docker/development-easy/)); env vars in [`docker/agentforge/secrets.env.example`](../../docker/agentforge/secrets.env.example).
+
 ## Keeping the bundle in sync with source
 
 The OpenEMR panel iframe loads the **built** bundle from

@@ -21,12 +21,12 @@ export function ProblemListCard({ patientId }: Props) {
   )
 
   if (query.isLoading) {
-    return <ClinicalCard title="Problem List" icon={<Activity size={16} />} accent="amber" status="loading" />
+    return <ClinicalCard title="Medical Problems" icon={<Activity size={16} />} accent="amber" status="loading" />
   }
   if (query.error) {
     return (
       <ClinicalCard
-        title="Problem List" icon={<Activity size={16} />} accent="amber"
+        title="Medical Problems" icon={<Activity size={16} />} accent="amber"
         status="error"
         errorMessage="Could not load problem list."
         errorCorrelationId={query.error.detail.correlationId}
@@ -37,14 +37,14 @@ export function ProblemListCard({ patientId }: Props) {
   if (conditions.length === 0) {
     return (
       <ClinicalCard
-        title="Problem List" icon={<Activity size={16} />} accent="amber"
+        title="Medical Problems" icon={<Activity size={16} />} accent="amber"
         status="empty"
         emptyMessage="No active problems on file."
       />
     )
   }
   return (
-    <ClinicalCard title="Problem List" icon={<Activity size={16} />} accent="amber" status="content">
+    <ClinicalCard title="Medical Problems" icon={<Activity size={16} />} accent="amber" status="content">
       <ConditionList conditions={conditions} />
     </ClinicalCard>
   )

@@ -13,6 +13,9 @@
       "source_document_id": "docref-fb-b-01-pass",
       "ordering_provider": null,
       "performing_lab": "Quest",
+      "panel_name": "LIPID PANEL",
+      "date_collected": "2026-04-15",
+      "date_reported": "2026-04-15",
       "results": [
         {
           "test_name": "LDL Cholesterol",
@@ -24,6 +27,7 @@
           "reference_range_text": null,
           "collection_date": "2026-04-15",
           "abnormal_flag": "high",
+          "result_comments": null,
           "citation": {
             "source_type": "lab_pdf",
             "source_id": "docref-fb-b-01-pass",
@@ -33,6 +37,8 @@
           }
         }
       ],
+      "interpretive_comments": null,
+      "interpretive_comments_citation": null,
       "extraction_metadata": {
         "pages_processed": 1,
         "overall_confidence": "high",

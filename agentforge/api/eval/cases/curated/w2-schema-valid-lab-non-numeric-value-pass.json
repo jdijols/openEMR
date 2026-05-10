@@ -13,6 +13,9 @@
       "source_document_id": "docref-ua-qualitative",
       "ordering_provider": "Donna Lee",
       "performing_lab": "In-Office Lab",
+      "panel_name": "URINALYSIS",
+      "date_collected": "2026-04-30",
+      "date_reported": "2026-04-30",
       "results": [
         {
           "test_name": "Urine leukocyte esterase",
@@ -24,6 +27,7 @@
           "reference_range_text": "Negative",
           "collection_date": "2026-04-30",
           "abnormal_flag": "normal",
+          "result_comments": null,
           "citation": {
             "source_type": "lab_pdf",
             "source_id": "docref-ua-qualitative",
@@ -42,6 +46,7 @@
           "reference_range_text": "Negative",
           "collection_date": "2026-04-30",
           "abnormal_flag": "normal",
+          "result_comments": null,
           "citation": {
             "source_type": "lab_pdf",
             "source_id": "docref-ua-qualitative",
@@ -51,6 +56,8 @@
           }
         }
       ],
+      "interpretive_comments": null,
+      "interpretive_comments_citation": null,
       "extraction_metadata": {
         "pages_processed": 1,
         "overall_confidence": "high",

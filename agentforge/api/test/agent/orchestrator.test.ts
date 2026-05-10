@@ -563,6 +563,7 @@ describe('runChatTurn (PRD §5.7 wiring)', () => {
       'propose_tobacco_write',
       'propose_vitals_delete',
       'propose_vitals_write',
+      'update_proposal',
     ]);
     expect(args.system).toMatch(/clinical copilot/i);
     expect(args.prompt).toMatch(/pat-1/);

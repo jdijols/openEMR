@@ -18,15 +18,46 @@ final class AllergyWritePayload
     private const KEYS = ['action', 'substance', 'allergy_uuid', 'reaction', 'severity', 'onset_date', 'comments'];
 
     /** @var list<string> */
-    private const ACTIONS = ['add', 'update_reaction', 'update_severity'];
+    private const ACTIONS = ['add', 'update_substance', 'update_reaction', 'update_severity'];
 
-    /** Map PRD-aligned tokens → OpenEMR `severity_ccda` option_id (lists table severity_al column). */
+    /**
+     * Map incoming severity tokens → OpenEMR `severity_ccda` option_id
+     * (lists.severity_al column). Accepts both:
+     *   - Direct option_ids (what the dashboard modal / agent now send,
+     *     aligned with `list_options.list_id='severity_ccda'`).
+     *   - Legacy PRD-aligned aliases (`life_threatening`, `unknown`)
+     *     kept so existing eval cases / older callers don't break.
+     */
     private const SEVERITY_TO_OPTION_ID = [
+        // severity_ccda option_ids — 1:1 identity.
+        'unassigned' => 'unassigned',
         'mild' => 'mild',
+        'mild_to_moderate' => 'mild_to_moderate',
         'moderate' => 'moderate',
+        'moderate_to_severe' => 'moderate_to_severe',
         'severe' => 'severe',
+        'life_threatening_severity' => 'life_threatening_severity',
+        'fatal' => 'fatal',
+        // Legacy aliases.
         'life_threatening' => 'life_threatening_severity',
         'unknown' => 'unassigned',
+    ];
+
+    /**
+     * Map incoming reaction tokens → `list_options.list_id='reaction'`
+     * option_ids that land in `lists.reaction`. Mirrors the severity
+     * allowlist — anything not in this map is rejected at parse time, so
+     * stray free-text reactions don't sneak into the controlled column.
+     * `other` is a real `list_options` row (added alongside this map) so
+     * the FHIR encoder's `LEFT JOIN list_options` resolves cleanly on
+     * read-back instead of producing a stringy reaction with no codes.
+     */
+    private const REACTION_TO_OPTION_ID = [
+        'unassigned' => 'unassigned',
+        'hives' => 'hives',
+        'nausea' => 'nausea',
+        'shortness_of_breath' => 'shortness_of_breath',
+        'other' => 'other',
     ];
 
     private function __construct(
@@ -107,6 +138,12 @@ final class AllergyWritePayload
             $reaction = is_string($rv) ? trim($rv) : null;
             if ($reaction === '') {
                 $reaction = null;
+            } elseif ($reaction !== null && !isset(self::REACTION_TO_OPTION_ID[$reaction])) {
+                // Reject anything outside the controlled vocabulary — same
+                // posture as severity. Keeps `lists.reaction` aligned with
+                // `list_options.list_id='reaction'` so the FHIR encoder's
+                // LEFT JOIN always resolves.
+                return [null, 'invalid_allergy_payload'];
             }
         }
 
@@ -167,6 +204,17 @@ final class AllergyWritePayload
             }
 
             return [new self($action, $substance, null, $reaction, $severityOpt, $onsetDate, $extraComments), null];
+        }
+
+        if ($action === 'update_substance') {
+            // Same length / nullability rules as `add` so a typo-fix update
+            // can't slip in a 1-char or empty title that the legacy form
+            // would reject.
+            if ($allergyUuid === null || $substance === null || strlen($substance) < 2 || strlen($substance) > 255) {
+                return [null, 'invalid_allergy_payload'];
+            }
+
+            return [new self($action, $substance, $allergyUuid, null, null, null, null), null];
         }
 
         if ($action === 'update_reaction') {

@@ -13,6 +13,9 @@
       "source_document_id": "docref-reyes-hba1c",
       "ordering_provider": "Donna Lee",
       "performing_lab": "Outside Lab (phone photo)",
+      "panel_name": "HEMOGLOBIN A1C",
+      "date_collected": "2026-04-15",
+      "date_reported": "2026-04-15",
       "results": [
         {
           "test_name": "Hemoglobin A1c",
@@ -24,6 +27,7 @@
           "reference_range_text": "<5.7 normal; 5.7-6.4 prediabetes; >=6.5 diabetes",
           "collection_date": "2026-04-15",
           "abnormal_flag": "high",
+          "result_comments": null,
           "citation": {
             "source_type": "lab_pdf",
             "source_id": "docref-reyes-hba1c",
@@ -33,6 +37,8 @@
           }
         }
       ],
+      "interpretive_comments": null,
+      "interpretive_comments_citation": null,
       "extraction_metadata": {
         "pages_processed": 1,
         "overall_confidence": "medium",

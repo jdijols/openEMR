@@ -18,10 +18,14 @@ export function corsAllowlistMiddleware(env: Env): MiddlewareHandler {
       if (origin && allowed.has(origin)) {
         c.header('Access-Control-Allow-Origin', origin);
         c.header('Vary', 'Origin');
-        c.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+        // PATCH added for the proposal-lifecycle API (POST/GET/PATCH).
+        c.header('Access-Control-Allow-Methods', 'GET,POST,PATCH,OPTIONS');
+        // x-agentforge-session added for the proposal-lifecycle API; the
+        // legacy /chat and /conversations endpoints carry the token in the
+        // body, but the proposals routes use the header form for cleanliness.
         c.header(
           'Access-Control-Allow-Headers',
-          'Content-Type, X-Correlation-Id, X-Session-Token, Authorization',
+          'Content-Type, X-Correlation-Id, X-Session-Token, x-agentforge-session, Authorization',
         );
         c.header('Access-Control-Max-Age', '86400');
       }

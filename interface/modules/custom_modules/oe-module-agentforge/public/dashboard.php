@@ -29,7 +29,10 @@ use OpenEMR\Common\Session\PatientSessionUtil;
 use OpenEMR\Common\Session\SessionWrapperFactory;
 use OpenEMR\Core\OEGlobalsBag;
 use OpenEMR\Modules\AgentForge\Acl\AclMap;
+use OpenEMR\Modules\AgentForge\Context\AppointmentEncounterBinder;
 use OpenEMR\Modules\AgentForge\Install\AgentForgeAclInstaller;
+use OpenEMR\Modules\AgentForge\Security\LaunchCode;
+use OpenEMR\Modules\AgentForge\Security\OpenEmrLaunchCodeStore;
 
 AgentForgeAclInstaller::ensureRegistered();
 
@@ -163,6 +166,24 @@ if ($patientUuid === null || $patientUuid === '') {
 
 $csrfToken = CsrfUtils::collectCsrfToken($session, 'api');
 
+/*
+ * G2-Final — mint an agentforge launch code so the React modal can redeem
+ * a session token and call the proposal-lifecycle API. Mirrors panel.php's
+ * pattern (single-use code, JS-side redemption) so the dashboard and CUI
+ * use the same auth flow. Encounter binding is best-effort: dashboard
+ * proposals are patient-scoped (allergies, medications) so a missing
+ * encounter is not fatal here, unlike the in-encounter writes the panel
+ * issues (vitals, clinical_note).
+ */
+$encounterBinding = (new AppointmentEncounterBinder())->bindForCurrentPatient($pid);
+$encounterId = $encounterBinding->encounterId;
+
+$launchCodeService = new LaunchCode(new OpenEmrLaunchCodeStore());
+$launchCode = $launchCodeService->mint($userId, $patientUuid, $encounterId, new \DateTimeImmutable('now'));
+
+$apiPublic = \getenv('AGENTFORGE_API_PUBLIC_URL');
+$apiPublicStr = (\is_string($apiPublic) && $apiPublic !== '') ? $apiPublic : '';
+
 $globals = OEGlobalsBag::getInstance();
 $webroot = (string) $globals->getWebRoot();
 
@@ -190,6 +211,13 @@ $bootstrap = [
     'fhirBase' => $webroot . '/apis/default/fhir',
     'webroot' => $webroot,
     'authUser' => $authUser,
+    // G2-Final — agentforge handshake. JS redeems `launchCode` against
+    // `apiBase` on boot to populate `afSessionToken`. When `apiBase` is
+    // empty (env var unset in dev) the modal degrades gracefully and the
+    // proposal API is unavailable; the dashboard's read-only cards still
+    // render via the OpenEMR FHIR endpoints under `fhirBase`.
+    'apiBase' => $apiPublicStr,
+    'launchCode' => $launchCode,
 ];
 $bootstrapJson = \json_encode($bootstrap, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
 

@@ -8,8 +8,58 @@ import { z } from 'zod';
 import type { Pool } from 'pg';
 import type { Env } from '../env.js';
 import type { Observability } from '../observability/index.js';
-import { insertPendingProposal } from '../conversations/store.js';
+import { fetchPendingProposal, insertPendingProposal, updatePendingProposalPayload } from '../conversations/store.js';
+import { broadcast } from '../conversations/proposal_bus.js';
 import { assertBoundPatient } from './_binding.js';
+
+/**
+ * Normalize an allergy substance for storage: trim whitespace + capitalize
+ * the first character. Mirrors the legacy form's display convention so a
+ * physician dictating "fur" or typing "fur" in the dashboard modal lands
+ * as "Fur" in `lists.title` (which is what surfaces in chart cards and
+ * the FHIR resource narrative).
+ */
+function normalizeSubstance(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed === '') {
+    return trimmed;
+  }
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+}
+
+/**
+ * Map whatever the LLM produced for a reaction onto one of the
+ * `list_options.list_id='reaction'` option_ids that `lists.reaction`
+ * stores. The agent's Zod schema accepts open free-text so the
+ * dictation pipeline doesn't reject natural utterances ("shortness of
+ * breath", "rash") at the LLM boundary; normalization here keeps the
+ * stored value compatible with the PHP allowlist + the modal dropdown.
+ * Anything that doesn't map to a known option_id falls through to
+ * 'other' (a real list_options row, added in round 11).
+ */
+function normalizeReactionToOptionId(raw: string): string {
+  const norm = raw.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (norm === '' || norm === 'unassigned' || norm === 'unknown') {
+    return 'unassigned';
+  }
+  if (norm === 'hives' || norm === 'hive' || norm === 'urticaria') {
+    return 'hives';
+  }
+  if (norm === 'nausea' || norm === 'nauseous' || norm === 'nauseated') {
+    return 'nausea';
+  }
+  if (
+    norm === 'shortness of breath' ||
+    norm === 'shortness_of_breath' ||
+    norm === 'sob' ||
+    norm === 'dyspnea' ||
+    norm === 'difficulty breathing' ||
+    norm === 'breathing difficulty'
+  ) {
+    return 'shortness_of_breath';
+  }
+  return 'other';
+}
 
 const chiefSchema = z.object({
   patient_uuid: z.string().min(1),
@@ -99,7 +149,16 @@ const tobaccoSchema = z.object({
   status: tobaccoStatusSchema,
 });
 
-const allergyActionSchema = z.enum(['add', 'update_reaction', 'update_severity']);
+const allergyActionSchema = z.enum([
+  'add',
+  // Single-field update actions, dispatched 1:1 to the PHP write port.
+  // The dashboard modal submits these sequentially when more than one
+  // field changed in a single Save (the legacy form's "save everything
+  // at once" UX, just exploded into the granular write pipeline).
+  'update_substance',
+  'update_reaction',
+  'update_severity',
+]);
 
 // G2-Early-25 — W2 propose-write schemas. Each mirrors the PHP payload parser; an out-of-enum
 // value is rejected at the type system level before the propose tool ever fires.
@@ -184,7 +243,23 @@ const allergySchema = z
     substance: z.string().min(1).max(255).optional(),
     allergy_uuid: z.string().uuid().optional(),
     reaction: z.string().min(1).max(4000).optional(),
-    severity: z.enum(['mild', 'moderate', 'severe', 'life_threatening', 'unknown']).optional(),
+    // Aligned with `list_options.list_id='severity_ccda'` option_ids so
+    // the value the agent / modal sends matches what the legacy form
+    // stores and what the FHIR encoder reads back. Includes the full
+    // option set, not just the modal's curated 5-item dropdown — the
+    // agent can pick a subtler grade if the dictation is more specific.
+    severity: z
+      .enum([
+        'unassigned',
+        'mild',
+        'mild_to_moderate',
+        'moderate',
+        'moderate_to_severe',
+        'severe',
+        'life_threatening_severity',
+        'fatal',
+      ])
+      .optional(),
   })
   .strict()
   .superRefine((val, ctx) => {
@@ -198,6 +273,10 @@ const allergySchema = z
     if (val.allergy_uuid === undefined) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'update requires allergy_uuid' });
       return;
+    }
+
+    if (val.action === 'update_substance' && (val.substance === undefined || val.substance.trim() === '')) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'update_substance requires substance' });
     }
 
     if (val.action === 'update_reaction' && (val.reaction === undefined || val.reaction.trim() === '')) {
@@ -571,7 +650,8 @@ export function createProposeWriteTools(
     }),
 
     propose_allergy_write: tool({
-      description: 'Propose allergy add/update (reaction / severity fields). Delete is intentionally not represented.',
+      description:
+        'Propose allergy add/update (substance / reaction / severity fields). BEFORE calling with action="add", verify the substance is NOT already in the patient\'s allergy list — call get_allergies if you do not already have it. If the substance is already on file (case-insensitive match), call this tool with action="update_reaction" or "update_severity" and the existing allergy_uuid instead; never add a duplicate. For the reaction field, prefer the controlled vocabulary (Hives, Nausea, "Shortness of breath"); anything outside that set should be passed through and will be normalized to the catch-all "Other" option. Delete is intentionally not represented.',
       inputSchema: allergySchema,
       execute: async (input) => {
         const bound = assertBoundPatient(env, sessionToken, input.patient_uuid);
@@ -589,7 +669,7 @@ export function createProposeWriteTools(
 
           const allergyPayload: Record<string, unknown> = { action: input.action };
           if (input.substance !== undefined) {
-            allergyPayload['substance'] = input.substance;
+            allergyPayload['substance'] = normalizeSubstance(input.substance);
           }
 
           if (input.allergy_uuid !== undefined) {
@@ -597,7 +677,14 @@ export function createProposeWriteTools(
           }
 
           if (input.reaction !== undefined) {
-            allergyPayload['reaction'] = input.reaction;
+            // Normalize whatever the LLM produced ("shortness of breath",
+            // "Hives", "rash") into one of the controlled
+            // `list_options.list_id='reaction'` option_ids the PHP write
+            // path accepts. Free text would hit the PHP allowlist as
+            // `invalid_allergy_payload`; mapping here keeps the round-trip
+            // alive even when the model picks natural language over the
+            // exact option_id token.
+            allergyPayload['reaction'] = normalizeReactionToOptionId(input.reaction);
           }
 
           if (input.severity !== undefined) {
@@ -942,6 +1029,82 @@ export function createProposeWriteTools(
             preview,
             patient_uuid: input.patient_uuid.toLowerCase(),
             payload: { docref_uuid: docrefUuid },
+          };
+        } catch (e) {
+          await span.end({ error: e });
+          throw e;
+        }
+      },
+    }),
+
+    // Update an existing pending proposal in place. The dashboard modal and
+    // the CUI rail both observe the same row over SSE — the agent calls this
+    // whenever the physician supplies a follow-up field after a propose_*_write.
+    // Shallow-merge semantics; last-write-wins per top-level key. Same
+    // proposal_id can be updated multiple times until the physician confirms
+    // or rejects.
+    update_proposal: tool({
+      description:
+        'Update an existing pending proposal with additional fields the physician has now supplied. Use after a propose_*_write call when the physician answers follow-up questions (e.g. "what was the reaction?" or "moderate or severe?"). The same proposal_id can be updated multiple times until the physician confirms or rejects. Shallow-merge: top-level keys in `payload` overwrite the matching keys on the existing proposal; absent keys are preserved.',
+      inputSchema: z
+        .object({
+          patient_uuid: z.string().min(1),
+          proposal_id: z.string().uuid(),
+          payload: z.record(z.string(), z.unknown()),
+        })
+        .strict(),
+      execute: async (input) => {
+        const bound = assertBoundPatient(env, sessionToken, input.patient_uuid);
+        if (!bound.ok) {
+          return { ok: false as const, error: bound.error };
+        }
+
+        const span = await obs.recordToolCall({
+          correlationId,
+          toolName: 'update_proposal',
+          meta: { proposal_id: input.proposal_id },
+        });
+        try {
+          const existing = await fetchPendingProposal(pool, input.proposal_id);
+          if (existing === null) {
+            await span.end({ meta: { proposal_id: input.proposal_id, outcome: 'not_found' } });
+            return { ok: false as const, error: 'proposal_not_found' as const };
+          }
+
+          if (existing.patientUuid.toLowerCase() !== input.patient_uuid.toLowerCase()) {
+            await span.end({ meta: { proposal_id: input.proposal_id, outcome: 'patient_mismatch' } });
+            return { ok: false as const, error: 'patient_mismatch' as const };
+          }
+
+          if (existing.status !== 'pending') {
+            await span.end({ meta: { proposal_id: input.proposal_id, outcome: 'not_pending' } });
+            return { ok: false as const, error: 'not_pending' as const };
+          }
+
+          const updated = await updatePendingProposalPayload(pool, input.proposal_id, input.payload);
+          if (updated === null) {
+            // Race: row finalized between fetch and update.
+            await span.end({ meta: { proposal_id: input.proposal_id, outcome: 'not_pending' } });
+            return { ok: false as const, error: 'not_pending' as const };
+          }
+
+          broadcast(input.proposal_id, 'payload_updated', {
+            proposal_id: updated.proposalId,
+            payload: updated.payload,
+          });
+
+          await span.end({
+            meta: {
+              proposal_id: updated.proposalId,
+              write_target: updated.writeTarget,
+              merged_keys: Object.keys(input.payload),
+            },
+          });
+
+          return {
+            ok: true as const,
+            proposal_id: updated.proposalId,
+            payload: updated.payload,
           };
         } catch (e) {
           await span.end({ error: e });

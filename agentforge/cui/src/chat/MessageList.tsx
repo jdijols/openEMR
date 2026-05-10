@@ -15,6 +15,7 @@ import { IntakeProposalCard } from './IntakeProposalCard.js';
 import type { IntakeDispatchEnv } from './intake_dispatch.js';
 import { ProposalCardShell, type ProposalCardActionsConfig, type ProposalCardState } from './ProposalCardShell.js';
 import { TypingIndicator } from './TypingIndicator.js';
+import { broadcast as broadcastProposalEvent } from '../proposals/proposalBus.js';
 
 /**
  * Format a confirm/reject failure for the rail. Surfaces the literal server
@@ -83,18 +84,27 @@ function requestCitationNavigation(
  * handles the bridge into OpenEMR's `refreshVisitDisplay()`.
  */
 function notifyParentOfWriteConfirmed(writeTarget: string, expectedPatientUuid: string): void {
-  if (typeof window.parent === 'undefined' || window.parent === null) {
-    return;
+  if (typeof window.parent !== 'undefined' && window.parent !== null) {
+    window.parent.postMessage(
+      {
+        type: 'WRITE_CONFIRMED',
+        write_target: writeTarget,
+        expected_patient_uuid: expectedPatientUuid,
+      },
+      window.location.origin,
+    );
   }
 
-  window.parent.postMessage(
-    {
-      type: 'WRITE_CONFIRMED',
-      write_target: writeTarget,
-      expected_patient_uuid: expectedPatientUuid,
-    },
-    window.location.origin,
-  );
+  // G2-Final — also fan out via BroadcastChannel so the patient-dashboard
+  // iframe knows to invalidate its FHIR react-query cache. Same-origin
+  // BroadcastChannel reaches sibling iframes without a parent-window relay.
+  // Without this, intake-form rows confirm successfully but the dashboard
+  // cards keep showing the pre-write state.
+  broadcastProposalEvent({
+    type: 'chart:updated',
+    patient_uuid: expectedPatientUuid,
+    source: 'cui',
+  });
 }
 
 /** Strip legacy case-presentation header the model was asked to emit; UI does not show this label. */
@@ -623,6 +633,19 @@ function renderBlock(
 ): ReactElement {
   switch (block.type) {
     case 'proposal':
+      // G2-Final — allergy proposals own a richer two-surface UX: the
+      // dashboard's <AllergyModal> opens pre-filled (via the
+      // proposal:open_modal BroadcastChannel event) and the
+      // above-composer affordance carries the Confirm/Reject. Rendering
+      // the legacy in-chat card here would create a duplicate Confirm /
+      // Reject pair pointing at the same proposal_id, which is what the
+      // physician was seeing. Suppressing the card for allergy keeps
+      // exactly one surface owning the action; everything else (vitals,
+      // chief_complaint, clinical_note, etc.) keeps the in-chat card
+      // since they don't have the dashboard-modal counterpart yet.
+      if (block.write_target === 'allergy') {
+        return <Fragment key={key} />;
+      }
       return opts.assistantMessage === true && opts.proposalEnv !== undefined ?
         <ProposalBlock
           key={key}
