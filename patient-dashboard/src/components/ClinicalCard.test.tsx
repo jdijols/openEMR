@@ -1,8 +1,13 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { ClinicalCard } from './ClinicalCard'
+import { _resetForTesting as resetCardCollapseStore } from '../cards/cardCollapseStore'
 
 describe('<ClinicalCard>', () => {
+  beforeEach(() => {
+    resetCardCollapseStore()
+  })
+
   it('renders the title', () => {
     render(<ClinicalCard title="Allergies" status="content">body</ClinicalCard>)
     expect(screen.getByRole('heading', { name: /Allergies/ })).toBeInTheDocument()
@@ -53,5 +58,43 @@ describe('<ClinicalCard>', () => {
   it('renders an action node next to the title when provided', () => {
     render(<ClinicalCard title="x" status="content" action={<span>edit</span>} />)
     expect(screen.getByText('edit')).toBeInTheDocument()
+  })
+
+  it('starts expanded by default', () => {
+    render(
+      <ClinicalCard title="Allergies" status="content">
+        <span>inner-content</span>
+      </ClinicalCard>,
+    )
+    expect(screen.getByRole('button', { name: /Allergies/ })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('inner-content')).toBeVisible()
+  })
+
+  it('collapses the body when the title is clicked, and re-expands on a second click', () => {
+    render(
+      <ClinicalCard title="Allergies" status="content">
+        <span>inner-content</span>
+      </ClinicalCard>,
+    )
+    const toggle = screen.getByRole('button', { name: /Allergies/ })
+
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByText('inner-content')).not.toBeVisible()
+
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('inner-content')).toBeVisible()
+  })
+
+  it('does not toggle when the action button is clicked', () => {
+    render(
+      <ClinicalCard title="Allergies" status="content" action={<button>add</button>}>
+        <span>inner-content</span>
+      </ClinicalCard>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'add' }))
+    expect(screen.getByRole('button', { name: /Allergies/ })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('inner-content')).toBeVisible()
   })
 })

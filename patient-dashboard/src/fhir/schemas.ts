@@ -1,9 +1,14 @@
 import { z } from 'zod'
 
+// `nullish()` (not `optional()`) because OpenEMR's FHIR serializer emits
+// explicit `null` for missing string fields (e.g. `display: null` on coded
+// concepts where no human-readable label exists). Zod's `optional()` accepts
+// `undefined` but rejects `null`, so a single null on any coding entry would
+// fail the whole bundle parse and surface as "Could not load …" on the card.
 const FhirCoding = z.object({
-  system: z.string().optional(),
-  code: z.string().optional(),
-  display: z.string().optional(),
+  system: z.string().nullish(),
+  code: z.string().nullish(),
+  display: z.string().nullish(),
 })
 
 const FhirCodeableConcept = z.object({
@@ -106,6 +111,18 @@ export const FhirAllergyIntoleranceSchema = z.object({
     .optional(),
   recordedDate: z.string().optional(),
   note: z.array(z.object({ text: z.string().optional() })).optional(),
+  // OpenEMR's FhirAllergyIntoleranceService puts the allergy substance
+  // (lists.title — e.g. "eggs", "Penicillin") into the resource narrative
+  // when there is no SNOMED-coded diagnosis. Without it, `code.coding[0].
+  // display` falls back to "Unknown" and the card shows nothing useful.
+  // We read the narrative div as the primary source for the substance name
+  // and treat code.text / code.coding[0].display as fallbacks.
+  text: z
+    .object({
+      status: z.string().optional(),
+      div: z.string().optional(),
+    })
+    .optional(),
 })
 export type FhirAllergyIntolerance = z.infer<typeof FhirAllergyIntoleranceSchema>
 

@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react'
-import { AlertCircle, Inbox } from 'lucide-react'
+import { useId, type ReactNode } from 'react'
+import { AlertCircle, ChevronDown, Inbox } from 'lucide-react'
+import { useCardExpanded } from '../cards/cardCollapseStore'
 
 export type ClinicalCardStatus = 'loading' | 'empty' | 'error' | 'content'
 
@@ -46,13 +47,21 @@ export function ClinicalCard({
   action,
   children,
 }: Props) {
+  const [expanded, setExpanded] = useCardExpanded(title)
+  const bodyId = useId()
   return (
     <section
       className="group rounded-xl border border-af-border bg-af-surface shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:shadow-[0_4px_12px_rgba(15,23,42,0.06)] hover:border-af-border-strong/70 transition-all duration-200 overflow-hidden"
       data-status={status}
       data-accent={accent}
+      data-expanded={expanded}
     >
-      <header className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-af-gray-100">
+      <header
+        className={
+          'flex items-center justify-between gap-3 px-5 py-3.5 ' +
+          (expanded ? 'border-b border-af-gray-100' : '')
+        }
+      >
         <div className="flex items-center gap-3 min-w-0">
           {icon && (
             <span
@@ -62,13 +71,29 @@ export function ClinicalCard({
               {icon}
             </span>
           )}
-          <h2 className="text-[14px] font-semibold tracking-tight text-af-text truncate">
-            {title}
+          <h2 className="min-w-0 text-[14px] font-semibold tracking-tight text-af-text">
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-controls={bodyId}
+              onClick={() => setExpanded(!expanded)}
+              className="inline-flex max-w-full items-center gap-1.5 rounded-af-control hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-af-primary/40"
+            >
+              <span className="truncate">{title}</span>
+              <ChevronDown
+                size={14}
+                aria-hidden
+                className={
+                  'shrink-0 text-af-gray-400 transition-transform duration-150 ' +
+                  (expanded ? '' : '-rotate-90')
+                }
+              />
+            </button>
           </h2>
         </div>
         {action && <div className="shrink-0 text-af-gray-400">{action}</div>}
       </header>
-      <div className="px-5 py-4">
+      <div id={bodyId} hidden={!expanded} className="px-5 py-4">
         {status === 'loading' && <LoadingSkeleton />}
         {status === 'empty' && (emptyState ?? <DefaultEmptyState message={emptyMessage} />)}
         {status === 'error' && <ErrorState message={errorMessage} correlationId={errorCorrelationId} />}

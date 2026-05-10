@@ -107,6 +107,29 @@ describe('FHIR schemas', () => {
     expect(r.success).toBe(true)
   })
 
+  it('parses Immunization with null coding fields (OpenEMR shape)', () => {
+    // OpenEMR's FHIR serializer emits explicit `null` (not omitted) for
+    // missing string fields on Coding entries. Regression for a real bundle
+    // received from /apis/default/fhir/Immunization where `display: null`
+    // failed schema parsing and broke the card.
+    const r = FhirImmunizationSchema.safeParse({
+      resourceType: 'Immunization',
+      id: 'a1ba47a5-c3ba-41b6-bca4-8f135eb30dff',
+      status: 'not-done',
+      vaccineCode: {
+        coding: [
+          {
+            system: 'http://hl7.org/fhir/sid/cvx',
+            code: '03',
+            display: null,
+          },
+        ],
+      },
+      occurrenceDateTime: '2018-05-08T11:00:00+00:00',
+    })
+    expect(r.success).toBe(true)
+  })
+
   it('parses Appointment', () => {
     const r = FhirAppointmentSchema.safeParse({
       resourceType: 'Appointment',

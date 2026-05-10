@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
-import { Cake, IdCard, UserRound, X } from 'lucide-react'
+import { Cake, ChevronDown, IdCard, UserRound, X } from 'lucide-react'
 import { useFhirQuery } from '../fhir/hooks'
 import { FhirPatientSchema, type FhirPatient } from '../fhir/schemas'
+import { setAllExpanded, useAllCardsExpanded } from '../cards/cardCollapseStore'
 import { calculateAge, formatDob } from '../utils/date'
 
 type Props = { patientId: string }
@@ -61,8 +62,32 @@ export function PatientHeaderView({ patient }: { patient: FhirPatient }) {
             )}
           </div>
         </div>
+        <CollapseAllToggle />
       </div>
     </PatientHeaderShell>
+  )
+}
+
+function CollapseAllToggle() {
+  const allExpanded = useAllCardsExpanded()
+  const label = allExpanded ? 'Collapse All' : 'Expand All'
+  return (
+    <button
+      type="button"
+      onClick={() => setAllExpanded(!allExpanded)}
+      className="shrink-0 inline-flex items-center gap-1.5 text-[13px] font-medium text-af-text-subtle hover:underline rounded-af-control focus:outline-none focus-visible:ring-2 focus-visible:ring-af-primary/40"
+      aria-label={`${label} dashboard cards`}
+    >
+      <span>{label}</span>
+      <ChevronDown
+        size={14}
+        aria-hidden
+        className={
+          'shrink-0 text-af-gray-400 transition-transform duration-150 ' +
+          (allExpanded ? '' : '-rotate-90')
+        }
+      />
+    </button>
   )
 }
 

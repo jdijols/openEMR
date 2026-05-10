@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { PatientHeader } from './PatientHeader'
 import { PatientSubNav } from './PatientSubNav'
 import { AllergiesCard } from '../cards/AllergiesCard'
@@ -13,10 +15,35 @@ import { ImmunizationsCard } from '../cards/ImmunizationsCard'
 import { AppointmentsCard } from '../cards/AppointmentsCard'
 import { LabsCard } from '../cards/LabsCard'
 import { useFhirCredential } from '../auth/AuthProvider'
+import { subscribe as subscribeProposalEvents } from '../proposals/proposalBus'
 
 export function PatientDashboardPage() {
   const { id } = useParams<{ id: string }>()
   const credential = useFhirCredential()
+  const queryClient = useQueryClient()
+
+  /**
+   * G2-Final — subscribe to `chart:updated` broadcasts from the CUI iframe.
+   * Whenever the agent (or the physician via the CUI's confirm action)
+   * lands a write through the legacy /conversations/:id/confirm path or
+   * the new /proposals/:id/confirm path, the CUI emits this event so the
+   * dashboard knows to invalidate its FHIR react-query cache and refetch.
+   *
+   * Without this, intake-form rows write to OpenEMR successfully but the
+   * dashboard cards keep showing the pre-write state because react-query
+   * has no way to know data changed underneath.
+   *
+   * `patient_uuid` is on the event so we can scope-check, but for tonight
+   * we invalidate anything under the 'fhir' key — same patient or not, a
+   * stale cache for the wrong patient costs us a single re-fetch.
+   */
+  useEffect(() => {
+    return subscribeProposalEvents((event) => {
+      if (event.type === 'chart:updated') {
+        void queryClient.invalidateQueries({ queryKey: ['fhir'] })
+      }
+    })
+  }, [queryClient])
 
   // Token is in memory only (D1) — a hard refresh wipes it. In bearer mode
   // (standalone-dev) re-route to /login. In localApi mode (production) a
@@ -57,7 +84,7 @@ export function PatientDashboardPage() {
           All sections collapse to a single column below md (~768px) so the
           dashboard stays readable when the CUI rail is open or on mobile.
         */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-5 items-start">
           <AllergiesCard patientId={id} />
           <ProblemListCard patientId={id} />
           <MedicationsCard patientId={id} />
@@ -66,13 +93,23 @@ export function PatientDashboardPage() {
         <PrescriptionsCard patientId={id} />
         <CareTeamCard patientId={id} />
 
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <DemographicsCard patientId={id} />
-          <AppointmentsCard patientId={id} />
-          <LabsCard patientId={id} />
-          <HealthConcernsCard patientId={id} />
-          <VitalsCard patientId={id} />
-          <ImmunizationsCard patientId={id} />
+        {/*
+          Two independent vertical columns (not a 3×2 grid): each column is a
+          flex stack, so a short card sits directly under its column-mate
+          rather than being padded out to match a tall card in the other
+          column. Mirrors the legacy dashboard's column-flow layout.
+        */}
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
+          <div className="flex flex-col gap-5">
+            <DemographicsCard patientId={id} />
+            <LabsCard patientId={id} />
+            <VitalsCard patientId={id} />
+          </div>
+          <div className="flex flex-col gap-5">
+            <AppointmentsCard patientId={id} />
+            <HealthConcernsCard patientId={id} />
+            <ImmunizationsCard patientId={id} />
+          </div>
         </section>
       </main>
     </div>
