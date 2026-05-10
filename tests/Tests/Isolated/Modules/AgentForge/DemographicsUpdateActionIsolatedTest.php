@@ -88,7 +88,7 @@ final class DemographicsUpdateActionIsolatedTest extends TestCase
                 return isset($this->successful[$proposalId]);
             }
 
-            public function markSuccessful(string $proposalId, string $writeTarget): void
+            public function markSuccessful(string $proposalId, string $writeTarget, ?string $sourceDocrefUuid = null): void
             {
                 $this->successful[$proposalId] = $writeTarget;
             }
@@ -134,7 +134,7 @@ final class DemographicsUpdateActionIsolatedTest extends TestCase
                 return isset($this->successful[$proposalId]);
             }
 
-            public function markSuccessful(string $proposalId, string $writeTarget): void
+            public function markSuccessful(string $proposalId, string $writeTarget, ?string $sourceDocrefUuid = null): void
             {
             }
         };

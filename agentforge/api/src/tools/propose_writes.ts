@@ -10,6 +10,7 @@ import type { Env } from '../env.js';
 import type { Observability } from '../observability/index.js';
 import { fetchPendingProposal, insertPendingProposal, updatePendingProposalPayload } from '../conversations/store.js';
 import { broadcast } from '../conversations/proposal_bus.js';
+import { formatPreview } from '../conversations/preview_formatters.js';
 import { assertBoundPatient } from './_binding.js';
 
 /**
@@ -19,7 +20,7 @@ import { assertBoundPatient } from './_binding.js';
  * as "Fur" in `lists.title` (which is what surfaces in chart cards and
  * the FHIR resource narrative).
  */
-function normalizeSubstance(raw: string): string {
+export function normalizeSubstance(raw: string): string {
   const trimmed = raw.trim();
   if (trimmed === '') {
     return trimmed;
@@ -37,7 +38,7 @@ function normalizeSubstance(raw: string): string {
  * Anything that doesn't map to a known option_id falls through to
  * 'other' (a real list_options row, added in round 11).
  */
-function normalizeReactionToOptionId(raw: string): string {
+export function normalizeReactionToOptionId(raw: string): string {
   const norm = raw.trim().toLowerCase().replace(/\s+/g, ' ');
   if (norm === '' || norm === 'unassigned' || norm === 'unknown') {
     return 'unassigned';
@@ -260,6 +261,11 @@ const allergySchema = z
         'fatal',
       ])
       .optional(),
+    // Provenance: the docref_uuid of the source document this proposal was
+    // extracted from. Stamped by the agent when the proposal derives from
+    // an attach_and_extract turn so the apply step can record a clickable
+    // back-link from the resulting `lists` row to the original PDF/PNG.
+    source_docref_uuid: z.string().uuid().optional(),
   })
   .strict()
   .superRefine((val, ctx) => {
@@ -317,16 +323,18 @@ export function createProposeWriteTools(
         try {
           const proposalId = randomUUID();
 
+          const corePayload = { reason: input.reason.trim() };
+          const preview = formatPreview('chief_complaint', corePayload);
+          const payloadWithPreview = { ...corePayload, preview };
+
           await insertPendingProposal(pool, {
             proposalId,
             conversationInternalId: ctx.conversationInternalId,
             patientUuid: input.patient_uuid.toLowerCase(),
             encounterId: input.encounter_id,
             writeTarget: 'chief_complaint',
-            payload: { reason: input.reason.trim() },
+            payload: payloadWithPreview,
           });
-
-          const preview = `Chief complaint (encounter #${input.encounter_id}) → ${input.reason.trim().slice(0, 280)}`;
 
           await span.end({ meta: { proposal_id: proposalId, write_target: 'chief_complaint' } });
           return {
@@ -336,7 +344,7 @@ export function createProposeWriteTools(
             preview,
             patient_uuid: input.patient_uuid.toLowerCase(),
             encounter_id: input.encounter_id,
-            payload: { reason: input.reason.trim() },
+            payload: payloadWithPreview,
           };
         } catch (e) {
           await span.end({ error: e });
@@ -362,16 +370,18 @@ export function createProposeWriteTools(
         try {
           const proposalId = randomUUID();
 
+          const corePayload = { ...input.vitals };
+          const preview = formatPreview('vitals', corePayload);
+          const payloadWithPreview = { ...corePayload, preview };
+
           await insertPendingProposal(pool, {
             proposalId,
             conversationInternalId: ctx.conversationInternalId,
             patientUuid: input.patient_uuid.toLowerCase(),
             encounterId: input.encounter_id,
             writeTarget: 'vitals',
-            payload: { ...input.vitals },
+            payload: payloadWithPreview,
           });
-
-          const preview = `Vitals (encounter #${input.encounter_id}) — ${Object.keys(input.vitals).join(', ')}`;
 
           await span.end({
             meta: {
@@ -387,7 +397,7 @@ export function createProposeWriteTools(
             preview,
             patient_uuid: input.patient_uuid.toLowerCase(),
             encounter_id: input.encounter_id,
-            payload: { ...input.vitals },
+            payload: payloadWithPreview,
           };
         } catch (e) {
           await span.end({ error: e });
@@ -413,13 +423,17 @@ export function createProposeWriteTools(
         try {
           const proposalId = randomUUID();
 
+          const corePayload = { status: input.status };
+          const preview = formatPreview('tobacco', corePayload);
+          const payloadWithPreview = { ...corePayload, preview };
+
           await insertPendingProposal(pool, {
             proposalId,
             conversationInternalId: ctx.conversationInternalId,
             patientUuid: input.patient_uuid.toLowerCase(),
             encounterId: null,
             writeTarget: 'tobacco',
-            payload: { status: input.status },
+            payload: payloadWithPreview,
           });
 
           await span.end({ meta: { proposal_id: proposalId, write_target: 'tobacco' } });
@@ -427,9 +441,9 @@ export function createProposeWriteTools(
             ok: true as const,
             proposal_id: proposalId,
             write_target: 'tobacco',
-            preview: `Tobacco → ${input.status}`,
+            preview,
             patient_uuid: input.patient_uuid.toLowerCase(),
-            payload: { status: input.status },
+            payload: payloadWithPreview,
           };
         } catch (e) {
           await span.end({ error: e });
@@ -457,17 +471,18 @@ export function createProposeWriteTools(
           const proposalId = randomUUID();
           const text = input.text.trim();
 
+          const corePayload = { text };
+          const preview = formatPreview('clinical_note', corePayload);
+          const payloadWithPreview = { ...corePayload, preview };
+
           await insertPendingProposal(pool, {
             proposalId,
             conversationInternalId: ctx.conversationInternalId,
             patientUuid: input.patient_uuid.toLowerCase(),
             encounterId: input.encounter_id,
             writeTarget: 'clinical_note',
-            payload: { text },
+            payload: payloadWithPreview,
           });
-
-          const previewBody = text.length > 280 ? `${text.slice(0, 277)}…` : text;
-          const preview = `Clinical note (encounter #${input.encounter_id}) → ${previewBody}`;
 
           await span.end({ meta: { proposal_id: proposalId, write_target: 'clinical_note', text_length: text.length } });
           return {
@@ -477,7 +492,7 @@ export function createProposeWriteTools(
             preview,
             patient_uuid: input.patient_uuid.toLowerCase(),
             encounter_id: input.encounter_id,
-            payload: { text },
+            payload: payloadWithPreview,
           };
         } catch (e) {
           await span.end({ error: e });
@@ -514,24 +529,17 @@ export function createProposeWriteTools(
             payload['text'] = input.text.trim();
           }
 
+          const preview = formatPreview(writeTarget, payload);
+          const payloadWithPreview = { ...payload, preview };
+
           await insertPendingProposal(pool, {
             proposalId,
             conversationInternalId: ctx.conversationInternalId,
             patientUuid: input.patient_uuid.toLowerCase(),
             encounterId: input.encounter_id,
             writeTarget,
-            payload,
+            payload: payloadWithPreview,
           });
-
-          const previewLabel = input.action === 'delete' ? 'Delete clinical note' : 'Update clinical note';
-          const previewBody =
-            input.action === 'delete' ?
-              `note ${noteUuid.slice(0, 8)}…`
-            : (() => {
-                const t = (input.text ?? '').trim();
-                return t.length > 280 ? `${t.slice(0, 277)}…` : t;
-              })();
-          const preview = `${previewLabel} (encounter #${input.encounter_id}) → ${previewBody}`;
 
           await span.end({
             meta: { proposal_id: proposalId, write_target: writeTarget, action: input.action },
@@ -543,7 +551,7 @@ export function createProposeWriteTools(
             preview,
             patient_uuid: input.patient_uuid.toLowerCase(),
             encounter_id: input.encounter_id,
-            payload,
+            payload: payloadWithPreview,
           };
         } catch (e) {
           await span.end({ error: e });
@@ -571,16 +579,18 @@ export function createProposeWriteTools(
           const proposalId = randomUUID();
           const vitalsUuid = input.vitals_uuid.toLowerCase();
 
+          const corePayload = { vitals_uuid: vitalsUuid };
+          const preview = formatPreview('vitals_delete', corePayload);
+          const payloadWithPreview = { ...corePayload, preview };
+
           await insertPendingProposal(pool, {
             proposalId,
             conversationInternalId: ctx.conversationInternalId,
             patientUuid: input.patient_uuid.toLowerCase(),
             encounterId: input.encounter_id,
             writeTarget: 'vitals_delete',
-            payload: { vitals_uuid: vitalsUuid },
+            payload: payloadWithPreview,
           });
-
-          const preview = `Void vitals (encounter #${input.encounter_id}) → row ${vitalsUuid.slice(0, 8)}…`;
 
           await span.end({
             meta: { proposal_id: proposalId, write_target: 'vitals_delete' },
@@ -592,7 +602,7 @@ export function createProposeWriteTools(
             preview,
             patient_uuid: input.patient_uuid.toLowerCase(),
             encounter_id: input.encounter_id,
-            payload: { vitals_uuid: vitalsUuid },
+            payload: payloadWithPreview,
           };
         } catch (e) {
           await span.end({ error: e });
@@ -619,16 +629,17 @@ export function createProposeWriteTools(
         try {
           const proposalId = randomUUID();
 
+          const preview = formatPreview('chief_complaint_delete', {});
+          const payloadWithPreview = { preview };
+
           await insertPendingProposal(pool, {
             proposalId,
             conversationInternalId: ctx.conversationInternalId,
             patientUuid: input.patient_uuid.toLowerCase(),
             encounterId: input.encounter_id,
             writeTarget: 'chief_complaint_delete',
-            payload: {},
+            payload: payloadWithPreview,
           });
-
-          const preview = `Clear chief complaint (encounter #${input.encounter_id})`;
 
           await span.end({
             meta: { proposal_id: proposalId, write_target: 'chief_complaint_delete' },
@@ -640,7 +651,7 @@ export function createProposeWriteTools(
             preview,
             patient_uuid: input.patient_uuid.toLowerCase(),
             encounter_id: input.encounter_id,
-            payload: {},
+            payload: payloadWithPreview,
           };
         } catch (e) {
           await span.end({ error: e });
@@ -691,13 +702,26 @@ export function createProposeWriteTools(
             allergyPayload['severity'] = input.severity;
           }
 
+          // Stash provenance under a leading-underscore key so the inner
+          // `payload` object remains business-shape-only when the apply
+          // step lifts it back out to the top-level body. The PHP
+          // `AllergyWritePayload::parse()` allowlist would reject an
+          // unrecognized key inside `payload`; the apply step strips this
+          // before forwarding.
+          if (input.source_docref_uuid !== undefined) {
+            allergyPayload['_source_docref_uuid'] = input.source_docref_uuid.toLowerCase();
+          }
+
+          const preview = formatPreview('allergy', allergyPayload);
+          const payloadWithPreview = { ...allergyPayload, preview };
+
           await insertPendingProposal(pool, {
             proposalId,
             conversationInternalId: ctx.conversationInternalId,
             patientUuid: input.patient_uuid.toLowerCase(),
             encounterId: null,
             writeTarget: 'allergy',
-            payload: allergyPayload,
+            payload: payloadWithPreview,
           });
 
           await span.end({
@@ -707,9 +731,9 @@ export function createProposeWriteTools(
             ok: true as const,
             proposal_id: proposalId,
             write_target: 'allergy',
-            preview: `${input.action}`,
+            preview,
             patient_uuid: input.patient_uuid.toLowerCase(),
-            payload: allergyPayload,
+            payload: payloadWithPreview,
           };
         } catch (e) {
           await span.end({ error: e });
@@ -749,23 +773,17 @@ export function createProposeWriteTools(
             payload['sig'] = input.sig.trim();
           }
 
+          const preview = formatPreview('medication_add', payload);
+          const payloadWithPreview = { ...payload, preview };
+
           await insertPendingProposal(pool, {
             proposalId,
             conversationInternalId: ctx.conversationInternalId,
             patientUuid: input.patient_uuid.toLowerCase(),
             encounterId: null,
             writeTarget: 'medication_add',
-            payload,
+            payload: payloadWithPreview,
           });
-
-          const previewParts = [input.name.trim()];
-          if (input.dose !== undefined) {
-            previewParts.push(input.dose.trim());
-          }
-          if (input.frequency !== undefined) {
-            previewParts.push(input.frequency.trim());
-          }
-          const preview = `Medication → ${previewParts.join(' · ')}`;
 
           await span.end({ meta: { proposal_id: proposalId, write_target: 'medication_add' } });
           return {
@@ -774,7 +792,7 @@ export function createProposeWriteTools(
             write_target: 'medication_add',
             preview,
             patient_uuid: input.patient_uuid.toLowerCase(),
-            payload,
+            payload: payloadWithPreview,
           };
         } catch (e) {
           await span.end({ error: e });
@@ -805,16 +823,18 @@ export function createProposeWriteTools(
           const proposalId = randomUUID();
           const medicationUuid = input.medication_uuid.toLowerCase();
 
+          const corePayload = { medication_uuid: medicationUuid };
+          const preview = formatPreview('medication_discontinue', corePayload);
+          const payloadWithPreview = { ...corePayload, preview };
+
           await insertPendingProposal(pool, {
             proposalId,
             conversationInternalId: ctx.conversationInternalId,
             patientUuid: input.patient_uuid.toLowerCase(),
             encounterId: null,
             writeTarget: 'medication_discontinue',
-            payload: { medication_uuid: medicationUuid },
+            payload: payloadWithPreview,
           });
-
-          const preview = `Discontinue medication → row ${medicationUuid.slice(0, 8)}…`;
 
           await span.end({ meta: { proposal_id: proposalId, write_target: 'medication_discontinue' } });
           return {
@@ -823,7 +843,7 @@ export function createProposeWriteTools(
             write_target: 'medication_discontinue',
             preview,
             patient_uuid: input.patient_uuid.toLowerCase(),
-            payload: { medication_uuid: medicationUuid },
+            payload: payloadWithPreview,
           };
         } catch (e) {
           await span.end({ error: e });
@@ -853,16 +873,18 @@ export function createProposeWriteTools(
           const proposalId = randomUUID();
           const allergyUuid = input.allergy_uuid.toLowerCase();
 
+          const corePayload = { allergy_uuid: allergyUuid };
+          const preview = formatPreview('allergy_delete', corePayload);
+          const payloadWithPreview = { ...corePayload, preview };
+
           await insertPendingProposal(pool, {
             proposalId,
             conversationInternalId: ctx.conversationInternalId,
             patientUuid: input.patient_uuid.toLowerCase(),
             encounterId: null,
             writeTarget: 'allergy_delete',
-            payload: { allergy_uuid: allergyUuid },
+            payload: payloadWithPreview,
           });
-
-          const preview = `Remove allergy → row ${allergyUuid.slice(0, 8)}…`;
 
           await span.end({ meta: { proposal_id: proposalId, write_target: 'allergy_delete' } });
           return {
@@ -871,7 +893,7 @@ export function createProposeWriteTools(
             write_target: 'allergy_delete',
             preview,
             patient_uuid: input.patient_uuid.toLowerCase(),
-            payload: { allergy_uuid: allergyUuid },
+            payload: payloadWithPreview,
           };
         } catch (e) {
           await span.end({ error: e });
@@ -905,16 +927,17 @@ export function createProposeWriteTools(
             condition: input.condition.trim(),
           };
 
+          const preview = formatPreview('family_history_add', payload);
+          const payloadWithPreview = { ...payload, preview };
+
           await insertPendingProposal(pool, {
             proposalId,
             conversationInternalId: ctx.conversationInternalId,
             patientUuid: input.patient_uuid.toLowerCase(),
             encounterId: null,
             writeTarget: 'family_history_add',
-            payload,
+            payload: payloadWithPreview,
           });
-
-          const preview = `Family history → ${input.relation}: ${input.condition.trim().slice(0, 200)}`;
 
           await span.end({ meta: { proposal_id: proposalId, write_target: 'family_history_add' } });
           return {
@@ -923,7 +946,7 @@ export function createProposeWriteTools(
             write_target: 'family_history_add',
             preview,
             patient_uuid: input.patient_uuid.toLowerCase(),
-            payload,
+            payload: payloadWithPreview,
           };
         } catch (e) {
           await span.end({ error: e });
@@ -960,17 +983,19 @@ export function createProposeWriteTools(
             payload[key] = typeof value === 'string' ? value.trim() : value;
           }
 
+          const preview = formatPreview('demographics_update', payload);
+          const payloadWithPreview = { ...payload, preview };
+
           await insertPendingProposal(pool, {
             proposalId,
             conversationInternalId: ctx.conversationInternalId,
             patientUuid: input.patient_uuid.toLowerCase(),
             encounterId: null,
             writeTarget: 'demographics_update',
-            payload,
+            payload: payloadWithPreview,
           });
 
           const fields = Object.keys(payload);
-          const preview = `Demographics update → ${fields.join(', ')}`;
 
           await span.end({ meta: { proposal_id: proposalId, write_target: 'demographics_update', fields } });
           return {
@@ -979,7 +1004,7 @@ export function createProposeWriteTools(
             write_target: 'demographics_update',
             preview,
             patient_uuid: input.patient_uuid.toLowerCase(),
-            payload,
+            payload: payloadWithPreview,
           };
         } catch (e) {
           await span.end({ error: e });
@@ -1010,16 +1035,18 @@ export function createProposeWriteTools(
           const proposalId = randomUUID();
           const docrefUuid = input.docref_uuid.toLowerCase();
 
+          const corePayload = { docref_uuid: docrefUuid };
+          const preview = formatPreview('document_delete', corePayload);
+          const payloadWithPreview = { ...corePayload, preview };
+
           await insertPendingProposal(pool, {
             proposalId,
             conversationInternalId: ctx.conversationInternalId,
             patientUuid: input.patient_uuid.toLowerCase(),
             encounterId: null,
             writeTarget: 'document_delete',
-            payload: { docref_uuid: docrefUuid },
+            payload: payloadWithPreview,
           });
-
-          const preview = `Delete uploaded document → ${docrefUuid.slice(0, 8)}…`;
 
           await span.end({ meta: { proposal_id: proposalId, write_target: 'document_delete' } });
           return {
@@ -1028,7 +1055,7 @@ export function createProposeWriteTools(
             write_target: 'document_delete',
             preview,
             patient_uuid: input.patient_uuid.toLowerCase(),
-            payload: { docref_uuid: docrefUuid },
+            payload: payloadWithPreview,
           };
         } catch (e) {
           await span.end({ error: e });

@@ -18,16 +18,18 @@ final readonly class DocumentUploadResult
     public function __construct(
         public string $docrefUuid,
         public bool $wasReUpload,
+        /** OpenEMR documents.id when the parallel registrar projection succeeded; null on best-effort failure. */
+        public ?int $oeDocumentId = null,
     ) {
     }
 
-    public static function created(string $docrefUuid): self
+    public static function created(string $docrefUuid, ?int $oeDocumentId = null): self
     {
-        return new self($docrefUuid, false);
+        return new self($docrefUuid, false, $oeDocumentId);
     }
 
     public static function existing(string $docrefUuid): self
     {
-        return new self($docrefUuid, true);
+        return new self($docrefUuid, true, null);
     }
 }

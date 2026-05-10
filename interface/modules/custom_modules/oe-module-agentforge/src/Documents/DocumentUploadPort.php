@@ -30,4 +30,22 @@ interface DocumentUploadPort
         string $patientUuidCanonical,
         DocumentUploadPayload $payload,
     ): string;
+
+    /**
+     * Annotate the previously-persisted DocRef sidecar with the OpenEMR
+     * `documents.id` produced by the parallel registrar projection. Lets the
+     * reclassify hook (and any later provenance lookup) translate a
+     * docref_uuid back to an OpenEMR document_id without an extra index.
+     *
+     * Best-effort: a missing or unreadable sidecar is a no-op.
+     */
+    public function recordOpenEmrMapping(string $docrefUuid, int $oeDocumentId): void;
+
+    /**
+     * Look up the OpenEMR `documents.id` previously stamped on the sidecar by
+     * {@see self::recordOpenEmrMapping()}. Returns null when the sidecar is
+     * missing the mapping (registration failed, deleted DocRef, unknown
+     * UUID). Used by the reclassify hook.
+     */
+    public function findOpenEmrDocumentId(string $docrefUuid): ?int;
 }

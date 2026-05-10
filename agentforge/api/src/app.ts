@@ -17,6 +17,7 @@ import {
   fetchPendingProposal,
   insertConversationRow,
   insertPendingProposal,
+  setSectionRejected,
   updatePendingProposalPayload,
 } from './conversations/store.js';
 import { corsAllowlistMiddleware } from './cors.js';
@@ -181,6 +182,21 @@ const proposalPatchBodySchema = z
     session_token: z.string().min(1).optional(),
     patient_uuid: z.string().min(1).optional(),
     payload: z.record(z.string(), z.unknown()),
+  })
+  .strict();
+
+// Phase 4 — body shape for `POST /proposals/:id/items/{reject,restore}`.
+// `section_id` and `item_id` are STABLE slugs (the bundle assembler asserts
+// they don't contain `::` so the synthetic-id fan-out works), so the
+// server resolves the array index by id rather than positional index —
+// concurrent agent updates that re-order sections don't break a pending
+// reject toggle.
+const proposalSectionDecisionBodySchema = z
+  .object({
+    session_token: z.string().min(1).optional(),
+    patient_uuid: z.string().min(1).optional(),
+    section_id: z.string().min(1),
+    item_id: z.string().min(1).optional(),
   })
   .strict();
 
@@ -759,6 +775,91 @@ export function buildApp(
       correlation_id: correlationId,
     });
   });
+
+  // Phase 4 — per-section reject / restore for bundle proposals. Used by the
+  // dashboard's `BundleReviewModal` to flip a single section/item leaf's
+  // `rejected` flag without racing the agent's top-level `update_proposal`
+  // PATCHes (which would shallow-merge the entire `sections` array). The
+  // server resolves the leaf path via stable IDs and runs `jsonb_set` on
+  // the indexed path — concurrent agent edits to other sections don't
+  // collide with the user's local toggle. Two routes (reject / restore)
+  // share one shape; differ only in the boolean we write into the leaf.
+  for (const cfg of [
+    { path: '/proposals/:id/items/reject' as const, rejected: true },
+    { path: '/proposals/:id/items/restore' as const, rejected: false },
+  ]) {
+    app.post(cfg.path, async (c) => {
+      const proposalId = c.req.param('id');
+
+      let body: unknown;
+      try {
+        body = await c.req.json();
+      } catch {
+        return c.json({ error: 'invalid_request' }, 400);
+      }
+
+      const parsed = proposalSectionDecisionBodySchema.safeParse(body);
+      if (!parsed.success) {
+        return c.json({ error: 'invalid_request' }, 400);
+      }
+
+      const sessionToken = readSessionToken(c.req.raw, parsed.data.session_token);
+      if (sessionToken === null) {
+        return c.json({ error: 'unauthorized' }, 401);
+      }
+      const claims = verifySessionToken(sessionToken, env.SESSION_TOKEN_SECRET);
+      if (claims === null) {
+        return c.json({ error: 'unauthorized' }, 401);
+      }
+
+      const correlationId = c.get('correlationId');
+      const pool = c.get('pgPool');
+
+      const existing = await fetchPendingProposal(pool, proposalId);
+      if (existing === null) {
+        return c.json({ error: 'proposal_not_found', correlation_id: correlationId }, 404);
+      }
+      if (claims.patient_uuid !== null && claims.patient_uuid !== existing.patientUuid) {
+        return c.json({ error: 'patient_mismatch', correlation_id: correlationId }, 403);
+      }
+      if (
+        parsed.data.patient_uuid !== undefined &&
+        parsed.data.patient_uuid.toLowerCase() !== existing.patientUuid.toLowerCase()
+      ) {
+        return c.json({ error: 'patient_mismatch', correlation_id: correlationId }, 403);
+      }
+      if (existing.status !== 'pending') {
+        return c.json({ error: 'not_pending', correlation_id: correlationId }, 409);
+      }
+
+      const updated = await setSectionRejected(
+        pool,
+        proposalId,
+        parsed.data.section_id,
+        parsed.data.item_id ?? null,
+        cfg.rejected,
+      );
+      if (updated === null) {
+        return c.json({ error: 'section_not_found', correlation_id: correlationId }, 404);
+      }
+
+      // Live update for any subscribed bundle modal so other tabs / surfaces
+      // reflect the toggle in real time.
+      broadcast(proposalId, 'payload_updated', {
+        proposal_id: updated.proposalId,
+        payload: updated.payload,
+      });
+
+      return c.json({
+        proposal_id: updated.proposalId,
+        section_id: parsed.data.section_id,
+        item_id: parsed.data.item_id ?? null,
+        rejected: cfg.rejected,
+        payload: updated.payload,
+        correlation_id: correlationId,
+      });
+    });
+  }
 
   app.get('/proposals/:id/stream', (c) => {
     const proposalId = c.req.param('id');

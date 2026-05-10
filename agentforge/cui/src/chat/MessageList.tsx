@@ -12,8 +12,6 @@ import { AgentStepStrip } from './AgentStepStrip.js';
 import { StatusLabel } from './StatusLabel.js';
 import { AttachmentPreview } from './AttachmentPreview.js';
 import { ExtractionAcknowledgment } from './ExtractionAcknowledgment.js';
-import { IntakeProposalCard } from './IntakeProposalCard.js';
-import type { IntakeDispatchEnv } from './intake_dispatch.js';
 import { ProposalCardShell, type ProposalCardActionsConfig, type ProposalCardState } from './ProposalCardShell.js';
 import { broadcast as broadcastProposalEvent } from '../proposals/proposalBus.js';
 
@@ -616,6 +614,46 @@ function ProposalBlock(
 
 type ProposalBlockInner = Extract<ChatBlock, { type: 'proposal' }>;
 
+/**
+ * Phase 2 — small in-line receipt for a RESOLVED proposal.
+ *
+ * Replaces the full proposal-card chrome in the chat thread once a proposal
+ * has been confirmed or rejected. Pending proposals render NOTHING in the
+ * thread (the above-composer affordance owns the action surface); resolved
+ * proposals render this single line so the conversation has a written trail
+ * of what landed and what didn't.
+ *
+ * The receipt is intentionally subtle: a status icon, an action verb,
+ * and the same `preview` string the affordance carried at confirm time.
+ * Soft green fill for accepted, soft red fill for rejected/denied/failed.
+ */
+function ProposalReceipt(props: Readonly<{ block: ProposalBlockInner }>): ReactElement {
+  const resolution = props.block.resolved;
+  const phase = resolution?.phase ?? 'accepted';
+  const isAccepted = phase === 'accepted';
+  const verb =
+    phase === 'accepted' ? 'Saved'
+    : phase === 'declined' ? 'Rejected'
+    : phase === 'openemr_denied' ? 'Rejected by OpenEMR'
+    : 'Failed';
+  return (
+    <p className="agentforge-msg__proposal-receipt" data-phase={phase}>
+      <span className="agentforge-msg__proposal-receipt-icon" aria-hidden="true">
+        {isAccepted ? '✓' : '✗'}
+      </span>
+      <span className="agentforge-msg__proposal-receipt-verb">{verb}</span>
+      {props.block.preview !== '' ? (
+        <>
+          <span className="agentforge-msg__proposal-receipt-sep" aria-hidden="true">
+            ·
+          </span>
+          <span className="agentforge-msg__proposal-receipt-preview">{props.block.preview}</span>
+        </>
+      ) : null}
+    </p>
+  );
+}
+
 function renderBlock(
   block: ChatBlock,
   key: string,
@@ -624,52 +662,29 @@ function renderBlock(
     readonly boundPatientUuid: string | null;
     readonly assistantMessage?: boolean;
     readonly proposalEnv?: ProposalApiEnv;
-    /** G2-Early-26 — IntakeProposalCard Confirm dispatch context (module endpoint base + auth). */
-    readonly intakeDispatchEnv?: IntakeDispatchEnv;
     readonly voiceCompletedProposalIds?: ReadonlySet<string>;
     readonly onProposalResolved?: OnProposalResolved;
     readonly onOpenDocument?: (docrefUuid: string, page?: number) => void;
+    /** Post-extraction "View in documents" handler — opens the canonical OpenEMR Document viewer. */
+    readonly onViewInDocuments?: (docrefUuid: string) => void;
   },
 ): ReactElement | null {
   switch (block.type) {
     case 'proposal':
-      // G2-Final — allergy proposals own a richer two-surface UX: the
-      // dashboard's <AllergyModal> opens pre-filled (via the
-      // proposal:open_modal BroadcastChannel event) and the
-      // above-composer affordance carries the Confirm/Reject. Rendering
-      // the legacy in-chat card here would create a duplicate Confirm /
-      // Reject pair pointing at the same proposal_id, which is what the
-      // physician was seeing. Suppressing the card for allergy keeps
-      // exactly one surface owning the action; everything else (vitals,
-      // chief_complaint, clinical_note, etc.) keeps the in-chat card
-      // since they don't have the dashboard-modal counterpart yet.
-      if (block.write_target === 'allergy') {
+      // Phase 2 — universal suppression of in-chat proposal cards. Pending
+      // proposals are owned entirely by the above-composer affordance + any
+      // bound modal (allergy modal today; medication / demographics / etc.
+      // in Phase 5). Rendering a second card in the thread would create two
+      // Confirm/Reject surfaces pointing at the same proposal_id, which is
+      // the duplicate-action footgun we're collapsing.
+      //
+      // Resolved proposals still render — but as a one-line receipt rather
+      // than the full card chrome, so the conversation has a written trail
+      // of what landed without bloating the thread with deferred-card UI.
+      if (block.resolved === undefined) {
         return <Fragment key={key} />;
       }
-      return opts.assistantMessage === true && opts.proposalEnv !== undefined ?
-        <ProposalBlock
-          key={key}
-          block={block}
-          proposalEnv={opts.proposalEnv}
-          {...(opts.voiceCompletedProposalIds !== undefined ?
-            { voiceCompletedProposalIds: opts.voiceCompletedProposalIds }
-          : {})}
-          {...(opts.onProposalResolved !== undefined ?
-            { onResolve: opts.onProposalResolved }
-          : {})}
-        />
-      : (
-          <ProposalBlock
-            key={key}
-            block={block}
-            {...(opts.voiceCompletedProposalIds !== undefined ?
-              { voiceCompletedProposalIds: opts.voiceCompletedProposalIds }
-            : {})}
-            {...(opts.onProposalResolved !== undefined ?
-              { onResolve: opts.onProposalResolved }
-            : {})}
-          />
-        );
+      return <ProposalReceipt key={key} block={block} />;
     case 'text':
       if (opts.assistantMessage === true) {
         // Assistant prose runs through Markdown so `**bold**`, `### headings`,
@@ -911,38 +926,32 @@ function renderBlock(
       return (
         <div key={key} className="agentforge-msg__extraction">
           <ExtractionAcknowledgment status={ackStatus} />
-          {opts.onOpenDocument !== undefined ? (
+          {opts.onViewInDocuments !== undefined || opts.onOpenDocument !== undefined ? (
             <p style={{ margin: '0.25rem 0 0 0' }}>
               <button
                 type="button"
                 className="agentforge-msg__cite-link"
-                onClick={() => opts.onOpenDocument?.(block.docref_uuid, 1)}
+                onClick={() => {
+                  if (opts.onViewInDocuments !== undefined) {
+                    opts.onViewInDocuments(block.docref_uuid);
+                    return;
+                  }
+                  opts.onOpenDocument?.(block.docref_uuid, 1);
+                }}
               >
-                View source PDF
+                View in documents
               </button>
             </p>
           ) : null}
-          {block.doc_type === 'intake_form' && block.intake_data !== undefined ? (
-            <IntakeProposalCard
-              data={block.intake_data}
-              onConfirm={() => {
-                if (opts.intakeDispatchEnv !== undefined) {
-                  notifyParentOfWriteConfirmed('intake_proposal', opts.intakeDispatchEnv.patientUuid);
-                }
-              }}
-              onReject={() => {
-                /* no-op — UI state lives inside the card. */
-              }}
-              {...(opts.intakeDispatchEnv !== undefined ? { dispatchEnv: opts.intakeDispatchEnv } : {})}
-            />
-          ) : null}
-          {/* G2-Early-27 — Lab summary card-dedup: the actionable proposal card emitted by
-              the orchestrator (via maybeBuildLabSummaryProposal) is the SOLE render of the
-              lab summary bullet list. The previous informational ProposalCardShell preview
-              was visually identical and confused users into thinking there were two
-              actions to take. Killed in favor of the single Confirm/Reject card. The
-              ExtractionAcknowledgment above ("Read the lab — N results, N abnormal") is
-              the only thing rendered alongside the proposal. */}
+          {/* Phase 4 — IntakeProposalCard subtree removed. Intake forms now
+              produce a single bundle proposal that lands in the affordance
+              queue + opens BundleReviewModal on the dashboard. The
+              extraction-block above carries the "Read the intake form — N
+              facts" acknowledgment + a "View in documents" link; the
+              actionable surface is the bundle proposal, not an inline card.
+              Lab summaries follow the same one-card pattern via
+              maybeBuildLabSummaryProposal — only the ExtractionAcknowledgment
+              renders alongside the proposal. */}
         </div>
       );
     }
@@ -1000,8 +1009,6 @@ export function MessageList(props: {
   readonly messages: readonly ChatMessage[];
   readonly boundPatientUuid: string | null;
   readonly proposalEnv?: ProposalApiEnv;
-  /** G2-Early-26 — IntakeProposalCard fans out per-section writes through this env. */
-  readonly intakeDispatchEnv?: IntakeDispatchEnv;
   readonly voiceCompletedProposalIds?: ReadonlySet<string>;
   /**
    * Bubbled up to App so it can stamp the matching proposal block's
@@ -1010,11 +1017,20 @@ export function MessageList(props: {
    */
   readonly onProposalResolved?: OnProposalResolved;
   /**
-   * G2-MVP-99 — open the source PDF/image modal at a given page. Plumbed
-   * through to extraction-block "View source PDF" buttons. App owns the
-   * modal state.
+   * G2-MVP-99 — open the source PDF/image bbox modal at a given page.
+   * Used for the in-rail image-thumbnail click on the user's attached
+   * file (App owns the modal state, hosted in the parent shell as an
+   * overlay).
    */
   readonly onOpenDocument?: (docrefUuid: string, page?: number) => void;
+  /**
+   * Open the canonical OpenEMR Documents-tab viewer for a given
+   * docref_uuid. Used by the post-extraction "View in documents" link
+   * — distinct from `onOpenDocument` (which opens the in-rail bbox
+   * modal for image-thumbnail clicks). Falls back to onOpenDocument
+   * inside the App callback when the OpenEMR-side ids are missing.
+   */
+  readonly onViewInDocuments?: (docrefUuid: string) => void;
   /**
    * G2-MVP-99 — when true, render the assistant typing indicator at the
    * bottom of the scroll container as if it were the next incoming
@@ -1151,9 +1167,6 @@ export function MessageList(props: {
                     assistantMessage: m.role === 'assistant',
                     boundPatientUuid: props.boundPatientUuid,
                     ...(props.proposalEnv !== undefined && m.role === 'assistant' ? { proposalEnv: props.proposalEnv } : {}),
-                    ...(props.intakeDispatchEnv !== undefined && m.role === 'assistant' ?
-                      { intakeDispatchEnv: props.intakeDispatchEnv }
-                    : {}),
                     ...(props.voiceCompletedProposalIds !== undefined ?
                       { voiceCompletedProposalIds: props.voiceCompletedProposalIds }
                     : {}),
@@ -1164,6 +1177,7 @@ export function MessageList(props: {
                       { citationNav: m.citation_navigation }
                     : {}),
                     ...(props.onOpenDocument !== undefined ? { onOpenDocument: props.onOpenDocument } : {}),
+                    ...(props.onViewInDocuments !== undefined ? { onViewInDocuments: props.onViewInDocuments } : {}),
                   }),
                 )}
               </article>

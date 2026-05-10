@@ -22,6 +22,11 @@ interface CompletedWriteProposalLedgerInterface
 
     /**
      * Record proposal_id after an accepted OpenEMR write (accepted:true response path).
+     *
+     * @param string|null $sourceDocrefUuid When the proposal originated from an
+     *   `attach_and_extract` upload, the DocRef UUID of that source document.
+     *   Provenance link: lets later tooling trace any clinical row back to
+     *   the PDF/PNG it was extracted from. Null for non-document-derived writes.
      */
-    public function markSuccessful(string $proposalId, string $writeTarget): void;
+    public function markSuccessful(string $proposalId, string $writeTarget, ?string $sourceDocrefUuid = null): void;
 }

@@ -12,12 +12,14 @@ const createProposalMock = vi.fn()
 const getProposalMock = vi.fn()
 const patchProposalMock = vi.fn()
 const confirmProposalMock = vi.fn()
+const rejectProposalMock = vi.fn()
 
 vi.mock('../proposals/proposalsApi', () => ({
   createProposal: (...args: unknown[]) => createProposalMock(...args),
   getProposal: (...args: unknown[]) => getProposalMock(...args),
   patchProposal: (...args: unknown[]) => patchProposalMock(...args),
   confirmProposal: (...args: unknown[]) => confirmProposalMock(...args),
+  rejectProposal: (...args: unknown[]) => rejectProposalMock(...args),
 }))
 
 // ---- Mock the SSE stream ----
@@ -66,6 +68,7 @@ beforeEach(() => {
   getProposalMock.mockReset()
   patchProposalMock.mockReset()
   confirmProposalMock.mockReset()
+  rejectProposalMock.mockReset()
   broadcastMock.mockReset()
   unsubscribeMock.mockReset()
   streamHandlers = null
@@ -238,5 +241,138 @@ describe('<AllergyModal>', () => {
     })
 
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  // Phase 3 — modal contract refactor.
+  describe('Phase 3 modal contract', () => {
+    it('manual mode: Reject button is hidden (no proposal exists yet)', () => {
+      render(withQueryClient(<AllergyModal open patientUuid="pt-1" onClose={() => {}} />))
+      // Manual `+` add: no agent proposal is bound, so the explicit Reject
+      // button must NOT render. Closing via X / backdrop is the dismiss path.
+      expect(screen.queryByTestId('allergy-reject')).toBeNull()
+    })
+
+    it('agent mode: Reject button is visible alongside Confirm', async () => {
+      getProposalMock.mockResolvedValue({
+        proposal_id: 'prop-reject-vis',
+        patient_uuid: 'pt-1',
+        write_target: 'allergy',
+        payload: { action: 'add', substance: 'Walnuts' },
+        status: 'pending',
+      })
+      render(
+        withQueryClient(
+          <AllergyModal open patientUuid="pt-1" proposalId="prop-reject-vis" onClose={() => {}} />,
+        ),
+      )
+      await waitFor(() => expect(getProposalMock).toHaveBeenCalledTimes(1))
+      // Both Confirm and Reject visible in agent-driven mode (per the
+      // disabled-button matrix). The footer no longer carries Cancel.
+      expect(screen.getByTestId('allergy-save')).toBeInTheDocument()
+      expect(screen.getByTestId('allergy-reject')).toBeInTheDocument()
+    })
+
+    it('Confirm button label is "Confirm" (renamed from "Save")', async () => {
+      getProposalMock.mockResolvedValue({
+        proposal_id: 'prop-confirm-label',
+        patient_uuid: 'pt-1',
+        write_target: 'allergy',
+        payload: { action: 'add', substance: 'Eggs' },
+        status: 'pending',
+      })
+      render(
+        withQueryClient(
+          <AllergyModal open patientUuid="pt-1" proposalId="prop-confirm-label" onClose={() => {}} />,
+        ),
+      )
+      await waitFor(() => expect(getProposalMock).toHaveBeenCalledTimes(1))
+      expect(screen.getByTestId('allergy-save')).toHaveTextContent('Confirm')
+    })
+
+    it('Cancel button is removed from the footer', async () => {
+      getProposalMock.mockResolvedValue({
+        proposal_id: 'prop-no-cancel',
+        patient_uuid: 'pt-1',
+        write_target: 'allergy',
+        payload: { action: 'add', substance: 'Sulfa' },
+        status: 'pending',
+      })
+      render(
+        withQueryClient(
+          <AllergyModal open patientUuid="pt-1" proposalId="prop-no-cancel" onClose={() => {}} />,
+        ),
+      )
+      await waitFor(() => expect(getProposalMock).toHaveBeenCalledTimes(1))
+      // Cancel collapsed into Snooze (X / backdrop). Any explicit "Cancel"
+      // text in the footer is a regression — the only buttons are
+      // Reject and Confirm.
+      expect(screen.queryByRole('button', { name: /^cancel$/i })).toBeNull()
+    })
+
+    it('Reject calls rejectProposal and broadcasts proposal:resolved with rejected outcome', async () => {
+      getProposalMock.mockResolvedValue({
+        proposal_id: 'prop-do-reject',
+        patient_uuid: 'pt-1',
+        write_target: 'allergy',
+        payload: { action: 'add', substance: 'Latex' },
+        status: 'pending',
+      })
+      rejectProposalMock.mockResolvedValue({ ok: true })
+      const onClose = vi.fn()
+      render(
+        withQueryClient(
+          <AllergyModal open patientUuid="pt-1" proposalId="prop-do-reject" onClose={onClose} />,
+        ),
+      )
+      await waitFor(() => expect(getProposalMock).toHaveBeenCalledTimes(1))
+
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      await user.click(screen.getByTestId('allergy-reject'))
+
+      // Server-side reject lifecycle endpoint hit.
+      await waitFor(() => expect(rejectProposalMock).toHaveBeenCalledTimes(1))
+      // CUI gets the dismiss signal so the above-composer affordance hides
+      // and the chat thread stamps a "✗ Rejected" receipt.
+      expect(broadcastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'proposal:resolved',
+          proposal_id: 'prop-do-reject',
+          outcome: 'rejected',
+        }),
+      )
+      // Modal closes itself after a successful reject.
+      await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+    })
+
+    it('Reject failure surfaces an error and leaves the modal open (recoverable)', async () => {
+      getProposalMock.mockResolvedValue({
+        proposal_id: 'prop-reject-fail',
+        patient_uuid: 'pt-1',
+        write_target: 'allergy',
+        payload: { action: 'add', substance: 'Iodine' },
+        status: 'pending',
+      })
+      rejectProposalMock.mockResolvedValue({ ok: false, reason: 'http_500' })
+      const onClose = vi.fn()
+      render(
+        withQueryClient(
+          <AllergyModal open patientUuid="pt-1" proposalId="prop-reject-fail" onClose={onClose} />,
+        ),
+      )
+      await waitFor(() => expect(getProposalMock).toHaveBeenCalledTimes(1))
+
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      await user.click(screen.getByTestId('allergy-reject'))
+
+      await waitFor(() => expect(rejectProposalMock).toHaveBeenCalledTimes(1))
+      // Pending row stays pending until success — modal does NOT close, no
+      // proposal:resolved broadcast. Physician retries from the same modal.
+      expect(onClose).not.toHaveBeenCalled()
+      expect(broadcastMock).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'proposal:resolved' }),
+      )
+      // Error message is rendered for the physician.
+      expect(screen.getByText(/http_500/i)).toBeInTheDocument()
+    })
   })
 })

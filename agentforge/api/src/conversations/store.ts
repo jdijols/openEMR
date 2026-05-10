@@ -369,6 +369,131 @@ export async function updatePendingProposalPayload(
   }
 }
 
+/**
+ * Phase 4 — Per-section reject / restore for bundle proposals.
+ *
+ * Toggles `payload.sections[i][.items[j]].rejected` server-side via
+ * `jsonb_set`. Path resolution scans the existing JSONB for the supplied
+ * stable IDs (`section_id`, optional `item_id`), so concurrent agent
+ * `update_proposal` PATCHes that re-order sections do NOT collide with an
+ * in-flight reject — this is the key reason this lives behind a dedicated
+ * endpoint rather than reusing the top-level `||` shallow-merge PATCH.
+ *
+ * Returns the updated row when the section/item was found and toggled, or
+ * `null` if the proposal doesn't exist, isn't pending, isn't a bundle, or
+ * the supplied IDs don't match any leaf in the current payload.
+ */
+export async function setSectionRejected(
+  pool: Pool,
+  proposalId: string,
+  sectionId: string,
+  itemId: string | null,
+  rejected: boolean,
+  client?: PoolClient,
+): Promise<PendingProposalRow | null> {
+  const { client: db, release } = await maybeClient(pool, client);
+  try {
+    const existing = await db.query<{ payload: unknown; status: PendingProposalRow['status'] }>(
+      `SELECT payload, status
+       FROM agentforge.pending_proposals
+       WHERE proposal_id = $1
+       LIMIT 1`,
+      [proposalId],
+    );
+    const row0 = existing.rows[0];
+    if (row0 === undefined || row0.status !== 'pending') {
+      return null;
+    }
+    const payload =
+      row0.payload !== null && typeof row0.payload === 'object' && !Array.isArray(row0.payload) ?
+        (row0.payload as Record<string, unknown>)
+      : null;
+    if (payload === null || payload['kind'] !== 'bundle') {
+      return null;
+    }
+    const sections = Array.isArray(payload['sections']) ? (payload['sections'] as ReadonlyArray<unknown>) : null;
+    if (sections === null) {
+      return null;
+    }
+
+    const sectionIdx = sections.findIndex(
+      (s) => s !== null && typeof s === 'object' && (s as Record<string, unknown>)['section_id'] === sectionId,
+    );
+    if (sectionIdx === -1) {
+      return null;
+    }
+    const section = sections[sectionIdx] as Record<string, unknown>;
+
+    let path: string[];
+    if (itemId === null) {
+      // Section-level reject only valid for single-write sections.
+      if (Array.isArray(section['items'])) {
+        return null;
+      }
+      path = ['sections', String(sectionIdx), 'rejected'];
+    } else {
+      const items = Array.isArray(section['items']) ? (section['items'] as ReadonlyArray<unknown>) : null;
+      if (items === null) {
+        return null;
+      }
+      const itemIdx = items.findIndex(
+        (it) => it !== null && typeof it === 'object' && (it as Record<string, unknown>)['item_id'] === itemId,
+      );
+      if (itemIdx === -1) {
+        return null;
+      }
+      path = ['sections', String(sectionIdx), 'items', String(itemIdx), 'rejected'];
+    }
+
+    const r = await db.query<{
+      proposal_id: string;
+      conversation_internal_id: string;
+      patient_uuid: string;
+      encounter_id: string | null;
+      write_target: string;
+      payload: unknown;
+      status: PendingProposalRow['status'];
+    }>(
+      `UPDATE agentforge.pending_proposals
+       SET payload = jsonb_set(payload, $2::text[], $3::jsonb, false)
+       WHERE proposal_id = $1 AND status = 'pending'
+       RETURNING proposal_id, conversation_internal_id, patient_uuid, encounter_id, write_target, payload, status`,
+      [proposalId, `{${path.join(',')}}`, JSON.stringify(rejected)],
+    );
+
+    const row = r.rows[0];
+    if (row === undefined) {
+      return null;
+    }
+
+    const newPayload =
+      row.payload !== null && typeof row.payload === 'object' && !Array.isArray(row.payload) ?
+        (row.payload as Record<string, unknown>)
+      : {};
+
+    let encounterIdNum: number | null = null;
+    const encRaw = row.encounter_id;
+    if (encRaw !== null && encRaw !== undefined && `${encRaw}`.trim() !== '') {
+      const n = Number.parseInt(`${encRaw}`, 10);
+      encounterIdNum = Number.isFinite(n) && n > 0 ? n : null;
+    }
+
+    return {
+      proposalId: row.proposal_id,
+      conversationInternalId: Number.parseInt(String(row.conversation_internal_id), 10),
+      patientUuid: typeof row.patient_uuid === 'string' ? row.patient_uuid.toLowerCase() : '',
+      encounterId: encounterIdNum,
+      writeTarget: row.write_target,
+      payload: newPayload,
+      status: row.status,
+    };
+  } finally {
+    if (release) {
+      db.release();
+    }
+  }
+}
+
 export async function markProposalFinal(
   pool: Pool,
   proposalId: string,

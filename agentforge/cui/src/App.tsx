@@ -326,25 +326,6 @@ export default function App(): ReactElement {
     };
   }, [apiBase, handshake, conversationExternalId, patientUuid]);
 
-  // G2-Early-26 — IntakeProposalCard Confirm dispatches to module write endpoints directly,
-  // not via the agentforge API. So this env is shaped around `moduleBase` (the OpenEMR module
-  // public path) plus the same auth context the upload uses.
-  const intakeDispatchEnv = useMemo(() => {
-    if (
-      handshake.status !== 'ready' ||
-      patientUuid === null ||
-      patientUuid.trim() === ''
-    ) {
-      return undefined;
-    }
-    return {
-      moduleBase: readModuleBase(),
-      sessionToken: handshake.sessionToken,
-      patientUuid,
-      boundEncounterId,
-    };
-  }, [handshake, patientUuid, boundEncounterId]);
-
   /**
    * Synchronous in-flight guard. State updates from `setBriefStatus` are
    * batched by React, so two effect runs in the same tick (notably
@@ -552,6 +533,19 @@ export default function App(): ReactElement {
     const headId = activeProposal?.proposalId ?? null;
     const headTarget = activeProposal?.writeTarget ?? null;
 
+    // Phase 3 — broadcast a queue-state snapshot on every head change so
+    // dashboard cards (AllergiesCard today; medication / demographics in
+    // Phase 5) can disable their manual `+` button while an agent
+    // proposal of the same target is queued. Fires on both initial mount
+    // (so a chart that opens with a stale pending proposal disables the
+    // `+` immediately) and subsequent transitions.
+    broadcastProposalEvent({
+      type: 'proposal:queue_state',
+      head_id: headId,
+      head_target: headTarget,
+      count: queueCount,
+    });
+
     if (!initialHeadCheckedRef.current) {
       initialHeadCheckedRef.current = true;
       lastBroadcastedHeadIdRef.current = headId;
@@ -574,7 +568,7 @@ export default function App(): ReactElement {
       write_target: headTarget,
       patient_uuid: patientUuid,
     });
-  }, [activeProposal, patientUuid]);
+  }, [activeProposal, patientUuid, queueCount]);
 
   /**
    * G2-Final — listen for `proposal:resolved` from the dashboard's
@@ -663,23 +657,56 @@ export default function App(): ReactElement {
   }, [activeProposal, proposalEnv, onProposalResolved]);
 
   /**
-   * G2-Final — clicking the affordance body re-broadcasts `proposal:open_modal`
-   * so the dashboard reopens the modal if the physician X-ed it out earlier.
+   * Phase 3 — clicking the affordance body routes to a target-appropriate
+   * surface for reviewing the proposal:
+   *
+   *   - **Modal-bearing targets** (allergy today; medication / demographics
+   *     in Phase 5): re-broadcast `proposal:open_modal` so the dashboard
+   *     reopens the modal pre-populated with the proposal payload. Same
+   *     event the round-11 broadcast effect fires on first arrival, so the
+   *     modal binds via the same path whether it's first-open or
+   *     post-snooze re-open.
+   *   - **Modal-less targets** (vitals, vitals_delete, chief_complaint,
+   *     chief_complaint_delete, clinical_note, clinical_note_update,
+   *     clinical_note_delete, tobacco): no per-target dashboard modal
+   *     exists yet, so navigate the OpenEMR shell to the bound encounter
+   *     view — same NAV_REQUEST envelope the header "Today" link uses.
+   *     The physician can review the existing chart values alongside the
+   *     pending proposal in the affordance, then confirm/reject from
+   *     there. Skipped silently when no encounter is bound (rail launched
+   *     without one); the affordance Confirm/Reject buttons still work.
+   *
+   *   Targets without either path (none today; future writes that don't
+   *   touch the encounter) fall through to a no-op.
    */
   const onAffordanceReopen = useCallback((): void => {
     if (activeProposal === null || patientUuid === null || patientUuid === '') {
       return;
     }
-    if (activeProposal.writeTarget !== 'allergy') {
+    const target = activeProposal.writeTarget;
+    if (target === 'allergy') {
+      broadcastProposalEvent({
+        type: 'proposal:open_modal',
+        proposal_id: activeProposal.proposalId,
+        write_target: target,
+        patient_uuid: patientUuid,
+      });
       return;
     }
-    broadcastProposalEvent({
-      type: 'proposal:open_modal',
-      proposal_id: activeProposal.proposalId,
-      write_target: activeProposal.writeTarget,
-      patient_uuid: patientUuid,
-    });
-  }, [activeProposal, patientUuid]);
+    const ENCOUNTER_TARGETS: ReadonlySet<string> = new Set([
+      'vitals',
+      'vitals_delete',
+      'chief_complaint',
+      'chief_complaint_delete',
+      'clinical_note',
+      'clinical_note_update',
+      'clinical_note_delete',
+      'tobacco',
+    ]);
+    if (ENCOUNTER_TARGETS.has(target) && boundEncounterId !== null) {
+      requestEncounterNavigation(boundEncounterId, patientUuid);
+    }
+  }, [activeProposal, patientUuid, boundEncounterId]);
 
   const onDictationFinal = useCallback(
     async (text: string): Promise<void> => {
@@ -836,16 +863,26 @@ export default function App(): ReactElement {
         );
         docrefUuid = upload.docrefUuid;
 
-        // Stamp the docref onto the user message's attachment so the
-        // chip becomes clickable (opens DocumentModal). We match by
-        // File reference identity — the user message we just appended
-        // is the only one carrying this exact File object.
+        // Stamp the docref + OpenEMR document mapping onto the user
+        // message's attachment so the chip becomes clickable (image
+        // preview opens DocumentModal/bbox; the post-extraction link
+        // uses oeDocumentId to navigate to OpenEMR's Documents tab).
+        // Match by File reference identity — the user message we just
+        // appended is the only one carrying this exact File object.
         setMessages((prev) =>
           prev.map((m) => {
             if (m.role !== 'user' || m.attachment?.file !== file) {
               return m;
             }
-            return { ...m, attachment: { ...m.attachment, docrefUuid: upload.docrefUuid } };
+            return {
+              ...m,
+              attachment: {
+                ...m.attachment,
+                docrefUuid: upload.docrefUuid,
+                ...(upload.oeDocumentId !== null ? { oeDocumentId: upload.oeDocumentId } : {}),
+                ...(upload.oePatientPid !== null ? { oePatientPid: upload.oePatientPid } : {}),
+              },
+            };
           }),
         );
       }
@@ -930,6 +967,50 @@ export default function App(): ReactElement {
       window.location.origin,
     );
   }, [moduleBase, handshake, patientUuid]);
+
+  /**
+   * Post-extraction "View in documents" link — asks the host shell to
+   * navigate the chart's main content area to the canonical OpenEMR
+   * Document viewer for this file (same destination as a clinician
+   * double-clicking the document inside the Documents tab). Mirrors the
+   * existing `requestEncounterNavigation` / `requestVisitHistoryNavigation`
+   * pattern: post a NAV_REQUEST hint to the parent rail container, which
+   * owns the `top.navigateTab(...)` plumbing.
+   *
+   * Looks up the OpenEMR `documents.id` + numeric pid from the user
+   * message that owns this docref (stamped by the upload-success path).
+   * Falls back to the in-rail bbox modal when the OpenEMR-side ids are
+   * missing — this happens when the upload predates the registrar
+   * projection (legacy `agentforge_w2/`-only uploads).
+   */
+  const onViewInDocuments = useCallback((docrefUuid: string): void => {
+    const match = messages.find(
+      (m) => m.attachment?.docrefUuid === docrefUuid && m.attachment?.oeDocumentId !== undefined,
+    );
+    const oeDocId = match?.attachment?.oeDocumentId;
+    const pid = match?.attachment?.oePatientPid;
+    if (oeDocId === undefined || pid === undefined) {
+      onOpenDocument(docrefUuid, 1);
+      return;
+    }
+    if (typeof window.parent === 'undefined' || window.parent === null) {
+      return;
+    }
+    if (patientUuid === null || patientUuid === '') {
+      return;
+    }
+    window.parent.postMessage(
+      {
+        type: 'NAV_REQUEST',
+        hint: {
+          kind: 'document',
+          params: { document_id: oeDocId, patient_pid: pid },
+        },
+        expected_patient_uuid: patientUuid,
+      },
+      window.location.origin,
+    );
+  }, [messages, onOpenDocument, patientUuid]);
 
   // G2-MVP-99 — file attachment plumbing. Validation matches the W2
   // brief: PDF/PNG/JPEG only, 10 MB cap. Errors surface as `attachError`
@@ -1187,10 +1268,10 @@ export default function App(): ReactElement {
         messages={messages}
         boundPatientUuid={patientUuid}
         {...(proposalEnv !== undefined ? { proposalEnv } : {})}
-        {...(intakeDispatchEnv !== undefined ? { intakeDispatchEnv } : {})}
         voiceCompletedProposalIds={voiceCompletedProposalIds}
         onProposalResolved={onProposalResolved}
         onOpenDocument={onOpenDocument}
+        onViewInDocuments={onViewInDocuments}
         typing={sending}
         routingLabel={routingLabel}
       />

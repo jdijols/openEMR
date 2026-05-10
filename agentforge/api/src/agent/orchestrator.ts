@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { Env } from '../env.js';
 import type { Observability } from '../observability/index.js';
 import { appendTurn, insertConversationRow, insertPendingProposal } from '../conversations/store.js';
+import { normalizeReactionToOptionId, normalizeSubstance } from '../tools/propose_writes.js';
 import { verifySessionToken } from '../handshake/sessionToken.js';
 import { chatBlockSchema, type ChatBlock } from '../openemr/types.js';
 import { createChartContextReadTools } from '../tools/chart_context_reads.js';
@@ -964,6 +965,29 @@ export async function runChatTurn(
     ];
   }
 
+  // Phase 4 — intake-form bundle proposal. Replaces the W2 IntakeProposalCard
+  // path (browser-side fan-out via intake_dispatch.ts) with a single bundle
+  // pending_proposals row. The CUI affordance queues it like any other
+  // proposal; the dashboard's BundleReviewModal opens against the queue
+  // head with per-section toggles + Confirm All / Reject All. Server-side
+  // fan-out (apply_pending_write.ts) writes each leaf with a synthetic
+  // proposal_id so the PHP idempotency ledger keeps each section/item
+  // uniquely de-duplicable.
+  const intakeBundleProposal = await maybeBuildIntakeBundleProposal(mergedToolResults, {
+    pool: deps.pool,
+    conversationInternalId: convRecord.internalId,
+    patientUuid: input.patientUuid,
+    encounterId: boundEncounterId,
+  });
+  if (intakeBundleProposal !== null) {
+    const insertAt = blocks.findIndex((b) => b.type === 'extraction') + 1;
+    blocks = [
+      ...blocks.slice(0, insertAt),
+      intakeBundleProposal,
+      ...blocks.slice(insertAt),
+    ];
+  }
+
   const evidence = buildClinicalToolEvidence(input.patientUuid, mergedToolResults);
 
   // Verification gate — runs post-LLM, post-tool, pre-return. The four layers
@@ -1218,6 +1242,377 @@ async function maybeBuildLabSummaryProposal(
   }
 
   return null;
+}
+
+/**
+ * Phase 4 — Intake-form bundle proposal.
+ *
+ * When `attach_and_extract` succeeds for a patient intake form, fold every
+ * extracted section (demographics, chief concern, current medications,
+ * allergies, family history) into ONE bundle `pending_proposals` row and
+ * emit a single `proposal` chat block that lands in the affordance queue.
+ * The dashboard's `BundleReviewModal` opens against the queue head so the
+ * physician can per-section reject / per-row toggle, then Confirm All to
+ * fan out N writes.
+ *
+ * Replaces the W2-era `IntakeProposalCard` flow which dispatched per-row
+ * writes browser-side via `intake_dispatch.ts`. The new path is
+ * server-side fan-out (apply_pending_write.ts) using synthetic per-leaf
+ * proposal_ids so the PHP idempotency ledger keeps each section/item
+ * uniquely de-duplicable.
+ *
+ * Returns null when:
+ *   - no successful intake_form extraction in this turn
+ *   - extraction has no usable sections (every field empty)
+ *   - row insert fails (logged, doesn't block the turn)
+ */
+async function maybeBuildIntakeBundleProposal(
+  toolResults: AiToolResultLike[],
+  ctx: Readonly<{
+    pool: Pool;
+    conversationInternalId: number;
+    patientUuid: string;
+    encounterId: number | null;
+  }>,
+): Promise<ChatBlock | null> {
+  for (let i = toolResults.length - 1; i >= 0; i--) {
+    const tr = toolResults[i];
+    if (tr === undefined || tr.toolName !== 'attach_and_extract') {
+      continue;
+    }
+    const out = tr.output;
+    if (out === null || typeof out !== 'object' || (out as { ok?: unknown }).ok !== true) {
+      continue;
+    }
+    const r = (out as { result?: unknown }).result;
+    if (r === null || typeof r !== 'object') {
+      continue;
+    }
+    const meta = (r as { metadata?: { docType?: string } }).metadata;
+    if (meta?.docType !== 'intake_form') {
+      continue;
+    }
+    const ext = (r as { extraction?: unknown }).extraction;
+    if (ext === null || typeof ext !== 'object') {
+      continue;
+    }
+    const extObj = ext as Record<string, unknown>;
+    if (extObj['document_type'] !== 'intake_form') {
+      continue;
+    }
+
+    const docrefUuid =
+      tr.input !== null && typeof tr.input === 'object' ?
+        ((tr.input as { docref_uuid?: string }).docref_uuid ?? '')
+      : '';
+
+    const sections = buildIntakeBundleSections(extObj, ctx.encounterId);
+    if (sections.length === 0) {
+      // Extraction returned but every section was empty — nothing to confirm.
+      // Skip silently (the extraction acknowledgment block still renders).
+      return null;
+    }
+
+    const preview = formatIntakeBundlePreview(sections);
+    const proposalId = randomUUID();
+    const bundlePayload: Record<string, unknown> = {
+      kind: 'bundle',
+      source: 'intake_form',
+      preview,
+      sections,
+    };
+    if (docrefUuid !== '') {
+      bundlePayload['doc_ref_uuid'] = docrefUuid;
+    }
+
+    try {
+      await insertPendingProposal(ctx.pool, {
+        proposalId,
+        conversationInternalId: ctx.conversationInternalId,
+        // Bundle root has no encounter binding — `encounter_id` lives at the
+        // section level, since one bundle may mix encounter-bound (chief
+        // complaint) and patient-scoped (allergy / medication) sections.
+        encounterId: null,
+        patientUuid: ctx.patientUuid.toLowerCase(),
+        writeTarget: 'intake_bundle',
+        payload: bundlePayload,
+      });
+    } catch (e) {
+      console.error('intake_bundle_proposal_insert_failed', {
+        proposal_id: proposalId,
+        error_message: e instanceof Error ? e.message : String(e),
+      });
+      return null;
+    }
+
+    return {
+      type: 'proposal',
+      proposal_id: proposalId,
+      write_target: 'intake_bundle',
+      preview,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Walk the `intake_form` extraction shape and build per-section bundle
+ * entries. Each leaf carries its own `write_target`, `payload`, and
+ * (when relevant) `encounter_id`. Empty sections are skipped — the
+ * extracted form may have had rows for some fields and not others.
+ *
+ * Slug-style `section_id` and `item_id` values are intentional: the PHP
+ * idempotency ledger column is `VARCHAR(191)` and the synthetic proposal
+ * ids fan-out emits are `${parent}::${section}[::${item}]`. Short slugs
+ * stay well within budget; the bundle assembler asserts no `::` in the
+ * IDs (see plan doc, "Schema constraints on synthetic IDs").
+ */
+type IntakeBundleItem = Readonly<{
+  item_id: string;
+  write_target: string;
+  encounter_id: number | null;
+  payload: Record<string, unknown>;
+  rejected: boolean;
+}>;
+
+type IntakeBundleSection =
+  | {
+      readonly section_id: string;
+      readonly title: string;
+      readonly write_target: string;
+      readonly encounter_id: number | null;
+      readonly payload: Record<string, unknown>;
+      readonly rejected: boolean;
+    }
+  | {
+      readonly section_id: string;
+      readonly title: string;
+      readonly items: ReadonlyArray<IntakeBundleItem>;
+    };
+
+function buildIntakeBundleSections(
+  ext: Record<string, unknown>,
+  encounterId: number | null,
+): IntakeBundleSection[] {
+  const sections: IntakeBundleSection[] = [];
+
+  // Demographics — single section. The intake extractor emits split name
+  // fields directly (`legal_name_first` / `legal_name_last` /
+  // `legal_name_middle`); `name` (combined) is a legacy alias from older
+  // fixtures that we still tolerate. PHP `DemographicsUpdatePayload`'s
+  // ALLOWED_KEYS is `first_name`, `last_name`, `middle_name`, `dob`,
+  // `sex`, `contact_phone` — keep the bundle payload to that exact set or
+  // it gets rejected as `unsupported_payload`.
+  const demo = ext['demographics'] as Record<string, unknown> | undefined;
+  const demoPayload: Record<string, unknown> = {};
+  if (demo !== undefined && demo !== null) {
+    const firstSplit = typeof demo['legal_name_first'] === 'string' ? (demo['legal_name_first'] as string).trim() : '';
+    const lastSplit = typeof demo['legal_name_last'] === 'string' ? (demo['legal_name_last'] as string).trim() : '';
+    const middleSplit = typeof demo['legal_name_middle'] === 'string' ? (demo['legal_name_middle'] as string).trim() : '';
+    if (firstSplit !== '') {
+      demoPayload['first_name'] = firstSplit;
+    }
+    if (lastSplit !== '') {
+      demoPayload['last_name'] = lastSplit;
+    }
+    if (middleSplit !== '') {
+      demoPayload['middle_name'] = middleSplit;
+    }
+    // Fallback: legacy fixtures that emit a single combined `name`.
+    if (firstSplit === '' && lastSplit === '' && typeof demo['name'] === 'string' && (demo['name'] as string).trim() !== '') {
+      const parts = (demo['name'] as string).trim().split(/\s+/);
+      if (parts.length >= 1 && parts[0] !== undefined && parts[0] !== '') {
+        demoPayload['first_name'] = parts[0];
+      }
+      if (parts.length >= 2) {
+        const last = parts[parts.length - 1];
+        if (last !== undefined && last !== '') {
+          demoPayload['last_name'] = last;
+        }
+      }
+    }
+    if (typeof demo['dob'] === 'string' && (demo['dob'] as string).trim() !== '') {
+      demoPayload['dob'] = (demo['dob'] as string).trim();
+    }
+    if (typeof demo['sex'] === 'string' && (demo['sex'] as string).trim() !== '') {
+      demoPayload['sex'] = (demo['sex'] as string).trim();
+    }
+    if (typeof demo['contact_phone'] === 'string' && (demo['contact_phone'] as string).trim() !== '') {
+      demoPayload['contact_phone'] = (demo['contact_phone'] as string).trim();
+    }
+  }
+  if (Object.keys(demoPayload).length > 0) {
+    sections.push({
+      section_id: 'demographics',
+      title: 'Demographics',
+      write_target: 'demographics_update',
+      encounter_id: null,
+      payload: demoPayload,
+      rejected: false,
+    });
+  }
+
+  // Chief concern — encounter-bound. Skipped when no encounter is bound
+  // (the rail launched without one); the rest of the bundle still
+  // confirms.
+  const chief = ext['chief_concern'] as { text?: unknown } | undefined;
+  if (typeof chief?.text === 'string' && chief.text.trim() !== '' && encounterId !== null) {
+    sections.push({
+      section_id: 'chief_concern',
+      title: 'Chief concern',
+      write_target: 'chief_complaint',
+      encounter_id: encounterId,
+      payload: { reason: chief.text.trim() },
+      rejected: false,
+    });
+  }
+
+  // Medications — list-shaped section. PHP `MedicationAddPayload` accepts
+  // `name | dose | frequency | sig | indication | begdate | enddate`;
+  // pull through every field the extractor emitted so the chart write
+  // captures the full medication row (the agent extracts indication +
+  // begdate + sig from richer intake forms).
+  const medsRaw = Array.isArray(ext['current_medications']) ?
+    (ext['current_medications'] as ReadonlyArray<Record<string, unknown>>)
+  : [];
+  const medItems: IntakeBundleItem[] = [];
+  medsRaw.forEach((m, idx) => {
+    const name = typeof m['name'] === 'string' ? (m['name'] as string).trim() : '';
+    if (name === '') {
+      return;
+    }
+    const itemPayload: Record<string, unknown> = { name };
+    for (const key of ['dose', 'frequency', 'sig', 'indication', 'begdate', 'enddate'] as const) {
+      const v = m[key];
+      if (typeof v === 'string' && v.trim() !== '') {
+        itemPayload[key] = v.trim();
+      }
+    }
+    medItems.push({
+      item_id: `med-${idx + 1}`,
+      write_target: 'medication_add',
+      encounter_id: null,
+      payload: itemPayload,
+      rejected: false,
+    });
+  });
+  if (medItems.length > 0) {
+    sections.push({ section_id: 'medications', title: 'Medications', items: medItems });
+  }
+
+  // Allergies — list-shaped section. PHP `AllergyWritePayload` enforces
+  // strict allowlists for both `reaction` (must be one of the
+  // `list_options.list_id='reaction'` ids: unassigned / hives / nausea /
+  // shortness_of_breath / other) and `severity` (severity_ccda option_ids
+  // plus `life_threatening` / `unknown` legacy aliases). Apply the same
+  // normalizers `propose_allergy_write` uses so the bundle's free-text
+  // extractions ("Hives", "shortness of breath") survive PHP parse.
+  const allergiesRaw = Array.isArray(ext['allergies']) ?
+    (ext['allergies'] as ReadonlyArray<Record<string, unknown>>)
+  : [];
+  const allergyItems: IntakeBundleItem[] = [];
+  allergiesRaw.forEach((a, idx) => {
+    const substance = typeof a['substance'] === 'string' ? (a['substance'] as string).trim() : '';
+    if (substance === '') {
+      return;
+    }
+    const itemPayload: Record<string, unknown> = {
+      action: 'add',
+      substance: normalizeSubstance(substance),
+    };
+    const reaction = typeof a['reaction'] === 'string' ? (a['reaction'] as string).trim() : '';
+    if (reaction !== '') {
+      itemPayload['reaction'] = normalizeReactionToOptionId(reaction);
+    }
+    const severity = typeof a['severity'] === 'string' ? (a['severity'] as string).trim() : '';
+    if (severity !== '') {
+      itemPayload['severity'] = severity;
+    }
+    allergyItems.push({
+      item_id: `alg-${idx + 1}`,
+      write_target: 'allergy',
+      encounter_id: null,
+      payload: itemPayload,
+      rejected: false,
+    });
+  });
+  if (allergyItems.length > 0) {
+    sections.push({ section_id: 'allergies', title: 'Allergies', items: allergyItems });
+  }
+
+  // Family history — list-shaped section. PHP `FamilyHistoryAddPayload`
+  // accepts `relation | condition | age_of_onset | deceased`; plumb both
+  // optional fields when the extractor populated them.
+  const familyRaw = Array.isArray(ext['family_history']) ?
+    (ext['family_history'] as ReadonlyArray<Record<string, unknown>>)
+  : [];
+  const familyItems: IntakeBundleItem[] = [];
+  familyRaw.forEach((f, idx) => {
+    const relation = typeof f['relation'] === 'string' ? (f['relation'] as string).trim().toLowerCase() : '';
+    const condition = typeof f['condition'] === 'string' ? (f['condition'] as string).trim() : '';
+    if (relation === '' || condition === '') {
+      return;
+    }
+    const itemPayload: Record<string, unknown> = { relation, condition };
+    if (typeof f['age_of_onset'] === 'string' && (f['age_of_onset'] as string).trim() !== '') {
+      itemPayload['age_of_onset'] = (f['age_of_onset'] as string).trim();
+    }
+    if (f['deceased'] === true) {
+      itemPayload['deceased'] = true;
+    } else if (f['deceased'] === false) {
+      itemPayload['deceased'] = false;
+    }
+    familyItems.push({
+      item_id: `fam-${idx + 1}`,
+      write_target: 'family_history_add',
+      encounter_id: null,
+      payload: itemPayload,
+      rejected: false,
+    });
+  });
+  if (familyItems.length > 0) {
+    sections.push({ section_id: 'family_history', title: 'Family history', items: familyItems });
+  }
+
+  return sections;
+}
+
+/**
+ * Render-ready preview line for a bundle, derived from its section list.
+ * Format: "Demographics · 3 medications · 2 allergies · 1 family history".
+ * The bundle review modal can recompute this client-side from the
+ * payload after a section gets rejected — see preview_formatters.ts's
+ * `formatPreview('bundle', payload)` consumer.
+ */
+function formatIntakeBundlePreview(sections: IntakeBundleSection[]): string {
+  const parts: string[] = [];
+  for (const s of sections) {
+    if ('items' in s) {
+      const live = s.items.filter((it) => !it.rejected);
+      if (live.length === 0) {
+        continue;
+      }
+      const noun = pluralizeBundleSection(s.section_id, live.length);
+      parts.push(`${live.length} ${noun}`);
+    } else if (!s.rejected) {
+      parts.push(s.title);
+    }
+  }
+  return parts.length > 0 ? parts.join(' · ') : 'Intake form';
+}
+
+function pluralizeBundleSection(sectionId: string, count: number): string {
+  if (sectionId === 'medications') {
+    return count === 1 ? 'medication' : 'medications';
+  }
+  if (sectionId === 'allergies') {
+    return count === 1 ? 'allergy' : 'allergies';
+  }
+  if (sectionId === 'family_history') {
+    return count === 1 ? 'family-history entry' : 'family-history entries';
+  }
+  return sectionId;
 }
 
 /**

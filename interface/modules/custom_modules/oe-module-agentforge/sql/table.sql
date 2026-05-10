@@ -23,6 +23,18 @@ CREATE TABLE `agentforge_completed_write_proposal` (
     `proposal_id` VARCHAR(191) NOT NULL,
     `write_target` VARCHAR(64) NOT NULL,
     `recorded_at` DATETIME NOT NULL,
-    PRIMARY KEY (`proposal_id`)
+    `source_docref_uuid` VARCHAR(64) DEFAULT NULL,
+    PRIMARY KEY (`proposal_id`),
+    KEY `idx_source_docref` (`source_docref_uuid`)
 ) ENGINE=InnoDB;
+#EndIf
+
+-- Provenance: when a propose-write originates from an `attach_and_extract`
+-- document, the api stamps the source DocRef UUID onto the apply call so
+-- the ledger can record it. Idempotent ALTER for installs that pre-date
+-- the column.
+#IfMissingColumn agentforge_completed_write_proposal source_docref_uuid
+ALTER TABLE `agentforge_completed_write_proposal`
+    ADD COLUMN `source_docref_uuid` VARCHAR(64) DEFAULT NULL,
+    ADD KEY `idx_source_docref` (`source_docref_uuid`);
 #EndIf

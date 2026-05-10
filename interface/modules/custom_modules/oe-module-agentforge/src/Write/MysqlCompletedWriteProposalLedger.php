@@ -25,11 +25,34 @@ final class MysqlCompletedWriteProposalLedger implements CompletedWriteProposalL
         return $row !== false && isset($row['proposal_id']);
     }
 
-    public function markSuccessful(string $proposalId, string $writeTarget): void
+    public function markSuccessful(string $proposalId, string $writeTarget, ?string $sourceDocrefUuid = null): void
     {
+        $sourceDocrefUuid = self::normalizeSourceDocrefUuid($sourceDocrefUuid);
         \sqlStatement(
-            'INSERT IGNORE INTO `agentforge_completed_write_proposal` (`proposal_id`, `write_target`, `recorded_at`) VALUES (?, ?, NOW())',
-            [$proposalId, $writeTarget]
+            'INSERT IGNORE INTO `agentforge_completed_write_proposal` '
+            . '(`proposal_id`, `write_target`, `recorded_at`, `source_docref_uuid`) '
+            . 'VALUES (?, ?, NOW(), ?)',
+            [$proposalId, $writeTarget, $sourceDocrefUuid]
         );
+    }
+
+    private static function normalizeSourceDocrefUuid(?string $raw): ?string
+    {
+        if ($raw === null) {
+            return null;
+        }
+        $trimmed = \trim($raw);
+        if ($trimmed === '') {
+            return null;
+        }
+        // Accept canonical lowercase UUID-shaped strings only — anything else
+        // is a caller bug and shouldn't poison the provenance column.
+        if (\preg_match(
+            '/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i',
+            $trimmed,
+        ) !== 1) {
+            return null;
+        }
+        return \strtolower($trimmed);
     }
 }

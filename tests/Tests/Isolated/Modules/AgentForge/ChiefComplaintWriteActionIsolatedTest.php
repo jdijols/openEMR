@@ -58,7 +58,7 @@ final class ChiefComplaintWriteActionIsolatedTest extends TestCase
                 return isset($this->successful[$proposalId]);
             }
 
-            public function markSuccessful(string $proposalId, string $writeTarget): void
+            public function markSuccessful(string $proposalId, string $writeTarget, ?string $sourceDocrefUuid = null): void
             {
                 $this->wasMarkedSuccessful = true;
                 $this->successful[$proposalId] = $writeTarget;
@@ -111,7 +111,7 @@ final class ChiefComplaintWriteActionIsolatedTest extends TestCase
                 return isset($this->successful[$proposalId]);
             }
 
-            public function markSuccessful(string $proposalId, string $writeTarget): void
+            public function markSuccessful(string $proposalId, string $writeTarget, ?string $sourceDocrefUuid = null): void
             {
             }
         };
@@ -141,7 +141,7 @@ final class ChiefComplaintWriteActionIsolatedTest extends TestCase
                 return false;
             }
 
-            public function markSuccessful(string $proposalId, string $writeTarget): void
+            public function markSuccessful(string $proposalId, string $writeTarget, ?string $sourceDocrefUuid = null): void
             {
                 $this->successful[$proposalId] = $writeTarget;
             }
@@ -189,7 +189,7 @@ final class ChiefComplaintWriteActionIsolatedTest extends TestCase
                 return false;
             }
 
-            public function markSuccessful(string $proposalId, string $writeTarget): void
+            public function markSuccessful(string $proposalId, string $writeTarget, ?string $sourceDocrefUuid = null): void
             {
                 $this->marked = true;
             }
@@ -228,7 +228,7 @@ final class ChiefComplaintWriteActionIsolatedTest extends TestCase
                 return false;
             }
 
-            public function markSuccessful(string $proposalId, string $writeTarget): void
+            public function markSuccessful(string $proposalId, string $writeTarget, ?string $sourceDocrefUuid = null): void
             {
             }
         };
@@ -264,7 +264,7 @@ final class ChiefComplaintWriteActionIsolatedTest extends TestCase
                 return false;
             }
 
-            public function markSuccessful(string $proposalId, string $writeTarget): void
+            public function markSuccessful(string $proposalId, string $writeTarget, ?string $sourceDocrefUuid = null): void
             {
             }
         };

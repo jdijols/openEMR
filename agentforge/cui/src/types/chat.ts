@@ -101,6 +101,15 @@ export type ChatAttachment = {
   name: string;
   /** Filled in once the upload completes; clickable preview opens DocumentModal. */
   docrefUuid?: string;
+  /**
+   * Filled in alongside `docrefUuid` when the parallel OpenEMR-`documents`
+   * registrar projection succeeded. Used by the post-extraction "View in
+   * documents" link to open the canonical OpenEMR Document viewer
+   * (`/controller.php?document&view&...`) rather than the in-rail bbox modal.
+   */
+  oeDocumentId?: number;
+  /** Numeric pid for the bound patient — needed to build the Documents-tab URL. */
+  oePatientPid?: number;
 };
 
 export type ChatMessage = {

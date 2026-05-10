@@ -51,6 +51,19 @@ export type ProposalEvent =
       readonly type: 'proposal:resolved';
       readonly proposal_id: string;
       readonly outcome: 'confirmed' | 'rejected';
+    }
+  | {
+      // Phase 3 — CUI → dashboard: snapshot of the FIFO queue head used by
+      // the dashboard to gate manual `+ add` actions. While an agent
+      // proposal of the same `head_target` is at the head of the queue,
+      // the corresponding card's `+` button disables itself with a tooltip
+      // ("Resolve the pending allergy proposal first") so the physician
+      // doesn't open a manual modal while the agent has one waiting.
+      // `head_id === null` (count 0) means the queue is empty.
+      readonly type: 'proposal:queue_state';
+      readonly head_id: string | null;
+      readonly head_target: string | null;
+      readonly count: number;
     };
 
 let channel: BroadcastChannel | null = null;

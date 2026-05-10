@@ -28,6 +28,12 @@ export function AllergiesCard({ patientId }: Props) {
   // Save so we don't surface "could not open proposal" before the user has
   // even started editing.
   const [editSeed, setEditSeed] = useState<AllergyPayload | null>(null)
+  // Phase 3 — `+` is disabled while an agent allergy proposal is at the head
+  // of the CUI queue. Otherwise the physician could open a manual modal in
+  // parallel with the agent's pending review modal — two open surfaces for
+  // the same intent. The CUI broadcasts queue snapshots via
+  // `proposal:queue_state`; we only care about the head's target.
+  const [allergyQueued, setAllergyQueued] = useState(false)
 
   useEffect(() => {
     return subscribe((event) => {
@@ -35,11 +41,16 @@ export function AllergiesCard({ patientId }: Props) {
         setAgentProposalId(event.proposal_id)
         setEditSeed(null)
         setModalOpen(true)
+        return
+      }
+      if (event.type === 'proposal:queue_state') {
+        setAllergyQueued(event.head_target === 'allergy')
       }
     })
   }, [])
 
   const handleOpenManual = () => {
+    if (allergyQueued) return
     setAgentProposalId(null)
     setEditSeed(null)
     setModalOpen(true)
@@ -73,9 +84,10 @@ export function AllergiesCard({ patientId }: Props) {
     <button
       type="button"
       aria-label="Add allergy"
-      title="Add allergy"
+      title={allergyQueued ? 'Resolve the pending allergy proposal first' : 'Add allergy'}
       onClick={handleOpenManual}
-      className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-af-border-strong bg-af-surface text-af-text-subtle hover:bg-af-surface-alt hover:border-af-gray-500 focus:outline-none focus-visible:ring-[3px] focus-visible:ring-af-primary/30 transition-colors duration-150"
+      disabled={allergyQueued}
+      className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-af-border-strong bg-af-surface text-af-text-subtle hover:bg-af-surface-alt hover:border-af-gray-500 focus:outline-none focus-visible:ring-[3px] focus-visible:ring-af-primary/30 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-af-surface disabled:hover:border-af-border-strong"
     >
       <Plus size={14} aria-hidden />
     </button>

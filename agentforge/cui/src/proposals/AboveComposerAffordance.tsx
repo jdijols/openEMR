@@ -1,16 +1,26 @@
 import type { ReactElement } from 'react';
-import { useState } from 'react';
+import { ProposalCardShell, type ProposalCardState } from '../chat/ProposalCardShell.js';
 
 /**
- * G2-Final — persistent confirm/reject row pinned above the composer.
+ * Phase 1 — persistent confirm/reject row pinned above the composer, rendered
+ * via `ProposalCardShell` so the visual language matches the in-chat proposal
+ * card (amber-on-cream "decision needed" treatment). Replaces the prior
+ * CSS-in-JS implementation that read like a sent user-message bubble.
  *
- * Replaces the click-target portion of in-chat proposal cards for the
- * hybrid agent/manual flow. The chat thread still shows the agent's
- * text turns; this row is the always-visible save action so the
- * physician can confirm hands-free or by tap.
+ * The affordance always renders the FIFO head of the unresolved-proposal queue
+ * (`findProposalQueue(messages).head` — see proposal_lookup.ts). The "1 of N"
+ * queue counter renders OUTSIDE this component, in the wrapper stack at the
+ * call site (App.tsx) — design call: counter belongs above-and-right of the
+ * card itself, aligned to its right edge, rather than inside the card header
+ * where it competes with the action label.
  *
- * Click on the body re-broadcasts `proposal:open_modal` so the
- * dashboard reopens the modal if the physician closed it.
+ * After confirm / reject the queue advances to the next head; the consumer
+ * keys this component on `proposalId` so the new head fades in via the
+ * `agentforge-affordance-fade-in` animation rather than a content swap.
+ *
+ * Click on the body re-broadcasts `proposal:open_modal` so the dashboard
+ * reopens the modal if the physician X-ed it out earlier (or, in Phase 3,
+ * navigates to the encounter view for modal-less write targets).
  */
 
 export type AboveComposerState = 'idle' | 'submitting' | 'failed';
@@ -48,119 +58,65 @@ function labelForTarget(target: string): string {
   return ACTION_LABELS[target] ?? 'Save change';
 }
 
-export function AboveComposerAffordance(props: AboveComposerAffordanceProps): ReactElement {
-  const [hoverConfirm, setHoverConfirm] = useState(false);
-  const [hoverReject, setHoverReject] = useState(false);
+function shellStateFor(state: AboveComposerState): ProposalCardState {
+  if (state === 'submitting') {
+    return 'submitting';
+  }
+  if (state === 'failed') {
+    return 'failed';
+  }
+  return 'idle';
+}
 
+export function AboveComposerAffordance(props: AboveComposerAffordanceProps): ReactElement {
   const label = labelForTarget(props.writeTarget);
   const submitting = props.state === 'submitting';
   const failed = props.state === 'failed';
+  const previewText = failed && props.errorMessage !== undefined ? props.errorMessage : props.preview;
 
   return (
     <div
       data-testid="above-composer-affordance"
       data-state={props.state}
-      role="region"
-      aria-label={`${label} — ${props.preview}`}
+      data-proposal-id={props.proposalId}
       className="agentforge-cui__above-composer"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.5rem',
-        padding: '0.5rem 0.75rem',
-        margin: '0 0 0.5rem 0',
-        background: failed ? 'rgba(254, 226, 226, 0.6)' : 'rgba(239, 246, 255, 0.95)',
-        border: `1px solid ${failed ? 'rgba(239, 68, 68, 0.4)' : 'rgba(37, 99, 235, 0.25)'}`,
-        borderRadius: 8,
-        fontSize: 13,
-        cursor: 'pointer',
-        userSelect: 'none',
-      }}
       onClick={(e) => {
+        // Buttons inside the shell stop propagation themselves, but defense in
+        // depth — body click should never fire when the click landed on a
+        // Confirm / Reject button.
         if ((e.target as HTMLElement).closest('button') !== null) {
           return;
         }
         props.onReopen();
       }}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600, color: failed ? '#991b1b' : '#1e3a8a' }}>{label}</div>
-        <div
-          style={{
-            color: '#475569',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-          title={props.preview}
-        >
-          {failed && props.errorMessage !== undefined ? props.errorMessage : props.preview}
-        </div>
-      </div>
-      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-        <button
-          type="button"
-          data-testid="above-composer-confirm"
-          aria-label="Confirm"
-          disabled={submitting}
-          onMouseEnter={() => setHoverConfirm(true)}
-          onMouseLeave={() => setHoverConfirm(false)}
-          onClick={(e) => {
-            e.stopPropagation();
+      <ProposalCardShell
+        title={label}
+        state={shellStateFor(props.state)}
+        ariaLabel={`${label} — ${props.preview}`}
+        actions={{
+          onConfirm: () => {
             if (!submitting) {
               props.onConfirm();
             }
-          }}
-          style={{
-            all: 'unset',
-            cursor: submitting ? 'wait' : 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minWidth: 64,
-            padding: '6px 12px',
-            borderRadius: 6,
-            background: submitting ? '#94a3b8' : hoverConfirm ? '#1d4ed8' : '#2563eb',
-            color: '#fff',
-            fontWeight: 600,
-            fontSize: 13,
-            opacity: submitting ? 0.7 : 1,
-          }}
-        >
-          {submitting ? 'Saving…' : '✓ Confirm'}
-        </button>
-        <button
-          type="button"
-          data-testid="above-composer-reject"
-          aria-label="Reject"
-          disabled={submitting}
-          onMouseEnter={() => setHoverReject(true)}
-          onMouseLeave={() => setHoverReject(false)}
-          onClick={(e) => {
-            e.stopPropagation();
+          },
+          onReject: () => {
             if (!submitting) {
               props.onReject();
             }
-          }}
-          style={{
-            all: 'unset',
-            cursor: submitting ? 'wait' : 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minWidth: 64,
-            padding: '6px 12px',
-            borderRadius: 6,
-            background: hoverReject ? '#e2e8f0' : '#f1f5f9',
-            color: '#334155',
-            fontWeight: 500,
-            fontSize: 13,
-            border: '1px solid #cbd5e1',
-          }}
+          },
+          confirmLabel: submitting ? 'Saving…' : 'Confirm',
+          rejectLabel: 'Reject',
+          disabled: submitting,
+        }}
+      >
+        <p
+          className="agentforge-cui__above-composer-preview"
+          title={props.preview}
         >
-          ✗ Reject
-        </button>
-      </div>
+          {previewText}
+        </p>
+      </ProposalCardShell>
     </div>
   );
 }

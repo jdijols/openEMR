@@ -502,7 +502,16 @@ export async function postUploadDocument(
   patientUuid: string,
   docType: 'lab_pdf' | 'intake_form',
   file: File,
-): Promise<{ docrefUuid: string; mimeType: string; fileSize: number; reUpload: boolean }> {
+): Promise<{
+  docrefUuid: string;
+  /** OpenEMR `documents.id` when the parallel registrar projection succeeded; null on best-effort failure. */
+  oeDocumentId: number | null;
+  /** Numeric pid for the bound patient; null when ChartContextGate didn't resolve one. */
+  oePatientPid: number | null;
+  mimeType: string;
+  fileSize: number;
+  reUpload: boolean;
+}> {
   if (moduleBase === '') {
     throw new AgentForgeDeliveryError('misconfigured_llm', undefined, 'missing_module_base');
   }
@@ -546,12 +555,22 @@ export async function postUploadDocument(
 
   const body = json as {
     docref_uuid: string;
+    oe_document_id?: number | null;
+    oe_patient_pid?: number | null;
     mime_type?: string;
     file_size?: number;
     re_upload?: boolean;
   };
   return {
     docrefUuid: body.docref_uuid,
+    oeDocumentId:
+      typeof body.oe_document_id === 'number' && Number.isFinite(body.oe_document_id) && body.oe_document_id > 0
+        ? body.oe_document_id
+        : null,
+    oePatientPid:
+      typeof body.oe_patient_pid === 'number' && Number.isFinite(body.oe_patient_pid) && body.oe_patient_pid > 0
+        ? body.oe_patient_pid
+        : null,
     mimeType: typeof body.mime_type === 'string' ? body.mime_type : file.type,
     fileSize: typeof body.file_size === 'number' ? body.file_size : file.size,
     reUpload: body.re_upload === true,

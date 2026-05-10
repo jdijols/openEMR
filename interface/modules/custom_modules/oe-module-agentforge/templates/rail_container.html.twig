@@ -374,6 +374,45 @@
             }
         }
 
+        /**
+         * Navigate the chart shell's main content area to a specific OpenEMR
+         * document — same destination as a clinician double-clicking the file
+         * inside the Documents tab. Mirrors `navigateEncounterInChrome` /
+         * `navigateVisitHistoryInChrome` but targets the `pat` tab (Documents
+         * lives under the Patient panel) and uses the canonical
+         * `/controller.php?document&view&...` deep-link.
+         */
+        function navigateDocumentInChrome(documentId, patientPid) {
+            var topWin = window.top;
+            var root = baseWebRoot();
+            // ORDER MATTERS — Controller.act() (controllers/Controller.class.php)
+            // is positional: the first two keys in $_GET become controller +
+            // action, then the remaining keys are passed to the action method
+            // via array_values() in their URL order. C_Document::view_action's
+            // signature is ($patient_id, $doc_id), so patient_id MUST appear
+            // before document_id in the URL or the IDOR check compares the
+            // wrong values and dies "Not authorized to view requested file".
+            var url = root + '/controller.php?document&view';
+            if (patientPid !== null && patientPid !== undefined && String(patientPid) !== '') {
+                url += '&patient_id=' + encodeURIComponent(String(patientPid));
+            }
+            url += '&document_id=' + encodeURIComponent(String(documentId));
+            if (typeof topWin.navigateTab === 'function') {
+                topWin.navigateTab(url, 'pat', function () {
+                    if (typeof topWin.activateTabByName === 'function') {
+                        topWin.activateTabByName('pat', true);
+                    }
+                });
+                return;
+            }
+            try {
+                if (topWin.RTop && topWin.RTop.location) {
+                    topWin.RTop.location = url;
+                }
+            } catch (ignored) {
+            }
+        }
+
         /** URLs align with Dashboard card links in demographics.php and patient menu (standard.json). */
         function urlForChartSection(section, pidStr) {
             var root = baseWebRoot();
@@ -927,6 +966,30 @@
                 // "enc" tab). Prefer the host's own helper so any future
                 // tab-routing changes there carry into the copilot too.
                 navigateVisitHistoryInChrome();
+                return;
+            }
+
+            if (hint.kind === 'document') {
+                // Open a specific OpenEMR document in the patient panel —
+                // equivalent to a clinician double-clicking the file inside
+                // the Documents tab. Used by the post-extraction "View in
+                // documents" link in the CUI.
+                var rawDoc = hint.params && hint.params.document_id;
+                var docId =
+                    typeof rawDoc === 'number'
+                        ? rawDoc
+                        : typeof rawDoc === 'string'
+                            ? parseInt(rawDoc, 10)
+                            : NaN;
+                if (!(docId > 0)) {
+                    return;
+                }
+                var rawPid = hint.params && hint.params.patient_pid;
+                var pidForNav =
+                    typeof rawPid === 'number' || typeof rawPid === 'string'
+                        ? String(rawPid)
+                        : '';
+                navigateDocumentInChrome(docId, pidForNav);
                 return;
             }
 

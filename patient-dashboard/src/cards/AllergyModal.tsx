@@ -26,6 +26,7 @@ import {
   createProposal,
   getProposal,
   patchProposal,
+  rejectProposal,
   type AllergyAction,
   type AllergyPayload,
   type AllergySeverity,
@@ -181,8 +182,15 @@ function AllergyModalInner({
   const [status, setStatus] = useState<ProposalStatus>('pending')
   const [bootError, setBootError] = useState<string | null>(null)
   const [confirmInFlight, setConfirmInFlight] = useState<boolean>(false)
+  const [rejectInFlight, setRejectInFlight] = useState<boolean>(false)
   const [confirmError, setConfirmError] = useState<string | null>(null)
   const [highlightField, setHighlightField] = useState<FieldKey | null>(null)
+  // Phase 3 — Reject is visible only when the modal is bound to a real agent
+  // proposal (`proposalId` prop set). Manual `+` and click-to-edit start
+  // with no proposal on the server (the proposal is created lazily on
+  // Confirm), so there's nothing to reject — closing the modal via X /
+  // backdrop is the correct dismiss path for those modes.
+  const isAgentDriven = proposalId !== undefined
   // G2-Final — when the modal opens against an update proposal (click-to-edit
   // path), capture the initial values once. Save uses this to detect which
   // field changed and route to update_reaction vs update_severity.
@@ -555,7 +563,48 @@ function AllergyModalInner({
     }
   }
 
+  // ------------- Reject --------------
+  // Phase 3 — explicit Reject button ends the proposal server-side and tells
+  // the CUI's above-composer affordance to dismiss. Distinct from X-close
+  // (snooze), which leaves the proposal `pending` so the affordance stays
+  // in the queue. Only reachable when an agent proposal is bound — the
+  // disabled matrix hides the button in manual + and click-to-edit modes
+  // because there is no server-side row to reject.
+  const handleReject = async (): Promise<void> => {
+    if (!session || !isAgentDriven || activeProposalId === null) return
+    setRejectInFlight(true)
+    setConfirmError(null)
+    try {
+      const result = await rejectProposal(session, activeProposalId, patientUuid)
+      if (!result.ok) {
+        setConfirmError(result.reason ?? 'Reject failed.')
+        return
+      }
+      // Tell the CUI: the proposal it's tracking is resolved (rejected).
+      // The affordance hides; the chat thread stamps a "✗ Rejected" receipt.
+      broadcast({
+        type: 'proposal:resolved',
+        proposal_id: activeProposalId,
+        outcome: 'rejected',
+      })
+      // Clear local timers, mirror the success-close path.
+      for (const timer of patchTimers.current.values()) clearTimeout(timer)
+      patchTimers.current.clear()
+      if (highlightTimer.current) clearTimeout(highlightTimer.current)
+      onCloseRef.current()
+    } catch (e) {
+      setConfirmError(e instanceof Error ? e.message : 'Reject failed.')
+    } finally {
+      setRejectInFlight(false)
+    }
+  }
+
   // ------------- Close --------------
+  // X-close / backdrop click = SNOOZE. Leaves the proposal `pending` on the
+  // server so the CUI affordance stays in the queue and the physician can
+  // re-open the modal later via the affordance body. The previous Cancel
+  // button collapsed into this gesture in Phase 3 — see plan doc for the
+  // X-as-universal-close rationale.
   const handleClose = (): void => {
     if (activeProposalId) {
       broadcast({ type: 'proposal:modal_closed', proposal_id: activeProposalId })
@@ -659,21 +708,25 @@ function AllergyModalInner({
         </div>
 
         <footer className="flex items-center justify-end gap-2 border-t border-af-gray-100 px-5 py-3">
-          <button
-            type="button"
-            onClick={handleClose}
-            className="rounded-af-control px-3 py-1.5 text-sm text-af-text-subtle hover:bg-af-gray-100"
-          >
-            Cancel
-          </button>
+          {isAgentDriven ? (
+            <button
+              type="button"
+              data-testid="allergy-reject"
+              disabled={rejectInFlight || confirmInFlight || !session}
+              onClick={() => void handleReject()}
+              className="rounded-af-control border border-af-danger bg-af-danger-50 px-3 py-1.5 text-sm font-medium text-af-danger-700 hover:bg-af-danger-50/80 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {rejectInFlight ? 'Rejecting…' : 'Reject'}
+            </button>
+          ) : null}
           <button
             type="button"
             data-testid="allergy-save"
-            disabled={!canSave}
+            disabled={!canSave || rejectInFlight}
             onClick={() => void handleSave()}
-            className="rounded-af-control bg-af-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-af-primary-600 disabled:cursor-not-allowed disabled:bg-af-gray-300"
+            className="rounded-af-control border border-af-success bg-af-success-50 px-3 py-1.5 text-sm font-medium text-af-success-700 hover:bg-af-success-50/80 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {confirmInFlight ? 'Saving…' : 'Save'}
+            {confirmInFlight ? 'Confirming…' : 'Confirm'}
           </button>
         </footer>
       </div>

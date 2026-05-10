@@ -27,6 +27,7 @@ final class AllergyWriteAction
         string $patientUuidCanonical,
         string $proposalId,
         AllergyWritePayload $payload,
+        ?string $sourceDocrefUuid = null,
     ): ConfirmedWriteOutcome {
         if ($this->ledger->hasSuccessfulCompletion($proposalId)) {
             throw new DuplicateProposalExecutionException($proposalId);
@@ -61,7 +62,7 @@ final class AllergyWriteAction
         };
 
         if ($outcome->isAccepted()) {
-            $this->ledger->markSuccessful($proposalId, self::WRITE_TARGET);
+            $this->ledger->markSuccessful($proposalId, self::WRITE_TARGET, $sourceDocrefUuid);
         }
 
         return $outcome;

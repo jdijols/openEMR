@@ -56,7 +56,44 @@ const ENCOUNTER_REQUIRED_TARGETS: ReadonlySet<WriteTarget> = new Set([
   'clinical_note_delete',
 ]);
 
-/** Build `{ session_token, patient_uuid, proposal_id, encounter_id?, payload }` for oe-module-agentforge writes. */
+/**
+ * Lift any leading-underscore metadata keys (e.g. `_source_docref_uuid`)
+ * out of the proposal's inner business payload up to top-level body
+ * fields. Lets the agent stash provenance metadata at propose time
+ * without polluting the strict allowlists that PHP-side payload parsers
+ * apply to the inner `payload` object.
+ *
+ * UI-only keys (`preview` — Phase 2's persisted affordance string) are
+ * dropped entirely: they belong in `pending_proposals.payload` so the
+ * dashboard, the chat-cache replay, and the affordance can read a
+ * canonical preview, but PHP write handlers neither need nor accept
+ * them. Adding `preview` to the strict allowlists in every per-target
+ * PHP payload parser would be churn for a field PHP never reads, so the
+ * apply step strips it here instead.
+ */
+function liftMetadataKeys(payload: Record<string, unknown>): {
+  cleanedPayload: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+} {
+  const cleanedPayload: Record<string, unknown> = {};
+  const metadata: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(payload)) {
+    if (k === 'preview') {
+      // UI-only — never sent to PHP, never lifted to top-level body.
+      continue;
+    }
+    if (k.startsWith('_') && k !== '_') {
+      // Strip the leading underscore so the body field reads naturally
+      // on the PHP side (`source_docref_uuid` rather than `_source_docref_uuid`).
+      metadata[k.slice(1)] = v;
+    } else {
+      cleanedPayload[k] = v;
+    }
+  }
+  return { cleanedPayload, metadata };
+}
+
+/** Build `{ session_token, patient_uuid, proposal_id, encounter_id?, payload, ...metadata }` for oe-module-agentforge writes. */
 export function buildOpenEmrWriteBody(
   row: {
     readonly proposalId: string;
@@ -67,6 +104,8 @@ export function buildOpenEmrWriteBody(
   },
   session_token: string,
 ): Record<string, unknown> {
+  const { cleanedPayload, metadata } = liftMetadataKeys(row.payload);
+
   if (ENCOUNTER_REQUIRED_TARGETS.has(row.writeTarget)) {
     const eid = row.encounterId;
     if (eid === null || eid <= 0) {
@@ -78,7 +117,8 @@ export function buildOpenEmrWriteBody(
       patient_uuid: row.patientUuid.toLowerCase(),
       proposal_id: row.proposalId,
       encounter_id: eid,
-      payload: row.payload,
+      payload: cleanedPayload,
+      ...metadata,
     };
   }
 
@@ -86,7 +126,8 @@ export function buildOpenEmrWriteBody(
     session_token,
     patient_uuid: row.patientUuid.toLowerCase(),
     proposal_id: row.proposalId,
-    payload: row.payload,
+    payload: cleanedPayload,
+    ...metadata,
   };
 }
 
@@ -129,6 +170,17 @@ export async function confirmPendingProposal(
 
   if (rowRaw.status !== 'pending') {
     return { ok: false, error: 'not_pending' };
+  }
+
+  // Phase 4 — bundle fan-out. `intake_bundle` (and any future bundle targets)
+  // hold an N-section payload; the apply step iterates the sections and
+  // POSTs each non-rejected leaf to its own per-target write endpoint with
+  // a SYNTHETIC proposal_id (`${parentBundleId}::${section_id}[::${item_id}]`)
+  // so the PHP idempotency ledger keeps each leaf uniquely de-duplicable —
+  // re-applying the bundle is a no-op per leaf, never a partial silent
+  // re-write.
+  if (rowRaw.writeTarget === 'intake_bundle' || rowRaw.payload['kind'] === 'bundle') {
+    return await applyBundleFanOut(env, pool, rowRaw, sessionToken, correlationId);
   }
 
   const candidateTarget = rowRaw.writeTarget;
@@ -197,6 +249,215 @@ export async function confirmPendingProposal(
     accepted: parsedAccept,
     ...(reason !== undefined ? { reason } : {}),
     ...(parsedAccept === false ? { detail: raw } : {}),
+  };
+}
+
+/**
+ * Phase 4 — outcome of a single leaf write inside a bundle fan-out. Returned
+ * to the caller (and broadcast over SSE) so the dashboard's
+ * `BundleReviewModal` can render per-row "✓ wrote N of M" badges.
+ */
+type BundleSectionOutcome = Readonly<{
+  section_id: string;
+  item_id: string | null;
+  write_target: string;
+  ok: boolean;
+  reason?: string;
+}>;
+
+type BundleLeaf = Readonly<{
+  section_id: string;
+  item_id: string | null;
+  write_target: string;
+  encounter_id: number | null;
+  payload: Record<string, unknown>;
+}>;
+
+/** Walk a bundle payload and return every non-rejected leaf, in section/item order. */
+function collectBundleLeaves(payload: Record<string, unknown>): BundleLeaf[] {
+  const leaves: BundleLeaf[] = [];
+  const sections = Array.isArray(payload['sections']) ? (payload['sections'] as ReadonlyArray<unknown>) : [];
+  for (const s of sections) {
+    if (s === null || typeof s !== 'object') {
+      continue;
+    }
+    const section = s as Record<string, unknown>;
+    const sectionId = typeof section['section_id'] === 'string' ? (section['section_id'] as string) : null;
+    if (sectionId === null || sectionId === '' || sectionId.includes('::')) {
+      // Slug-style only — a section_id with `::` would collide with the
+      // synthetic proposal_id separator and produce ambiguous ledger rows.
+      continue;
+    }
+    const items = Array.isArray(section['items']) ? (section['items'] as ReadonlyArray<unknown>) : null;
+    if (items !== null) {
+      for (const it of items) {
+        if (it === null || typeof it !== 'object') {
+          continue;
+        }
+        const item = it as Record<string, unknown>;
+        if (item['rejected'] === true) {
+          continue;
+        }
+        const itemId = typeof item['item_id'] === 'string' ? (item['item_id'] as string) : null;
+        const writeTarget = typeof item['write_target'] === 'string' ? (item['write_target'] as string) : null;
+        const itemPayload =
+          item['payload'] !== null && typeof item['payload'] === 'object' && !Array.isArray(item['payload']) ?
+            (item['payload'] as Record<string, unknown>)
+          : null;
+        if (itemId === null || itemId === '' || itemId.includes('::') || writeTarget === null || itemPayload === null) {
+          continue;
+        }
+        const eid = item['encounter_id'];
+        leaves.push({
+          section_id: sectionId,
+          item_id: itemId,
+          write_target: writeTarget,
+          encounter_id: typeof eid === 'number' && Number.isFinite(eid) && eid > 0 ? eid : null,
+          payload: itemPayload,
+        });
+      }
+      continue;
+    }
+    if (section['rejected'] === true) {
+      continue;
+    }
+    const writeTarget = typeof section['write_target'] === 'string' ? (section['write_target'] as string) : null;
+    const sectionPayload =
+      section['payload'] !== null && typeof section['payload'] === 'object' && !Array.isArray(section['payload']) ?
+        (section['payload'] as Record<string, unknown>)
+      : null;
+    if (writeTarget === null || sectionPayload === null) {
+      continue;
+    }
+    const eid = section['encounter_id'];
+    leaves.push({
+      section_id: sectionId,
+      item_id: null,
+      write_target: writeTarget,
+      encounter_id: typeof eid === 'number' && Number.isFinite(eid) && eid > 0 ? eid : null,
+      payload: sectionPayload,
+    });
+  }
+  return leaves;
+}
+
+/**
+ * Phase 4 — server-side fan-out for `kind: 'bundle'` proposals.
+ *
+ * Walks every non-rejected leaf, mints a synthetic `proposal_id` of the
+ * form `${parentBundleId}::${section_id}[::${item_id}]`, and POSTs each
+ * leaf to its per-target PHP write endpoint. The synthetic IDs are stable
+ * across re-applies (deterministic from the bundle id + slug IDs) so the
+ * PHP `agentforge_completed_write_proposal` ledger short-circuits any
+ * leaf that already wrote on a prior attempt — exactly the per-leaf
+ * idempotency the W1 single-write path gets for free.
+ *
+ * Marks the bundle row `confirmed` regardless of partial leaf failures —
+ * the per-leaf ledger has the truth of which writes landed, and the
+ * caller surfaces the per-leaf outcome so the dashboard can render
+ * "8 wrote, 2 failed" instead of a single binary verdict.
+ */
+async function applyBundleFanOut(
+  env: Env,
+  pool: Pool,
+  row: { proposalId: string; patientUuid: string; payload: Record<string, unknown> },
+  sessionToken: string,
+  correlationId: string,
+): Promise<ConfirmOutcome> {
+  const leaves = collectBundleLeaves(row.payload);
+  const outcomes: BundleSectionOutcome[] = [];
+
+  for (const leaf of leaves) {
+    if (!isWriteTarget(leaf.write_target)) {
+      outcomes.push({
+        section_id: leaf.section_id,
+        item_id: leaf.item_id,
+        write_target: leaf.write_target,
+        ok: false,
+        reason: 'unsupported_target',
+      });
+      continue;
+    }
+
+    const syntheticId =
+      leaf.item_id === null ?
+        `${row.proposalId}::${leaf.section_id}`
+      : `${row.proposalId}::${leaf.section_id}::${leaf.item_id}`;
+
+    let body: Record<string, unknown>;
+    try {
+      body = buildOpenEmrWriteBody(
+        {
+          proposalId: syntheticId,
+          patientUuid: row.patientUuid,
+          encounterId: leaf.encounter_id,
+          writeTarget: leaf.write_target,
+          payload: leaf.payload,
+        },
+        sessionToken,
+      );
+    } catch (e) {
+      const reason =
+        typeof e === 'object' && e !== null && (e as { code?: unknown }).code === 'missing_encounter_id' ?
+          'missing_encounter_id'
+        : 'invalid_payload';
+      outcomes.push({
+        section_id: leaf.section_id,
+        item_id: leaf.item_id,
+        write_target: leaf.write_target,
+        ok: false,
+        reason,
+      });
+      continue;
+    }
+
+    const ctx: OpenEmrClientContext = { sessionToken, correlationId };
+    try {
+      const raw = await postModuleJson(env, RELATIVE_PATH[leaf.write_target], ctx, body);
+      const accepted =
+        raw !== null &&
+        typeof raw === 'object' &&
+        (raw as Record<string, unknown>)['accepted'] === true;
+      const reason =
+        raw !== null && typeof raw === 'object' && typeof (raw as { reason?: unknown }).reason === 'string' ?
+          ((raw as { reason: string }).reason)
+        : undefined;
+      outcomes.push({
+        section_id: leaf.section_id,
+        item_id: leaf.item_id,
+        write_target: leaf.write_target,
+        ok: accepted,
+        ...(accepted === false && reason !== undefined ? { reason } : {}),
+      });
+    } catch (e) {
+      const code = e instanceof OpenEmrCallError ? e : undefined;
+      outcomes.push({
+        section_id: leaf.section_id,
+        item_id: leaf.item_id,
+        write_target: leaf.write_target,
+        ok: false,
+        reason: code?.status !== undefined ? `http_${code.status}` : 'openemr_error',
+      });
+    }
+  }
+
+  await markProposalFinal(pool, row.proposalId, 'confirmed');
+  // The bundle row is `confirmed` (the user reached a terminal decision)
+  // even when individual leaves failed. The per-leaf detail rides on the
+  // SSE event so any open BundleReviewModal renders accurate per-section
+  // outcome badges.
+  broadcast(row.proposalId, 'status_changed', {
+    proposal_id: row.proposalId,
+    status: 'confirmed',
+    sections: outcomes,
+  });
+  closeProposal(row.proposalId);
+
+  const anyOk = outcomes.some((o) => o.ok);
+  return {
+    ok: true,
+    accepted: anyOk,
+    detail: { sections: outcomes },
   };
 }
 

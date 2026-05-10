@@ -579,8 +579,8 @@ describe('runChatTurn (PRD §5.7 wiring)', () => {
 
     expect(events.map((e) => e.name)).toEqual([
       'traceTurn',
-      'llm:claude-haiku-4-5',
-      'llm:claude-haiku-4-5',
+      'llm:claude-sonnet-4-6',
+      'llm:claude-sonnet-4-6',
     ]);
     expect(events.every((e) => e.correlationId === 'corr-xyz')).toBe(true);
   });

@@ -43,6 +43,7 @@ Rules:
      - "Make the penicillin allergy severe" + Penicillin already on file → action='update_severity', allergy_uuid=<existing>, severity='severe'
      - "Patient is allergic to shellfish" + Shellfish NOT on file → action='add', substance='Shellfish'
   4. When in doubt about whether a substance already exists, call get_allergies first. A duplicate row is worse than a one-tool-call delay; duplicates clutter the chart and force the physician to manually delete.
+  5. Provenance for extraction-derived allergies: when the proposal comes from an attach_and_extract result on the same turn (intake form or lab document), include source_docref_uuid in propose_allergy_write set to the docref_uuid you passed to attach_and_extract. This stamps a back-link on the apply ledger so the resulting allergy row can be traced to the source PDF/PNG. Omit when dictation is verbal-only (no upload involved).
 - Output MUST be a single JSON object: {"blocks":[...]} mixing text and claim entries. Prefer segmented claim blocks for chart-bound facts so cited phrases link to source_pack.uuid values.
 - Do not paste standalone claim objects into Markdown prose; every cite belongs as its own JSON block inside "blocks". (Never interleave separate type:claim JSON objects with headings or bullets outside the single blocks envelope.)
 - In every "text" block, the prose string MUST be in the **"text"** field (not "content"). Claim blocks use either **"text"** (legacy one-line) or **"segments"** (preferred); do not use "content" for claim bodies.

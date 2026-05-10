@@ -35,6 +35,11 @@ $patientUuid = isset($body['patient_uuid']) && is_string($body['patient_uuid']) 
 $proposalId = isset($body['proposal_id']) && is_string($body['proposal_id']) ? trim($body['proposal_id']) : '';
 $payloadRaw = $body['payload'] ?? null;
 $proposalIdRaw = isset($body['proposal_id']);
+// Provenance: when the api lifts a docref from the pending-proposal payload,
+// it arrives as a top-level body field (kept out of $payload so the
+// AllergyWritePayload allowlist parser stays clean). Empty string → null.
+$sourceDocrefUuid = isset($body['source_docref_uuid']) && is_string($body['source_docref_uuid']) ? trim($body['source_docref_uuid']) : '';
+$sourceDocrefUuid = $sourceDocrefUuid !== '' ? $sourceDocrefUuid : null;
 
 $correlationId = agentforge_incoming_correlation_id();
 
@@ -120,6 +125,7 @@ try {
         $canonicalPatientUuid,
         $proposalId,
         $payload,
+        $sourceDocrefUuid,
     );
 } catch (DuplicateProposalExecutionException) {
     agentforge_emit_json(400, ['error' => 'duplicate_proposal', 'correlation_id' => $correlationId]);

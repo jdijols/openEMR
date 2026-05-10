@@ -117,7 +117,13 @@ export async function runIntakeExtractor(
   const userPrompt = buildPromptForDocType(input.docType);
 
   const llmResponse = await deps.client.messages.create({
-    model: 'claude-haiku-4-5',
+    // Phase 4 polish — Sonnet 4.6 over Haiku for intake extraction. The QA
+    // harness exercises 8 forms with diverse layouts (free-text fields,
+    // table-shaped meds lists, handwritten amendments); Sonnet's accuracy
+    // on under-specified layouts is meaningfully higher and the per-form
+    // cost differential is negligible at our throughput. See
+    // select_model.ts for the per-worker registry.
+    model: 'claude-sonnet-4-6',
     max_tokens: 4096,
     messages: [
       {

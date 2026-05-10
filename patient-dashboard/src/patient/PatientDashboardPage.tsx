@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { PatientHeader } from './PatientHeader'
@@ -14,6 +14,7 @@ import { HealthConcernsCard } from '../cards/HealthConcernsCard'
 import { ImmunizationsCard } from '../cards/ImmunizationsCard'
 import { AppointmentsCard } from '../cards/AppointmentsCard'
 import { LabsCard } from '../cards/LabsCard'
+import { BundleReviewModal } from '../cards/BundleReviewModal'
 import { useFhirCredential } from '../auth/AuthProvider'
 import { subscribe as subscribeProposalEvents } from '../proposals/proposalBus'
 
@@ -21,6 +22,19 @@ export function PatientDashboardPage() {
   const { id } = useParams<{ id: string }>()
   const credential = useFhirCredential()
   const queryClient = useQueryClient()
+
+  // Phase 4 — page-level listener for bundle proposals (intake forms today;
+  // future bundle producers e.g. lab ingestion would land here too). Lives
+  // at the page level rather than inside a per-target card because a
+  // bundle spans multiple cards and isn't owned by any one of them.
+  const [bundleProposalId, setBundleProposalId] = useState<string | null>(null)
+  useEffect(() => {
+    return subscribeProposalEvents((event) => {
+      if (event.type === 'proposal:open_modal' && event.write_target === 'intake_bundle') {
+        setBundleProposalId(event.proposal_id)
+      }
+    })
+  }, [])
 
   /**
    * G2-Final — subscribe to `chart:updated` broadcasts from the CUI iframe.
@@ -112,6 +126,14 @@ export function PatientDashboardPage() {
           </div>
         </section>
       </main>
+      {bundleProposalId !== null ? (
+        <BundleReviewModal
+          open
+          patientUuid={id}
+          proposalId={bundleProposalId}
+          onClose={() => setBundleProposalId(null)}
+        />
+      ) : null}
     </div>
   )
 }

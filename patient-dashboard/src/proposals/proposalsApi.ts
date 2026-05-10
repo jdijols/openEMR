@@ -138,3 +138,68 @@ export async function confirmProposal(
   }
   return (await resp.json()) as ConfirmResult
 }
+
+/**
+ * Phase 4 — toggle a single section/item leaf inside a bundle proposal.
+ *
+ * Calls `POST /proposals/:id/items/{reject,restore}`, which updates the
+ * indexed leaf via `jsonb_set` server-side so concurrent agent
+ * `update_proposal` PATCHes don't race on the array. Returns the updated
+ * payload so the BundleReviewModal can re-render against fresh state
+ * without an extra GET.
+ */
+export async function setSectionRejected(
+  session: AgentforgeSession,
+  proposalId: string,
+  patientUuid: string,
+  sectionId: string,
+  itemId: string | null,
+  rejected: boolean,
+  fetchImpl: FetchImpl = fetch,
+): Promise<{ ok: boolean; reason?: string; payload?: Record<string, unknown> }> {
+  const path = rejected ? '/items/reject' : '/items/restore'
+  const resp = await fetchImpl(endpoint(session, `/${proposalId}${path}`), {
+    method: 'POST',
+    headers: authHeaders(session),
+    body: JSON.stringify({
+      patient_uuid: patientUuid,
+      section_id: sectionId,
+      ...(itemId !== null ? { item_id: itemId } : {}),
+    }),
+  })
+  if (!resp.ok) {
+    return { ok: false, reason: `http_${resp.status}` }
+  }
+  const json = (await resp.json()) as { payload?: Record<string, unknown> }
+  return { ok: true, payload: json.payload }
+}
+
+/**
+ * Phase 3 — explicit Reject from the AllergyModal.
+ *
+ * Symmetric to `confirmProposal`: marks the proposal `rejected` server-side
+ * (no PHP write fan-out) and emits a `status_changed: rejected` SSE event to
+ * any open subscriber. The CUI's above-composer affordance dismisses on
+ * `proposal:resolved` (broadcast by the modal after a successful Reject).
+ *
+ * Returns `{ ok: false, ... }` on transport failure so the caller can flip
+ * the modal back to a recoverable error state without throwing — same
+ * shape as `confirmProposal`. The pending_proposals row stays `pending`
+ * until the server acknowledges the transition, so a retry is safe.
+ */
+export async function rejectProposal(
+  session: AgentforgeSession,
+  proposalId: string,
+  patientUuid: string,
+  fetchImpl: FetchImpl = fetch,
+): Promise<{ ok: boolean; reason?: string }> {
+  const resp = await fetchImpl(endpoint(session, `/${proposalId}/reject`), {
+    method: 'POST',
+    headers: authHeaders(session),
+    body: JSON.stringify({ patient_uuid: patientUuid }),
+  })
+  if (!resp.ok) {
+    return { ok: false, reason: `http_${resp.status}` }
+  }
+  return { ok: true }
+}

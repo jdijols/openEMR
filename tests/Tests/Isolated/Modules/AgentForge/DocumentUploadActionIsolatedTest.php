@@ -29,6 +29,8 @@ use OpenEMR\Modules\AgentForge\Documents\DocumentUploadAction;
 use OpenEMR\Modules\AgentForge\Documents\DocumentUploadPayload;
 use OpenEMR\Modules\AgentForge\Documents\DocumentUploadPort;
 use OpenEMR\Modules\AgentForge\Documents\DocumentUploadResult;
+use OpenEMR\Modules\AgentForge\Documents\NoopOpenEmrDocumentsRegistrar;
+use OpenEMR\Modules\AgentForge\Documents\OpenEmrDocumentsRegistrarPort;
 use PHPUnit\Framework\TestCase;
 
 $documentsDir = __DIR__ . '/../../../../../interface/modules/custom_modules/oe-module-agentforge/src/Documents/';
@@ -37,6 +39,8 @@ require_once $documentsDir . 'DocumentUploadPort.php';
 require_once $documentsDir . 'DocumentUploadResult.php';
 require_once $documentsDir . 'DocumentAuditSink.php';
 require_once $documentsDir . 'CrossPatientBindingException.php';
+require_once $documentsDir . 'OpenEmrDocumentsRegistrarPort.php';
+require_once $documentsDir . 'NoopOpenEmrDocumentsRegistrar.php';
 require_once $documentsDir . 'DocumentUploadAction.php';
 
 final class DocumentUploadActionIsolatedTest extends TestCase
@@ -60,7 +64,7 @@ final class DocumentUploadActionIsolatedTest extends TestCase
 
         $port = $this->getMockBuilder(DocumentUploadPort::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['findExistingDocRef', 'mintAndPersistDocument'])
+            ->onlyMethods(['findExistingDocRef', 'mintAndPersistDocument', 'recordOpenEmrMapping', 'findOpenEmrDocumentId'])
             ->getMock();
 
         $port->expects(self::once())
@@ -74,7 +78,7 @@ final class DocumentUploadActionIsolatedTest extends TestCase
             ->willReturn('docref-uuid-aaaa');
 
         $audit = self::makeRecordingAudit();
-        $action = new DocumentUploadAction($port, $audit);
+        $action = new DocumentUploadAction($port, $audit, new NoopOpenEmrDocumentsRegistrar());
 
         $result = $action->execute(
             self::AUTH_USER,
@@ -104,7 +108,7 @@ final class DocumentUploadActionIsolatedTest extends TestCase
 
         $port = $this->getMockBuilder(DocumentUploadPort::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['findExistingDocRef', 'mintAndPersistDocument'])
+            ->onlyMethods(['findExistingDocRef', 'mintAndPersistDocument', 'recordOpenEmrMapping', 'findOpenEmrDocumentId'])
             ->getMock();
 
         $port->expects(self::once())
@@ -115,7 +119,7 @@ final class DocumentUploadActionIsolatedTest extends TestCase
         $port->expects(self::never())->method('mintAndPersistDocument');
 
         $audit = self::makeRecordingAudit();
-        $action = new DocumentUploadAction($port, $audit);
+        $action = new DocumentUploadAction($port, $audit, new NoopOpenEmrDocumentsRegistrar());
 
         $result = $action->execute(
             self::AUTH_USER,
@@ -144,13 +148,13 @@ final class DocumentUploadActionIsolatedTest extends TestCase
 
         $port = $this->getMockBuilder(DocumentUploadPort::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['findExistingDocRef', 'mintAndPersistDocument'])
+            ->onlyMethods(['findExistingDocRef', 'mintAndPersistDocument', 'recordOpenEmrMapping', 'findOpenEmrDocumentId'])
             ->getMock();
         $port->expects(self::never())->method('findExistingDocRef');
         $port->expects(self::never())->method('mintAndPersistDocument');
 
         $audit = self::makeRecordingAudit();
-        $action = new DocumentUploadAction($port, $audit);
+        $action = new DocumentUploadAction($port, $audit, new NoopOpenEmrDocumentsRegistrar());
 
         try {
             $action->execute(
@@ -187,13 +191,13 @@ final class DocumentUploadActionIsolatedTest extends TestCase
 
         $port = $this->getMockBuilder(DocumentUploadPort::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['findExistingDocRef', 'mintAndPersistDocument'])
+            ->onlyMethods(['findExistingDocRef', 'mintAndPersistDocument', 'recordOpenEmrMapping', 'findOpenEmrDocumentId'])
             ->getMock();
         $port->method('findExistingDocRef')->willReturn(null);
         $port->method('mintAndPersistDocument')->willReturn('docref-uuid-bbbb');
 
         $audit = self::makeRecordingAudit();
-        $action = new DocumentUploadAction($port, $audit);
+        $action = new DocumentUploadAction($port, $audit, new NoopOpenEmrDocumentsRegistrar());
 
         $action->execute(
             self::AUTH_USER,
@@ -208,12 +212,14 @@ final class DocumentUploadActionIsolatedTest extends TestCase
         self::assertCount(1, $audit->records);
         $auditPayload = $audit->records[0]['payload'];
         self::assertSame(
-            ['docref_uuid', 'doc_type', 'mime', 'size_bytes', 'sha256_prefix', 're_upload'],
+            ['docref_uuid', 'doc_type', 'mime', 'size_bytes', 'sha256_prefix', 're_upload', 'oe_document_id'],
             array_keys($auditPayload),
             'audit payload must contain ONLY the approved PHI-safe keys',
         );
         // The full sha256 is 64 hex chars; the prefix shipped is 8.
         self::assertSame(8, strlen((string) $auditPayload['sha256_prefix']));
+        // Noop registrar in the test → oe_document_id is null on the audit row.
+        self::assertNull($auditPayload['oe_document_id']);
         // No patient name, MRN, or DOB anywhere in the payload.
         $serialized = json_encode($auditPayload, JSON_THROW_ON_ERROR);
         self::assertStringNotContainsString('Margaret', $serialized);

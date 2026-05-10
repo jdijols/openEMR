@@ -57,6 +57,20 @@ export type ProposalEvent =
       proposal_id: string
       outcome: 'confirmed' | 'rejected'
     }
+  | {
+      // Phase 3 — CUI → dashboard: snapshot of the FIFO queue head. The
+      // dashboard's per-target cards (AllergiesCard today; medication /
+      // demographics in Phase 5) read this to disable their manual `+`
+      // affordance while an agent proposal of the same target is queued —
+      // otherwise a manual add could open in parallel with the agent's
+      // pending review modal and the physician sees two open surfaces for
+      // the same intent. `head_id === null` (count 0) means the queue is
+      // empty and `+` buttons re-enable.
+      type: 'proposal:queue_state'
+      head_id: string | null
+      head_target: string | null
+      count: number
+    }
 
 function getChannel(): BroadcastChannel | null {
   // BroadcastChannel is missing in some test/jsdom configurations and on very
@@ -123,6 +137,12 @@ function isProposalEvent(value: unknown): value is ProposalEvent {
       return (
         typeof obj.proposal_id === 'string' &&
         (obj.outcome === 'confirmed' || obj.outcome === 'rejected')
+      )
+    case 'proposal:queue_state':
+      return (
+        (obj.head_id === null || typeof obj.head_id === 'string') &&
+        (obj.head_target === null || typeof obj.head_target === 'string') &&
+        typeof obj.count === 'number'
       )
     default:
       return false

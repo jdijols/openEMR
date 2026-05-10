@@ -3,7 +3,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Composer } from './Composer.js';
 import { ErrorBanner } from './ErrorBanner.js';
 import { ExtractionAcknowledgment } from './ExtractionAcknowledgment.js';
-import { IntakeProposalCard, type IntakeProposalData } from './IntakeProposalCard.js';
 import { StatusLabel } from './StatusLabel.js';
 import { CitationLink } from '../citations/CitationLink.js';
 
@@ -99,41 +98,11 @@ describe('§9 G2-MVP-68 — ExtractionAcknowledgment', () => {
   });
 });
 
-describe('§9 G2-MVP-69 — IntakeProposalCard', () => {
-  const data: IntakeProposalData = {
-    demographics: { name: 'Chen, Margaret L.', dob: '1967-08-14', sex: 'female', contact_phone: '(510) 555-0148' },
-    chief_concern: { text: 'Tired during the day', onset: '~3 weeks' },
-    current_medications: [
-      { name: 'Lisinopril', dose: '10 mg', frequency: 'PO daily' },
-      { name: 'Metformin', dose: '500 mg', frequency: 'PO BID' },
-    ],
-    allergies: [{ substance: 'Penicillin', reaction: 'Hives', severity: 'moderate' }],
-    family_history: [{ relation: 'Mother', condition: 'Type 2 diabetes' }],
-  };
-
-  it('renders all 5 sections from extraction', () => {
-    render(<IntakeProposalCard data={data} onConfirm={vi.fn()} onReject={vi.fn()} />);
-    expect(screen.getByTestId('intake-section-demographics')).toBeInTheDocument();
-    expect(screen.getByTestId('intake-section-chief-concern')).toBeInTheDocument();
-    expect(screen.getByTestId('intake-section-medications')).toBeInTheDocument();
-    expect(screen.getByTestId('intake-section-allergies')).toBeInTheDocument();
-    expect(screen.getByTestId('intake-section-family')).toBeInTheDocument();
-  });
-
-  it('Confirm fires intent dispatch', () => {
-    const onConfirm = vi.fn();
-    render(<IntakeProposalCard data={data} onConfirm={onConfirm} onReject={vi.fn()} />);
-    fireEvent.click(screen.getByTestId('intake-proposal-confirm'));
-    expect(onConfirm).toHaveBeenCalledOnce();
-  });
-
-  it('Reject discards', () => {
-    const onReject = vi.fn();
-    render(<IntakeProposalCard data={data} onConfirm={vi.fn()} onReject={onReject} />);
-    fireEvent.click(screen.getByTestId('intake-proposal-reject'));
-    expect(onReject).toHaveBeenCalledOnce();
-  });
-});
+// G2-MVP-69 IntakeProposalCard tests removed — Phase 4 replaced the
+// per-section bespoke card with a server-side bundle proposal that lands
+// in the affordance queue and opens BundleReviewModal on the dashboard.
+// Bundle behavior is tested via patient-dashboard's BundleReviewModal
+// suite + the API's bundle fan-out tests.
 
 describe('§9 G2-MVP-61 — Composer', () => {
   it('renders empty state with attach button + no file preview', () => {

@@ -7,18 +7,21 @@
  * is the authoritative number — see OBSERVABILITY.md §Q4 for that path.
  *
  * The values below are the V1 default-deployment rates:
- *   - `anthropic`     → claude-haiku-4-5 ($1 / $5 per Mtok input / output)
+ *   - `anthropic`     → claude-sonnet-4-6 ($3 / $15 per Mtok input / output)
  *   - `openai_azure`  → operator-supplied deployment id, no canonical model;
  *                       leave at a conservative GPT-4-class default until a
  *                       per-deployment table is added
  *   - `openai`        → same conservative default as openai_azure
  *
- * If the operator changes Anthropic's default model to a non-Haiku model
- * (Sonnet, Opus), update this table or move to a per-model lookup.
+ * If the operator changes Anthropic's default model (back to Haiku for
+ * cheaper bulk inference, or up to Opus for accuracy-critical workloads),
+ * update this table or move to a per-model lookup. Langfuse's per-model
+ * price database is the authoritative billing source — these rates only
+ * power the in-repo dev-tail estimate.
  */
 
 const RATES_USD_PER_MTOK: Partial<Record<string, { input: number; output: number }>> = {
-  anthropic: { input: 1.0, output: 5.0 },
+  anthropic: { input: 3.0, output: 15.0 },
   openai_azure: { input: 5.0, output: 15.0 },
   openai: { input: 5.0, output: 15.0 },
 };

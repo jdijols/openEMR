@@ -71,7 +71,7 @@ final class MedicationAddActionIsolatedTest extends TestCase
                 return isset($this->successful[$proposalId]);
             }
 
-            public function markSuccessful(string $proposalId, string $writeTarget): void
+            public function markSuccessful(string $proposalId, string $writeTarget, ?string $sourceDocrefUuid = null): void
             {
                 $this->marked = true;
                 $this->successful[$proposalId] = $writeTarget;
@@ -125,7 +125,7 @@ final class MedicationAddActionIsolatedTest extends TestCase
                 return isset($this->successful[$proposalId]);
             }
 
-            public function markSuccessful(string $proposalId, string $writeTarget): void
+            public function markSuccessful(string $proposalId, string $writeTarget, ?string $sourceDocrefUuid = null): void
             {
             }
         };

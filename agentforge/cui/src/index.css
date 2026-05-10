@@ -1153,6 +1153,60 @@ body {
   cursor: not-allowed;
 }
 
+/* ── Resolved proposal receipt (Phase 2) ───────────────────────────────
+ * One-line in-thread receipt that replaces the full proposal-card chrome
+ * once a proposal is confirmed/rejected. Pending proposals render nothing
+ * in the thread (the above-composer affordance owns the action surface);
+ * resolved proposals leave this single line behind so the conversation
+ * has a written trail of what landed.
+ *
+ * Soft success-bg / danger-bg fills mirror the section-pill palette used
+ * elsewhere in the proposal-card chrome — same family, lighter footprint. */
+.agentforge-msg__proposal-receipt {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--af-s1);
+  margin: var(--af-s2) 0;
+  padding: 4px var(--af-s2);
+  border-radius: var(--af-radius-pill);
+  background: var(--af-gray-100);
+  color: var(--af-text-muted);
+  font-size: var(--af-text-small);
+  line-height: 1.4;
+  max-width: 100%;
+}
+
+.agentforge-msg__proposal-receipt[data-phase="accepted"] {
+  background: var(--af-success-50);
+  color: var(--af-success-700);
+}
+
+.agentforge-msg__proposal-receipt[data-phase="declined"],
+.agentforge-msg__proposal-receipt[data-phase="openemr_denied"],
+.agentforge-msg__proposal-receipt[data-phase="delivery_failed"] {
+  background: var(--af-danger-50);
+  color: var(--af-danger-700);
+}
+
+.agentforge-msg__proposal-receipt-icon {
+  font-weight: 700;
+}
+
+.agentforge-msg__proposal-receipt-verb {
+  font-weight: 600;
+}
+
+.agentforge-msg__proposal-receipt-sep {
+  opacity: 0.5;
+}
+
+.agentforge-msg__proposal-receipt-preview {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
 /* ── Inline icons ─────────────────────────────────────────────────────
  * SVG sized inline (width/height attrs); this rule normalizes vertical
  * alignment so the icon sits on the type baseline next to its label
@@ -1185,12 +1239,15 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin: 0 0 var(--af-s2) 0;
+  /* Match the horizontal rhythm of the feed — same right margin the user's
+   * dictation/typed bubbles respect, so the counter pill and the card edge
+   * line up with sent-message right edges instead of running to the panel
+   * border. */
+  margin: 0 var(--af-s3) var(--af-s2) var(--af-s3);
 }
 
 .agentforge-cui__above-composer-counter {
   align-self: flex-end;
-  padding: 0 var(--af-s1);
   font-size: var(--af-text-micro);
   font-weight: 600;
   text-transform: uppercase;
@@ -1230,14 +1287,13 @@ body {
 
 /* Symmetric, equal-weight Confirm / Reject buttons for the rail.
  *
- * In-chat proposal cards lean asymmetric (filled-success Confirm vs
- * outlined Reject) because the in-chat card is bigger and the green
- * fill reads as "the agent is asking — pick one" within a wide thread.
- * In the rail, both buttons share one tight horizontal slot, so equal
- * weight (matched fill + matched border treatment, just different
- * accent colors) avoids pulling the eye toward Confirm and producing
- * accidental confirmations. The two buttons read as a single action
- * pair, not a primary-with-bailout pair. */
+ * Matched soft-pill treatment (light fill + accent-colored text + accent
+ * border) carrying their natural semantic palette: soft green for Confirm,
+ * soft red for Reject. Same shape, same height, same font weight, same
+ * border weight — only the color family differs, so neither button
+ * over-weights the other and physicians don't drift toward Confirm by
+ * visual pull. Echoes the existing section-pill treatment used elsewhere
+ * in the proposal-card chrome. */
 .agentforge-cui__above-composer .agentforge-msg__proposal-btn {
   padding: 6px var(--af-s3);
   font-size: var(--af-text-small);
@@ -1246,26 +1302,27 @@ body {
 }
 
 .agentforge-cui__above-composer .agentforge-msg__proposal-btn--primary {
-  background: var(--af-warning);
-  border-color: var(--af-warning-700);
-  color: #ffffff;
+  background: var(--af-success-50);
+  border-color: var(--af-success);
+  color: var(--af-success-700);
 }
 
 .agentforge-cui__above-composer .agentforge-msg__proposal-btn--primary:hover:not(:disabled) {
-  background: var(--af-warning-700);
-  border-color: var(--af-warning-700);
+  background: #d1fadf;
+  border-color: var(--af-success-600);
+  color: var(--af-success-700);
 }
 
 .agentforge-cui__above-composer .agentforge-msg__proposal-btn--secondary {
-  background: var(--af-surface);
-  border-color: var(--af-warning-700);
-  color: var(--af-warning-700);
+  background: var(--af-danger-50);
+  border-color: var(--af-danger);
+  color: var(--af-danger-700);
 }
 
 .agentforge-cui__above-composer .agentforge-msg__proposal-btn--secondary:hover:not(:disabled) {
-  background: var(--af-warning-50);
-  border-color: var(--af-warning-700);
-  color: var(--af-warning-700);
+  background: #fde7e7;
+  border-color: var(--af-danger-600);
+  color: var(--af-danger-700);
 }
 
 @keyframes agentforge-affordance-fade-in {

@@ -30,6 +30,7 @@ use OpenEMR\Modules\AgentForge\Documents\CrossPatientBindingException;
 use OpenEMR\Modules\AgentForge\Documents\DocumentUploadAction;
 use OpenEMR\Modules\AgentForge\Documents\DocumentUploadPayload;
 use OpenEMR\Modules\AgentForge\Documents\OpenEmrDocumentRepository;
+use OpenEMR\Modules\AgentForge\Documents\OpenEmrDocumentsRegistrarAdapter;
 
 $correlationId = agentforge_incoming_correlation_id();
 
@@ -57,6 +58,7 @@ if ($bytes === false || $bytes === '') {
 }
 
 $mimeType = (string) ($file['type'] ?? 'application/octet-stream');
+$originalFilename = isset($file['name']) && is_string($file['name']) ? trim((string) $file['name']) : '';
 [$payload, $payloadError] = DocumentUploadPayload::parse([
     'doc_type' => $docType,
     'mime_type' => $mimeType,
@@ -100,7 +102,8 @@ if (!AclMap::userPassesAgentForgeReadGate($ctx['auth_user'])) {
 $storageRoot = \dirname(__DIR__, 6) . '/sites/default/documents/agentforge_w2';
 $repository = new OpenEmrDocumentRepository($storageRoot);
 $audit = new AgentAuditDocumentSink();
-$action = new DocumentUploadAction($repository, $audit);
+$registrar = new OpenEmrDocumentsRegistrarAdapter();
+$action = new DocumentUploadAction($repository, $audit, $registrar);
 
 try {
     $result = $action->execute(
@@ -111,6 +114,7 @@ try {
         $patientUuid,
         $correlationId,
         $payload,
+        $originalFilename !== '' ? $originalFilename : null,
     );
 } catch (CrossPatientBindingException) {
     agentforge_emit_json(403, ['error' => 'active_chart_mismatch', 'correlation_id' => $correlationId]);
@@ -118,8 +122,11 @@ try {
     agentforge_emit_json(500, ['error' => 'doc_upload_failed', 'correlation_id' => $correlationId]);
 }
 
+$pidForResponse = (int) ($ctx['pid'] ?? 0);
 agentforge_emit_json(200, [
     'docref_uuid' => $result->docrefUuid,
+    'oe_document_id' => $result->oeDocumentId,
+    'oe_patient_pid' => $pidForResponse > 0 ? $pidForResponse : null,
     'file_size' => $payload->fileSize,
     'mime_type' => $payload->mimeType,
     'sha256_prefix' => substr($payload->sha256, 0, 8),

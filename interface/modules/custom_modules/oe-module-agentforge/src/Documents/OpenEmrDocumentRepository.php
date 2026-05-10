@@ -82,6 +82,43 @@ final class OpenEmrDocumentRepository implements DocumentUploadPort, DocumentByt
         return $docrefUuid;
     }
 
+    public function recordOpenEmrMapping(string $docrefUuid, int $oeDocumentId): void
+    {
+        if ($oeDocumentId <= 0) {
+            return;
+        }
+        $sidecarPath = $this->sidecarPath($docrefUuid);
+        $meta = $this->readSidecar($sidecarPath);
+        if ($meta === null) {
+            return;
+        }
+        $meta['oe_document_id'] = $oeDocumentId;
+        if (file_put_contents($sidecarPath, json_encode($meta, JSON_THROW_ON_ERROR)) === false) {
+            // Best-effort — log and move on. The agent still has the sidecar
+            // bytes; only the OpenEMR provenance link is lost.
+            \error_log('agentforge.oe_docs_registrar.sidecar_annotate_failed for ' . $docrefUuid);
+        }
+    }
+
+    public function findOpenEmrDocumentId(string $docrefUuid): ?int
+    {
+        $meta = $this->readSidecar($this->sidecarPath($docrefUuid));
+        if ($meta === null) {
+            return null;
+        }
+        if (isset($meta['deleted_at'])) {
+            return null;
+        }
+        $oeId = $meta['oe_document_id'] ?? null;
+        if (\is_int($oeId) && $oeId > 0) {
+            return $oeId;
+        }
+        if (\is_numeric($oeId) && (int) $oeId > 0) {
+            return (int) $oeId;
+        }
+        return null;
+    }
+
     public function fetch(string $docrefUuid, string $expectedPatientUuidCanonical): ?DocumentBytesResult
     {
         $sidecarPath = $this->sidecarPath($docrefUuid);

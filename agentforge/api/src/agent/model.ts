@@ -16,12 +16,12 @@ import type { Env } from '../env.js';
  * `501 misconfigured` response (PRD §5.7.2).
  */
 
-export const ANTHROPIC_DEFAULT_MODEL_ID = 'claude-haiku-4-5';
+export const ANTHROPIC_DEFAULT_MODEL_ID = 'claude-sonnet-4-6';
 
 /**
  * Canonical model identifier for a given provider env. Returned as a string
  * Langfuse's model-price database can match against (Anthropic publishes
- * `claude-haiku-4-5`; Azure OpenAI uses the deployment id as the model name).
+ * `claude-sonnet-4-6`; Azure OpenAI uses the deployment id as the model name).
  *
  * Falls back to the provider name if a per-provider id is somehow missing
  * — never throws, since this is called on the observability path.
