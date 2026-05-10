@@ -597,7 +597,7 @@ Stage 5 architecture must preserve the constraints below.
 
 ## 9. Stage 5 Traceability Requirement
 
-Every Stage 5 capability maps to at least one V1 use case below. New capabilities must add a row here before being claimed in `ARCHITECTURE.md`.
+Every Stage 5 capability maps to at least one V1 use case below. New capabilities must add a row here before being claimed in `W1_ARCHITECTURE.md`.
 
 | Capability | Use Cases | Tool / Endpoint |
 | --- | --- | --- |

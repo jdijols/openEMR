@@ -54,7 +54,7 @@ OpenEMR couples a legacy `library/`/`interface/` UI (session/`globals.php` patie
     - [`src/Common/Auth/UuidUserAccount.php`](src/Common/Auth/UuidUserAccount.php) resolves API subjects only as `users`, `patient`, or `system`.
     - [`src/RestControllers/Authorization/BearerTokenAuthorizationStrategy.php`](src/RestControllers/Authorization/BearerTokenAuthorizationStrategy.php) has `checkUserHasAccessToPatient()` returning `true` with a TODO describing future provider/clinic patient filtering.
 - **Implications for the agent:** A read-only copilot cannot infer clinician-specific read policy from API token role alone. The open handoff is not "OAuth or no OAuth"; it is whether the exact route/resource path also applies the OpenEMR ACLs and patient-binding semantics needed for the v1 clinician persona.
-- **Mitigation / next step:** Test candidate chart-read routes with distinct OpenEMR ACL users (physician, nurse, resident) before claiming role-specific behavior; document each route's effective enforcement layer in Stage 5 ARCHITECTURE.md.
+- **Mitigation / next step:** Test candidate chart-read routes with distinct OpenEMR ACL users (physician, nurse, resident) before claiming role-specific behavior; document each route's effective enforcement layer in Stage 5 [W1_ARCHITECTURE.md](W1_ARCHITECTURE.md).
 - **Related:** `Architecture-3`, `Security-3`, `Security-10`.
 
 ### Security-3: FHIR patient-context reads and staff ACL reads follow different enforcement paths
@@ -587,7 +587,7 @@ For AgentForge, the most important fact is that OpenEMR already owns the hard ap
 
 ## 6. Pre-Build Imperatives (Stage 4 design inputs)
 
-This audit is deliberately pre-code. The findings above are evidence and constraints, not a punch list against OpenEMR core. The list below distills them into design inputs that need owners *before* Stage 4 [`ARCHITECTURE.md`](ARCHITECTURE.md) commits to anything load-bearing. None of these are "fix this now in OpenEMR upstream"; they are decisions that block PHI-bearing agent code.
+This audit is deliberately pre-code. The findings above are evidence and constraints, not a punch list against OpenEMR core. The list below distills them into design inputs that need owners *before* Stage 4 [`W1_ARCHITECTURE.md`](W1_ARCHITECTURE.md) commits to anything load-bearing. None of these are "fix this now in OpenEMR upstream"; they are decisions that block PHI-bearing agent code.
 
 1. **Pick the LLM provider on contract grounds, then document the BAA.** No code path that touches real PHI gets reviewed until a BAA-bearing provider is documented with retention and training-prohibition posture. The case-study brief permits acting *as if* a BAA exists for the sprint, but the real document is a Stage 4 decision input. (→ `Compliance-2`)
 

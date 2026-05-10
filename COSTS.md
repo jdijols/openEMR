@@ -117,7 +117,7 @@ The full §3 spend reconciliation, §4 unit economics, §5 scaled projections wi
 
 ### 3.4 Observability (Langfuse Cloud Hobby)
 
-**Total: $0.00.** Langfuse Cloud's Hobby tier was used during dev; usage stayed well under the free trace-event allowance. Self-hosted Langfuse is the production posture per [ARCHITECTURE.md](ARCHITECTURE.md) §Observability and would replace the cloud account at any tier above Hobby.
+**Total: $0.00.** Langfuse Cloud's Hobby tier was used during dev; usage stayed well under the free trace-event allowance. Self-hosted Langfuse is the production posture per [W1_ARCHITECTURE.md](W1_ARCHITECTURE.md) §Observability and would replace the cloud account at any tier above Hobby.
 
 ### 3.5 Developer-side AI assistance (Cursor + Claude.ai)
 
@@ -204,7 +204,7 @@ The brief specifically asks what *changes architecturally* at each scale, not ju
 
 ### 100 clinicians (≈ 500K visits/year)
 
-- **No code changes required.** Current single-VPS topology (OpenEMR + agentforge-api + Postgres + Langfuse on one host) handles this comfortably with the 8 GB RAM minimum from [ARCHITECTURE.md](ARCHITECTURE.md) §VPS deployment.
+- **No code changes required.** Current single-VPS topology (OpenEMR + agentforge-api + Postgres + Langfuse on one host) handles this comfortably with the 8 GB RAM minimum from [W1_ARCHITECTURE.md](W1_ARCHITECTURE.md) §VPS deployment.
 - **Add per-clinician rate limiting** in `agentforge-api` (currently absent — relies on OpenEMR session). One or two abusive accounts at this scale can still spike LLM bills; a token-bucket per `user_id` upstream of `runChatTurn` is cheap insurance.
 - **Move STT keys behind tenant-scoped secret rotation;** AssemblyAI keys are currently a single shared dev/prod credential.
 - **VPS class:** scale up to a Vultr Optimized Cloud Compute 8 vCPU / 32 GB ($192/month) or equivalent — handles 100 concurrent clinicians × ~10 in-flight LLM/STT calls comfortably with headroom for spikes.
@@ -213,7 +213,7 @@ The brief specifically asks what *changes architecturally* at each scale, not ju
 
 - **Horizontal `agentforge-api`.** Single Node process saturates around a few hundred concurrent in-flight LLM calls (event loop + outbound HTTPS). Move to 3–5 stateless replicas behind Caddy (already a load-balancer-ready reverse proxy). The in-process brief cache becomes per-replica — fine, because the server-side cache is a hint, not a correctness requirement (the client-side cache survives reload anyway).
 - **Postgres connection pooling.** The `pg.Pool({ max: 10 })` in [agentforge/api/src/index.ts](agentforge/api/src/index.ts) is a per-process limit; 5 replicas × 10 = 50 connections, manageable but borderline. Add PgBouncer in transaction mode and lower per-replica `max` to 5.
-- **Self-hosted Langfuse cluster.** Hobby Cloud is no longer cost-effective at this scale; per [ARCHITECTURE.md](ARCHITECTURE.md) the production posture is self-hosted on the same Compose stack. At 1K users, Langfuse needs its own dedicated compute (separate from the agent API) and an external Postgres for trace storage with retention policy.
+- **Self-hosted Langfuse cluster.** Hobby Cloud is no longer cost-effective at this scale; per [W1_ARCHITECTURE.md](W1_ARCHITECTURE.md) the production posture is self-hosted on the same Compose stack. At 1K users, Langfuse needs its own dedicated compute (separate from the agent API) and an external Postgres for trace storage with retention policy.
 - **Add an LLM call budget alarm.** Wire a cumulative-cost guard into observability so a runaway prompt cannot burn $100K overnight before someone notices.
 - **STT provider: re-evaluate.** AssemblyAI streaming free-tier overflows immediately at this scale; lock in a paid tier or evaluate Deepgram Nova-2 for the ~30% rate advantage.
 
@@ -278,7 +278,7 @@ These are not future work — they are shipped and contributing to the §4 numbe
 
 - [Documentation/AgentForge/references/Week 1 - AgentForge.pdf](Documentation/AgentForge/references/Week%201%20-%20AgentForge.pdf) — original case-study brief; cost analysis is one of the listed Submission Requirements deliverables.
 - [USERS.md](USERS.md) — workflow assumptions feeding §2, §4 (visits per day, dictation minutes, turn count per visit).
-- [ARCHITECTURE.md](ARCHITECTURE.md) — VPS topology, cost-snapshot section, observability posture.
+- [W1_ARCHITECTURE.md](W1_ARCHITECTURE.md) — VPS topology, cost-snapshot section, observability posture.
 - [EVALUATION.md](EVALUATION.md) — confirms the eval suite has no LLM in the loop (§7 row, §8 risk note).
 - [OBSERVABILITY.md](OBSERVABILITY.md) §Q4 — Langfuse cost-tracking path that produces the per-turn USD field this document aggregates.
 - [PRD.md](PRD.md) §11.2 — per-turn trace content shape feeding §1's "what we measured" claim.

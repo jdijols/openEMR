@@ -2,7 +2,7 @@
 
 > **Status:** Working draft, kept in sync with the shipped CUI as of Gate 6 close. This document narrates one full encounter — and the clinic day around it — from the physician's point of view, through the lens of a single conversational thread.
 
-The PDF's first agent requirement is *"a multi-turn AI agent that can receive follow-up questions, maintain context across a conversation, and invoke tools to retrieve and reason over patient data."* This document describes how the shipped CUI delivers that for our V1 user — Dr. Maya Reynolds, an adult primary care physician working through an 18-24 visit clinic day — across three phases per visit: **pre-room**, **in-room**, and **post-room**. Implementation depth lives in [`PRD.md`](./PRD.md), [`ARCHITECTURE.md`](./ARCHITECTURE.md), and [`Documentation/AgentForge/`](./Documentation/AgentForge/); this file is the human story.
+The PDF's first agent requirement is *"a multi-turn AI agent that can receive follow-up questions, maintain context across a conversation, and invoke tools to retrieve and reason over patient data."* This document describes how the shipped CUI delivers that for our V1 user — Dr. Maya Reynolds, an adult primary care physician working through an 18-24 visit clinic day — across three phases per visit: **pre-room**, **in-room**, and **post-room**. Implementation depth lives in [`Documentation/AgentForge/archive/PRD.md`](Documentation/AgentForge/archive/PRD.md), [`W1_ARCHITECTURE.md`](W1_ARCHITECTURE.md), [`W2_ARCHITECTURE.md`](W2_ARCHITECTURE.md), and [`Documentation/AgentForge/`](Documentation/AgentForge/); this file is the human story.
 
 ## Guiding principles
 
@@ -166,7 +166,7 @@ Each journey moment has a corresponding eval case in [`agentforge/api/eval/cases
 ## Where to go next
 
 - Spec and invariants: [`PRD.md`](./PRD.md), with stop-the-line tests in [`TASKS.md`](./TASKS.md).
-- Architecture: [`ARCHITECTURE.md`](./ARCHITECTURE.md).
+- Architecture: [`W1_ARCHITECTURE.md`](W1_ARCHITECTURE.md), [`W2_ARCHITECTURE.md`](W2_ARCHITECTURE.md).
 - User and use-case definitions: [`USERS.md`](./USERS.md).
 - Process trail and decisions: [`Documentation/AgentForge/README.md`](./Documentation/AgentForge/README.md).
 - Encounter binding for the appointment-day path: [`Documentation/AgentForge/process/milestones/week-1/17-encounter-scoped-chart-bind-and-brief.md`](./Documentation/AgentForge/process/milestones/week-1/17-encounter-scoped-chart-bind-and-brief.md).

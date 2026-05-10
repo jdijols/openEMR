@@ -28,7 +28,7 @@ This translates into three properties the system has to demonstrate:
 
 We chose Langfuse for the sink because (a) it speaks the LLM-trace shape natively (traces, spans, generations with token usage and cost), (b) the cloud version computes USD cost from a model-price database keyed by the model name, so we don't have to maintain rate tables in our code path, and (c) it has a passable UI for the kind of forensic reconstruction a clinical incident review requires.
 
-Production currently sends to Langfuse Cloud (`https://us.cloud.langfuse.com`). Per [ARCHITECTURE.md](ARCHITECTURE.md) Compliance-2, real-PHI deployments would default back to the self-hosted Langfuse v2 service shipped in `docker-compose.override.yml` ([G6-07](Documentation/AgentForge/process/milestones/week-1/15-gate6-complete.md)); the self-hosted compose service stays in the repo for that swap, currently unused.
+Production currently sends to Langfuse Cloud (`https://us.cloud.langfuse.com`). Per [W1_ARCHITECTURE.md](W1_ARCHITECTURE.md) Compliance-2, real-PHI deployments would default back to the self-hosted Langfuse v2 service shipped in `docker-compose.override.yml` ([G6-07](Documentation/AgentForge/process/milestones/week-1/15-gate6-complete.md)); the self-hosted compose service stays in the repo for that swap, currently unused.
 
 ---
 
@@ -326,4 +326,4 @@ The observability layer satisfies the brief's four questions (what / when / fail
 - Eval-suite correlation IDs: every curated case can carry an optional `correlation_id` so adversarial fixtures point back at the trace they were derived from. See [EVALUATION.md](EVALUATION.md) and the case files under [agentforge/api/eval/cases/curated/](agentforge/api/eval/cases/curated/).
 - AI cost analysis appendix: [Documentation/AgentForge/implementation/ai-cost-analysis.md](Documentation/AgentForge/implementation/ai-cost-analysis.md) — methodology, unit economics measured from real Langfuse traces, projections at 100/1k/10k/100k MAU clinicians.
 - Process milestone covering the Langfuse-live transition: [Documentation/AgentForge/process/milestones/week-1/18-langfuse-observability-cost-analysis.md](Documentation/AgentForge/process/milestones/week-1/18-langfuse-observability-cost-analysis.md).
-- Self-hosted Langfuse compose service (unused in current demo posture; reserved for real-PHI deployments per [ARCHITECTURE.md](ARCHITECTURE.md) Compliance-2): `docker-compose.override.yml` Langfuse v2 service, runbook in `docker/agentforge/langfuse/README.md`.
+- Self-hosted Langfuse compose service (unused in current demo posture; reserved for real-PHI deployments per [W1_ARCHITECTURE.md](W1_ARCHITECTURE.md) Compliance-2): `docker-compose.override.yml` Langfuse v2 service, runbook in `docker/agentforge/langfuse/README.md`.

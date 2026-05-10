@@ -31,7 +31,7 @@ Milestones are organized by cohort week under `process/milestones/week-N/`, with
 | 5   | [process/milestones/week-1/05-stage2-deployment-decision.md](process/milestones/week-1/05-stage2-deployment-decision.md) | Stage 2: VPS + Compose deployment decision + trade-offs |
 | 6   | [process/milestones/week-1/06-stage3-audit.md](process/milestones/week-1/06-stage3-audit.md)                     | Stage 3: audit process pointer → [`AUDIT.md`](../../AUDIT.md) |
 | 7   | [process/milestones/week-1/07-stage4-users.md](process/milestones/week-1/07-stage4-users.md)                     | Stage 4: users process pointer → [`USERS.md`](../../USERS.md) |
-| 8   | [process/milestones/week-1/08-stage5-architecture.md](process/milestones/week-1/08-stage5-architecture.md)       | Stage 5: architecture process pointer → [`ARCHITECTURE.md`](../../ARCHITECTURE.md) |
+| 8   | [process/milestones/week-1/08-stage5-architecture.md](process/milestones/week-1/08-stage5-architecture.md)       | Stage 5: architecture process pointer → [`W1_ARCHITECTURE.md`](../../W1_ARCHITECTURE.md) |
 | 9   | [process/milestones/week-1/09-vps-live-deployment.md](process/milestones/week-1/09-vps-live-deployment.md)       | MVP: live OpenEMR on a Linux VPS (Vultr) + Compose; GitLab clone; nip.io / HTTPS path |
 | 10  | [process/milestones/week-1/10-prd.md](process/milestones/week-1/10-prd.md)                                       | PRD + gate-ordered implementation task list; pointer to [`PRD.md`](../../PRD.md) and [`../../TASKS.md`](../../TASKS.md) |
 | 11  | [process/milestones/week-1/11-gate0-complete.md](process/milestones/week-1/11-gate0-complete.md)                 | Gate 0 scaffold + contract spine closed; verification journal; handoff to Gate 1 |
