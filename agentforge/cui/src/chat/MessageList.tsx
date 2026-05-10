@@ -703,8 +703,10 @@ function renderBlock(
       page?: number,
       bbox?: readonly [number, number, number, number],
     ) => void;
-    /** Post-extraction "View in documents" handler — opens the canonical OpenEMR Document viewer. */
-    readonly onViewInDocuments?: (docrefUuid: string) => void;
+    /** Post-extraction "View in documents" handler — opens the canonical OpenEMR
+     *  Document viewer. Receives the docref + upload-provided OpenEMR ids
+     *  forwarded by the server onto the extraction block. */
+    readonly onViewInDocuments?: (docrefUuid: string, oeDocumentId?: number, oePatientPid?: number) => void;
   },
 ): ReactElement | null {
   switch (block.type) {
@@ -964,17 +966,13 @@ function renderBlock(
       return (
         <div key={key} className="agentforge-msg__extraction">
           <ExtractionAcknowledgment status={ackStatus} />
-          {opts.onViewInDocuments !== undefined || opts.onOpenDocument !== undefined ? (
+          {opts.onViewInDocuments !== undefined && block.oe_document_id !== undefined && block.oe_patient_pid !== undefined ? (
             <p style={{ margin: '0.25rem 0 0 0' }}>
               <button
                 type="button"
                 className="agentforge-msg__cite-link"
                 onClick={() => {
-                  if (opts.onViewInDocuments !== undefined) {
-                    opts.onViewInDocuments(block.docref_uuid);
-                    return;
-                  }
-                  opts.onOpenDocument?.(block.docref_uuid, 1);
+                  opts.onViewInDocuments!(block.docref_uuid, block.oe_document_id, block.oe_patient_pid);
                 }}
               >
                 View in documents
@@ -1069,10 +1067,10 @@ export function MessageList(props: {
    * Open the canonical OpenEMR Documents-tab viewer for a given
    * docref_uuid. Used by the post-extraction "View in documents" link
    * — distinct from `onOpenDocument` (which opens the in-rail bbox
-   * modal for image-thumbnail clicks). Falls back to onOpenDocument
-   * inside the App callback when the OpenEMR-side ids are missing.
+   * modal for image-thumbnail clicks). Receives the upload-provided
+   * OpenEMR ids that the server stamps onto the extraction block.
    */
-  readonly onViewInDocuments?: (docrefUuid: string) => void;
+  readonly onViewInDocuments?: (docrefUuid: string, oeDocumentId?: number, oePatientPid?: number) => void;
   /**
    * G2-MVP-99 — when true, render the assistant typing indicator at the
    * bottom of the scroll container as if it were the next incoming

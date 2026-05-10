@@ -758,6 +758,11 @@ export type ChatTurnInput = {
   /** §5 / G2-MVP-36 — when present, the supervisor invokes attach_and_extract first. */
   docrefUuid?: string | undefined;
   docType?: 'lab_pdf' | 'intake_form' | undefined;
+  /** Upload-provided OpenEMR ids. Forwarded onto the extraction block so the
+   *  CUI's "View in documents" link can postMessage NAV_REQUEST without a
+   *  client-side messages.find lookup (which races against cache replay). */
+  oeDocumentId?: number | undefined;
+  oePatientPid?: number | undefined;
 };
 
 export async function runChatTurn(
@@ -920,7 +925,10 @@ export async function runChatTurn(
   // headline + (for intake_form) the IntakeProposalCard inline. Prepended
   // so the visual flow is: ack → (lab summary proposal) → LLM commentary
   // → claims with citations.
-  const extractionBlock = buildExtractionBlock(mergedToolResults);
+  const extractionBlock = buildExtractionBlock(mergedToolResults, {
+    oeDocumentId: input.oeDocumentId,
+    oePatientPid: input.oePatientPid,
+  });
   if (extractionBlock !== null) {
     blocks = [extractionBlock, ...blocks];
   }
@@ -1043,8 +1051,19 @@ export async function runChatTurn(
  * §9 / G2-MVP-99 — find the latest successful `attach_and_extract` tool result
  * in `mergedToolResults` and convert it into an `extraction` ChatBlock for the
  * CUI. Returns null when no extraction ran or the extraction errored.
+ *
+ * `openEmrIds` carries the upload-provided OpenEMR ids forward onto the block
+ * so the CUI's post-extraction "View in documents" link can issue a NAV_REQUEST
+ * without doing a client-side messages.find lookup (which races with cache
+ * replay; on rehydrate the File reference is lost and the stamped attachment
+ * fields go undefined). When the chat call wasn't accompanied by an upload
+ * (a guideline / evidence question), both fields are undefined and the block
+ * simply omits them — the link is hidden in that case.
  */
-function buildExtractionBlock(toolResults: AiToolResultLike[]): ChatBlock | null {
+function buildExtractionBlock(
+  toolResults: AiToolResultLike[],
+  openEmrIds: { oeDocumentId?: number | undefined; oePatientPid?: number | undefined } = {},
+): ChatBlock | null {
   for (let i = toolResults.length - 1; i >= 0; i--) {
     const tr = toolResults[i];
     if (tr === undefined || tr.toolName !== 'attach_and_extract') {
@@ -1102,6 +1121,8 @@ function buildExtractionBlock(toolResults: AiToolResultLike[]): ChatBlock | null
         n_facts: typeof r.factsTotal === 'number' ? r.factsTotal : labResults.length,
         n_abnormal: nAbnormal,
         ...(labSummary !== '' ? { lab_summary: labSummary } : {}),
+        ...(openEmrIds.oeDocumentId !== undefined ? { oe_document_id: openEmrIds.oeDocumentId } : {}),
+        ...(openEmrIds.oePatientPid !== undefined ? { oe_patient_pid: openEmrIds.oePatientPid } : {}),
       };
     }
 
@@ -1147,6 +1168,8 @@ function buildExtractionBlock(toolResults: AiToolResultLike[]): ChatBlock | null
           condition: f.condition ?? '',
         })),
       },
+      ...(openEmrIds.oeDocumentId !== undefined ? { oe_document_id: openEmrIds.oeDocumentId } : {}),
+      ...(openEmrIds.oePatientPid !== undefined ? { oe_patient_pid: openEmrIds.oePatientPid } : {}),
     };
   }
   return null;

@@ -863,6 +863,8 @@ export default function App(): ReactElement {
     try {
       let docrefUuid: string | undefined;
       let docType: 'lab_pdf' | 'intake_form' | undefined;
+      let oeDocumentIdForChat: number | undefined;
+      let oePatientPidForChat: number | undefined;
 
       if (file !== null) {
         // Heuristic doc-type routing for the MVP demo. Filename hints
@@ -882,6 +884,12 @@ export default function App(): ReactElement {
           file,
         );
         docrefUuid = upload.docrefUuid;
+        if (upload.oeDocumentId !== null) {
+          oeDocumentIdForChat = upload.oeDocumentId;
+        }
+        if (upload.oePatientPid !== null) {
+          oePatientPidForChat = upload.oePatientPid;
+        }
 
         // Stamp the docref + OpenEMR document mapping onto the user
         // message's attachment so the chip becomes clickable (image
@@ -911,6 +919,8 @@ export default function App(): ReactElement {
         conversation_id?: string;
         docref_uuid?: string;
         doc_type?: 'lab_pdf' | 'intake_form';
+        oe_document_id?: number;
+        oe_patient_pid?: number;
         onRouting?: (event: { worker: 'intake_extractor' | 'evidence_retriever'; label: string }) => void;
       } = {
         onRouting: (event) => {
@@ -925,6 +935,17 @@ export default function App(): ReactElement {
       }
       if (docType !== undefined) {
         chatOpts.doc_type = docType;
+      }
+      // Forward upload-provided OpenEMR ids so the server stamps them onto
+      // the extraction block. The "View in documents" link then has the data
+      // directly on the block instead of via messages.find on the user
+      // upload message (the prior path failed when cache replay lost the
+      // File reference, leaving the IDs unstamped).
+      if (oeDocumentIdForChat !== undefined) {
+        chatOpts.oe_document_id = oeDocumentIdForChat;
+      }
+      if (oePatientPidForChat !== undefined) {
+        chatOpts.oe_patient_pid = oePatientPidForChat;
       }
 
       // For file-only sends, give the orchestrator a sane prompt so the
@@ -1011,44 +1032,50 @@ export default function App(): ReactElement {
    * missing — this happens when the upload predates the registrar
    * projection (legacy `agentforge_w2/`-only uploads).
    */
-  const onViewInDocuments = useCallback((docrefUuid: string): void => {
-    // Loosen the lookup — match any user message with this docref, regardless
-    // of whether `oeDocumentId` was stamped. The previous tighter condition
-    // silently fell back to `onOpenDocument` (the bbox preview modal) when
-    // either id was missing, but the button text is "View in documents", not
-    // "Preview". Misfiring the bbox modal on click is worse UX than a silent
-    // no-op — the rail container's NAV_REQUEST handler already short-circuits
-    // when `document_id` parses to NaN, so a click without the OpenEMR ids
-    // becomes a clean no-op rather than the wrong action.
-    const match = messages.find((m) => m.attachment?.docrefUuid === docrefUuid);
-    const oeDocId = match?.attachment?.oeDocumentId;
-    const pid = match?.attachment?.oePatientPid;
-    if (typeof window.parent === 'undefined' || window.parent === null) {
-      return;
-    }
-    if (patientUuid === null || patientUuid === '') {
-      return;
-    }
-    if (oeDocId === undefined || pid === undefined) {
-      console.warn('agentforge.view_in_documents.missing_ids', {
-        docrefUuid,
-        hasMatch: match !== undefined,
-        hasOeDocId: oeDocId !== undefined,
-        hasPid: pid !== undefined,
-      });
-    }
-    window.parent.postMessage(
-      {
-        type: 'NAV_REQUEST',
-        hint: {
-          kind: 'document',
-          params: { document_id: oeDocId, patient_pid: pid },
+  /**
+   * Post-extraction "View in documents" handler. The extraction block now
+   * carries `oe_document_id` + `oe_patient_pid` directly (forwarded by the
+   * server from the chat call's request body, which the CUI sets after the
+   * upload returns). No client-side `messages.find` is required — that
+   * lookup failed under cache replay because the File reference is lost on
+   * rehydrate and the lookup-by-File-identity stamp was skipped.
+   *
+   * Falls back to a silent no-op when either id is missing (e.g. an older
+   * cached message replayed without the server forwarding; or the upload
+   * registrar projection failed and oe_document_id came back null). The
+   * rail container's NAV_REQUEST handler already short-circuits on
+   * docId=NaN, so this is robust to either failure mode.
+   */
+  const onViewInDocuments = useCallback(
+    (docrefUuid: string, oeDocId?: number, pid?: number): void => {
+      if (typeof window.parent === 'undefined' || window.parent === null) {
+        return;
+      }
+      if (patientUuid === null || patientUuid === '') {
+        return;
+      }
+      if (oeDocId === undefined || pid === undefined) {
+        console.warn('agentforge.view_in_documents.missing_ids', {
+          docrefUuid,
+          hasOeDocId: oeDocId !== undefined,
+          hasPid: pid !== undefined,
+        });
+        return;
+      }
+      window.parent.postMessage(
+        {
+          type: 'NAV_REQUEST',
+          hint: {
+            kind: 'document',
+            params: { document_id: oeDocId, patient_pid: pid },
+          },
+          expected_patient_uuid: patientUuid,
         },
-        expected_patient_uuid: patientUuid,
-      },
-      window.location.origin,
-    );
-  }, [messages, patientUuid]);
+        window.location.origin,
+      );
+    },
+    [patientUuid],
+  );
 
   // G2-MVP-99 — file attachment plumbing. Validation matches the W2
   // brief: PDF/PNG/JPEG only, 10 MB cap. Errors surface as `attachError`

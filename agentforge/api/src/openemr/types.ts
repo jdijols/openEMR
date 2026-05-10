@@ -172,6 +172,13 @@ export const chatBlockSchema = z.union([
     /** G2-Early-27 informational preview — formatted lab summary text shown
      *  in a no-action ProposalCardShell. The actual chart write is deferred. */
     lab_summary: z.string().optional(),
+    /** Upload-provided OpenEMR ids forwarded from the chat call request body.
+     *  When both are present the CUI's "View in documents" link can issue a
+     *  NAV_REQUEST directly; otherwise the link is hidden (no client-side
+     *  messages.find fallback, since cache-replay loses the File reference
+     *  and the lookup silently failed in earlier rounds). */
+    oe_document_id: z.number().int().positive().optional(),
+    oe_patient_pid: z.number().int().positive().optional(),
     intake_data: z
       .object({
         demographics: z.object({

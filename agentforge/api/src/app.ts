@@ -148,6 +148,13 @@ const chatRequestSchema = z.object({
   // before answering. Both keys must be supplied together to take effect.
   docref_uuid: z.string().min(1).optional(),
   doc_type: z.enum(['lab_pdf', 'intake_form']).optional(),
+  // Post-upload — the upload PHP returns these; the CUI forwards them on
+  // the same turn so the orchestrator can stamp them onto the extraction
+  // block. Without this, the CUI's "View in documents" link has to look
+  // them up via messages.find on the user upload message, which fails
+  // under cache-replay races (File reference is lost on rehydrate).
+  oe_document_id: z.number().int().positive().optional(),
+  oe_patient_pid: z.number().int().positive().optional(),
 });
 
 const presentPatientSchema = z.object({
@@ -451,6 +458,8 @@ export function buildApp(
             conversation_id: parsed.data.conversation_id,
             docrefUuid: parsed.data.docref_uuid,
             docType: parsed.data.doc_type,
+            oeDocumentId: parsed.data.oe_document_id,
+            oePatientPid: parsed.data.oe_patient_pid,
           },
           correlationId,
           {

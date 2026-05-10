@@ -59,6 +59,12 @@ export type ChatBlock =
       /** G2-Early-27 informational preview (no chart write yet). */
       lab_summary?: string;
       intake_data?: IntakeProposalData;
+      /** Upload-provided OpenEMR ids forwarded by the server on this turn's
+       *  extraction block. When both are present, the "View in documents"
+       *  link issues a NAV_REQUEST directly without doing a client-side
+       *  messages.find lookup. When absent, the link is hidden. */
+      oe_document_id?: number;
+      oe_patient_pid?: number;
     }
   | {
       /**

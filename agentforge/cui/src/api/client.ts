@@ -216,6 +216,11 @@ export async function postChat(
     conversation_id?: string;
     docref_uuid?: string;
     doc_type?: 'lab_pdf' | 'intake_form';
+    /** Upload-provided OpenEMR ids. Forwarded to the server which stamps
+     *  them onto the extraction block — the CUI's "View in documents"
+     *  link then has the data on-block rather than via messages.find. */
+    oe_document_id?: number;
+    oe_patient_pid?: number;
     /**
      * Live routing callback. Fired once per worker invocation, the moment
      * the supervisor's tool call begins executing on the server. The CUI
@@ -254,6 +259,8 @@ export async function postChat(
           { docref_uuid: opts.docref_uuid }
         : {}),
         ...(opts?.doc_type !== undefined ? { doc_type: opts.doc_type } : {}),
+        ...(opts?.oe_document_id !== undefined ? { oe_document_id: opts.oe_document_id } : {}),
+        ...(opts?.oe_patient_pid !== undefined ? { oe_patient_pid: opts.oe_patient_pid } : {}),
       }),
     });
   } catch {

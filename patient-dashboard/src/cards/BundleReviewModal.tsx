@@ -468,10 +468,10 @@ function BundleLeafRow({
   disabled: boolean
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 text-sm">
+    <div className="flex items-start justify-between gap-3 text-sm">
       <span
         className={
-          rejected ? 'flex-1 truncate text-af-text-subtle line-through' : 'flex-1 truncate text-af-text'
+          rejected ? 'flex-1 text-af-text-subtle line-through break-words' : 'flex-1 text-af-text break-words'
         }
       >
         {label}
@@ -520,8 +520,40 @@ function summarizeItemPayload(payload: Record<string, unknown> | undefined, writ
   if (payload === undefined || payload === null) return writeTarget ?? '—'
   switch (writeTarget) {
     case 'demographics_update': {
-      const fields = Object.keys(payload).filter((k) => k !== 'preview' && !k.startsWith('_'))
-      return fields.length > 0 ? `Update ${fields.join(', ')}` : 'Demographics'
+      // Render the actual extracted VALUES so the physician can scan what
+      // will land in the chart, not just a list of field-key names. Previous
+      // shape ("Update dob, sex, last_name, first_name, …") was identical for
+      // any demographics payload — useless for review. Mirror the other
+      // sections' "show the content" convention.
+      const s = (k: string): string => (typeof payload[k] === 'string' ? (payload[k] as string).trim() : '')
+      const first = s('legal_name_first')
+      const middle = s('legal_name_middle')
+      const last = s('legal_name_last')
+      const nameParts = [first, middle, last].filter((p) => p !== '')
+      const name = nameParts.join(' ')
+      const dob = s('dob')
+      const sex = s('sex')
+      const phone = s('contact_phone')
+      const email = s('email')
+      const street = s('street')
+      const city = s('city')
+      const state = s('state')
+      const postal = s('postal_code')
+      const occupation = s('occupation')
+      const addrParts = [street, [city, state].filter((p) => p !== '').join(', '), postal]
+        .filter((p) => p !== '')
+      const address = addrParts.join(' ')
+
+      const parts: string[] = []
+      if (name !== '') parts.push(name)
+      if (dob !== '') parts.push(`DOB ${dob}`)
+      if (sex !== '') parts.push(sex)
+      if (phone !== '') parts.push(phone)
+      if (email !== '') parts.push(email)
+      if (address !== '') parts.push(address)
+      if (occupation !== '') parts.push(occupation)
+
+      return parts.length > 0 ? parts.join(' · ') : 'Demographics'
     }
     case 'chief_complaint': {
       const reason = typeof payload['reason'] === 'string' ? (payload['reason'] as string) : ''
