@@ -8,6 +8,8 @@ Every chat turn in the Clinical Copilot produces a single Langfuse trace, keyed 
 
 The brief asks observability to answer four questions from logs at any time: *what did the agent do, in what order, did any tools fail and why, and how many tokens were consumed at what cost?* All four are answerable from a single Langfuse trace against the live URL. Observability is wired in, used in production, and is the primary debugging tool for prod issues — not a checkbox.
 
+The W2 brief specifically asks each encounter to log **tool sequence, latency by step, token usage, cost estimate, retrieval hits, extraction confidence, and eval outcome** with **no raw PHI**. The §"W2 additions" section below documents the W2 fields layered on top of the W1 trace shape: handoff events between supervisor and workers, retrieval-hits metadata on the `evidence_retriever` span, extraction-confidence metadata on the `intake_extractor` span, the per-turn `eval_outcome` event, and the W2 content-block summarizer that replaces document/image bodies with `{type, size_bytes, mime}` summaries before any Langfuse span fires.
+
 This document walks through the trace shape, anchors each piece to its implementing code, explains the PHI redactor's deliberate over-redaction trade-off, and is honest about the cost-rate heuristic and other limitations the system carries today.
 
 ---
@@ -136,6 +138,95 @@ The screenshot below is the Tracing list view for the OpenEMR / AgentForge proje
 ![Langfuse Tracing list view — OpenEMR / AgentForge project, showing case_presentation and chat traces with correlation_id, latency, cost, and provider model name columns](Documentation/AgentForge/assets/LangFuse.png)
 
 This is the surface a grader, an SRE, or an incident reviewer lands on when they have a `correlation_id` and need to reconstruct a turn. The four brief questions answered above (what / when / failures / cost) are all answerable from this list plus a click into any single trace.
+
+---
+
+## W2 additions (multi-agent + RAG + eval outcome)
+
+The W2 brief expands the per-encounter logging requirement to seven fields: tool sequence, latency by step, token usage, cost estimate, **retrieval hits**, **extraction confidence**, and **eval outcome** — with no raw PHI. The W1 trace shape covers the first four directly; the next three were added in W2 alongside the supervisor + 2 workers refactor and the hybrid RAG pipeline. This section documents how each W2 field is logged and where to find it.
+
+### Handoff events (supervisor → worker)
+
+Every time the supervisor delegates to a worker (`intake_extractor` or `evidence_retriever`), a Langfuse event fires with structured routing metadata:
+
+```
+event: handoff.intake_extractor
+  metadata:
+    from:           "supervisor"
+    to:             "intake_extractor"
+    reason:         "document_attached_lab_pdf"
+    input_summary:  { mime: "application/pdf", size_bytes: 184320 }
+    decided_at:     "2026-05-10T14:22:08.137Z"
+```
+
+Source: [agentforge/api/src/agent/handoff.ts](agentforge/api/src/agent/handoff.ts) and orchestrator wiring at [agentforge/api/src/agent/orchestrator.ts](agentforge/api/src/agent/orchestrator.ts). The supervisor's system prompt encodes branching rules ([system_prompt.ts](agentforge/api/src/agent/system_prompt.ts)) that map 1:1 to the `reason` values, so a trace reader can correlate "the supervisor chose intake_extractor because reason X" with "the system prompt rule for X says Y." This is the brief's *"don't let the supervisor become a black box"* defense.
+
+Per [W2_ARCHITECTURE.md §7](W2_ARCHITECTURE.md), the handoff event is what makes the Vercel-AI-SDK supervisor an *"inspectable orchestration framework"* — every routing decision is a typed event a human can read in the trace, with no LangGraph-style migration required.
+
+### Retrieval hits (evidence_retriever span metadata)
+
+When the supervisor delegates to `evidence_retriever`, the worker's span carries hybrid-RAG retrieval metadata:
+
+```
+span: evidence_retriever
+  metadata:
+    query_summary:        "<rewritten query, PHI-redacted>"
+    sparse_hits:          12          # FTS5 results before fusion
+    dense_hits:           12          # bge-small results before fusion
+    fused_hits:           18          # after sparse+dense union
+    reranked_hits:        5           # after Cohere Rerank, top-k passed to LLM
+    rerank_provider:      "cohere"
+    rerank_model:         "rerank-3.5"
+    corpus_version:       "<git sha or pin>"
+    latency_ms_breakdown: { sparse: 8, dense: 14, rerank: 142, total: 188 }
+```
+
+Source: [agentforge/api/src/workers/evidence_retriever.ts](agentforge/api/src/workers/evidence_retriever.ts) and [agentforge/api/src/tools/evidence_retrieve.ts](agentforge/api/src/tools/evidence_retrieve.ts). `query_summary` runs through the PHI redactor before egress; raw query text never leaves the process when the user message contains chart data. Hit-count fields are integers (PHI-safe by construction). The brief's *"retrieval hits"* requirement is satisfied here — a grader can ask "did this turn actually use the corpus, and how many candidates did the reranker have to choose from?" and answer it from the trace alone.
+
+### Extraction confidence (intake_extractor span metadata)
+
+When the supervisor delegates to `intake_extractor`, the worker's span carries per-extraction confidence and the deterministic cross-check outcome:
+
+```
+span: intake_extractor
+  metadata:
+    doc_type:           "lab_pdf"
+    pages_processed:    2
+    fields_extracted:   12
+    overall_confidence: 0.94          # mean over per-field confidences from the VLM
+    cross_check_status: "verified"    # pdf-parse substring match against every quote_or_value
+    facts_dropped:      0             # facts the cross-check rejected before persistence
+    schema_valid:       true          # Zod parse over §6 schemas
+    source_docref_uuid: "<uuid>"      # OpenEMR DocumentReference UUID for the source bytes
+```
+
+Source: [agentforge/api/src/workers/intake_extractor.ts](agentforge/api/src/workers/intake_extractor.ts) and [agentforge/api/src/tools/attach_and_extract.ts](agentforge/api/src/tools/attach_and_extract.ts). The PHI-class fields (raw extracted JSON, `quote_or_value` text, `bbox` coordinates) live in Postgres only — never in the Langfuse span, per [W2_ARCHITECTURE.md §11](W2_ARCHITECTURE.md) decision row. The W2 content-block summarizer at [agentforge/api/src/observability/redact.ts](agentforge/api/src/observability/redact.ts) replaces any `document`/`image` content block with a `{type, size_bytes, mime}` summary before the meta payload reaches Langfuse — so even when the supervisor's input message includes the document bytes, the trace stays PHI-safe.
+
+This is also where the brief's *"extraction confidence"* logging requirement lives. The `overall_confidence` value is the VLM's self-reported per-field confidence aggregated to the document level; `cross_check_status` is the orthogonal deterministic gate (`pdf-parse` substring match against every `quote_or_value`) that catches VLM hallucination before facts persist. A grader who sees `overall_confidence: 0.95, cross_check_status: 'rejected'` knows the model thought it was right, the deterministic check disagreed, and `facts_dropped > 0` was the correct outcome.
+
+### Eval outcome event (per-turn)
+
+Each chat turn fires an `eval_outcome` event summarizing how the turn would score against the latest committed eval baseline. The payload is PHI-safe and structured:
+
+```
+event: eval_outcome
+  metadata:
+    baseline_version:        "w2-consolidated-2026-05-07"
+    rubric_categories_hit:   ["safe_refusal", "citation_present"]
+    expected_pass:           true
+    deterministic_outcome:   "pass"
+    judge_invoked:           false   # judge runs only in `EVAL_RUN_JUDGE=1` eval suite mode
+    judge_score:             null
+    correlation_id:          "<uuid>"
+```
+
+Source: [agentforge/api/src/observability/eval_outcome.ts](agentforge/api/src/observability/eval_outcome.ts). The event ties live production turns back to the eval suite shape — a clinician's incident report ("the agent gave me a weird answer at 2:14 PM") can be cross-referenced to the rubric category that *should* have fired and whether it did. The brief's *"eval outcome"* logging requirement is satisfied here.
+
+The `/agentforge/api/health/eval-status` HTTP endpoint exposes a PHI-safe summary of the latest committed eval run (run_id, cases, failures, gate_breaches, baseline_version, per-category pass rates) for the protected-spine **EvalGateBadge** in the CUI footer. See [agentforge/api/src/app.ts:181](agentforge/api/src/app.ts:181). The PHI-redaction path is similarly exposed at `/health/phi-redaction` ([app.ts:195](agentforge/api/src/app.ts:195)).
+
+### W2 content-block summarizer (PHI safety for document/image blocks)
+
+The W1 wire-level redactor (deny-list patterns + key-name masking) is insufficient when raw document bytes and per-page image data are first-class W2 inputs. The W2 redactor adds a content-block summarizer ([agentforge/api/src/observability/redact.ts](agentforge/api/src/observability/redact.ts)) that walks Anthropic-SDK content arrays before they leave the process and replaces every `document` and `image` block with a `{type, size_bytes, mime}` summary. The `no_phi_in_logs` rubric category in the eval gate ([eval/runner.ts](agentforge/api/eval/runner.ts)) regression-tests this surface every commit — 9 cases under the W2 baseline, each lighting up a distinct deny-list pattern (SSN, DOB-ISO, DOB-US, phone, email) plus the document/image-block summarization path.
 
 ---
 

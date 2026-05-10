@@ -898,6 +898,8 @@ export async function runChatTurn(
     if (evidenceForFinalizer.citationUuids.size > 0) {
       const structured = await finalizeStructuredEnvelope({
         model,
+        providerModelId,
+        provider: env.LLM_PROVIDER,
         userMessage: input.userMessage,
         draftText: result.text,
         citationLegend: citationLegendForFinalizer,

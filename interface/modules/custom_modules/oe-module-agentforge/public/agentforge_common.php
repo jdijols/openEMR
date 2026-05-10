@@ -20,12 +20,47 @@ use OpenEMR\Services\PatientService;
 /**
  * Bootstrap OpenEMR globals from a script in public/.
  */
+/**
+ * QA-pass — silence ADODB's `outp` channel. ADODB's mysqli driver dumps
+ * the offending SQL via `echo $msg;` when prepare() fails (see
+ * `vendor/adodb/adodb-php/adodb.inc.php::outp` and
+ * `drivers/adodb-mysqli.inc.php::outp_throw`). Stock OpenEMR core occasionally
+ * trips this against patient-uuid searches (`Column 'uuid' is ambiguous`,
+ * `Unknown column 'patient.uuid'`) and the dumped SQL ends up prepended to
+ * our JSON response, breaking the agent's `openemr_invalid_json` parse.
+ *
+ * Routing through the `ADODB_OUTP` hook redirects the message into
+ * `error_log` instead of stdout — the diagnostic stays available for ops
+ * (unlike just throwing it away), but the response body stays clean.
+ */
+function agentforge_silent_adodb_outp($msg, $newline = true): void
+{
+    $clean = \strip_tags(\is_string($msg) ? $msg : (string) $msg);
+    // Collapse to a single line so the error log stays grep-friendly.
+    $clean = \preg_replace('/\s+/', ' ', $clean) ?? $clean;
+    \error_log('agentforge.adodb_outp: ' . $clean);
+}
+
 function agentforge_require_globals(bool $ignoreAuthForRequest = false): void
 {
     static $loaded = false;
     if ($loaded) {
         return;
     }
+
+    // Claim the ADODB output hook BEFORE loading OpenEMR globals so the
+    // stock `echo $msg;` path in adodb.inc.php is bypassed entirely. Must
+    // be a constant (not a global) — ADODB checks `defined('ADODB_OUTP')`
+    // first and short-circuits when present.
+    if (!\defined('ADODB_OUTP')) {
+        \define('ADODB_OUTP', 'agentforge_silent_adodb_outp');
+    }
+
+    // Defense-in-depth — start an output buffer so any other framework
+    // output (PHP deprecation notices, third-party `echo`s) is captured
+    // and can be discarded by `agentforge_emit_json` /
+    // `agentforge_emit_html` before they send the Content-Type header.
+    \ob_start();
 
     if ($ignoreAuthForRequest) {
         $ignoreAuth = true;
@@ -64,6 +99,17 @@ function agentforge_json_input(): array
  */
 function agentforge_emit_json(int $status, array $body): never
 {
+    // Discard any output captured by `agentforge_require_globals`'s
+    // ob_start so the Content-Type header can still be sent. ADODB and
+    // assorted OpenEMR framework code occasionally emit deprecation
+    // notices / warnings via direct echo (see adodb.inc.php:862 — known
+    // offender on PHP 8.x); without this drain the JSON body is
+    // corrupted by leading text and the agent reports the call as
+    // `openemr_invalid_json`.
+    while (\ob_get_level() > 0) {
+        \ob_end_clean();
+    }
+
     \http_response_code($status);
     \header('Content-Type: application/json; charset=utf-8');
     echo \json_encode($body, \JSON_THROW_ON_ERROR);
@@ -72,6 +118,11 @@ function agentforge_emit_json(int $status, array $body): never
 
 function agentforge_emit_html(int $status, string $html): never
 {
+    // Same drain pattern as `agentforge_emit_json` — see comment there.
+    while (\ob_get_level() > 0) {
+        \ob_end_clean();
+    }
+
     \http_response_code($status);
     \header('Content-Type: text/html; charset=utf-8');
     echo $html;

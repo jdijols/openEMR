@@ -47,6 +47,26 @@
             max-width: 100%;
             height: auto;
         }
+        /*
+         * G2-Final-Citation — visual bounding-box overlay rendered on
+         * the cited page when a citation click forwards a `bbox` URL
+         * param. Wraps each rendered canvas so the absolutely-positioned
+         * highlight sits over the page without disturbing the stacked
+         * scroll layout. Yellow + amber border mirrors DocumentModal's
+         * existing styling so both surfaces look identical.
+         */
+        .agentforge-pdf-page-wrap {
+            position: relative;
+            display: block;
+            line-height: 0;
+        }
+        .agentforge-pdf-bbox-overlay {
+            position: absolute;
+            background: rgba(255, 235, 59, 0.35);
+            border: 2px solid #f9a825;
+            pointer-events: none;
+            box-shadow: 0 0 0 1px rgba(249, 168, 37, 0.4);
+        }
         #status {
             position: absolute;
             inset: 0;
@@ -77,6 +97,25 @@
         const params = new URLSearchParams(window.location.search);
         const fileUrl = params.get('file');
         const initialPage = Math.max(1, parseInt(params.get('page') || '1', 10) || 1);
+
+        // G2-Final-Citation — parse an optional normalized bbox forwarded
+        // by the host overlay (`bbox=x0,y0,x1,y1`, all in 0..1). Drop
+        // silently on any malformed shape — the page still renders cleanly
+        // without the highlight. Coords mirror the §6 SourceCitation
+        // schema and the bboxToPixels math in agentforge/cui/src/citations/bbox.ts.
+        let citedBbox = null;
+        const bboxParam = params.get('bbox');
+        if (bboxParam) {
+            const parts = bboxParam.split(',').map((s) => parseFloat(s));
+            if (
+                parts.length === 4 &&
+                parts.every((n) => Number.isFinite(n)) &&
+                parts[2] > parts[0] &&
+                parts[3] > parts[1]
+            ) {
+                citedBbox = parts;
+            }
+        }
 
         function setStatus(text, state) {
             if (!text) { status.hidden = true; return; }
@@ -158,20 +197,51 @@
             for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
                 const page = await pdf.getPage(pageNumber);
                 const viewport = page.getViewport({ scale });
+
+                // G2-Final-Citation — wrap the canvas so the bbox overlay
+                // can be absolutely positioned over the cited page. The
+                // wrapper is line-height:0 so it doesn't introduce
+                // descender whitespace under the canvas.
+                const wrap = document.createElement('div');
+                wrap.className = 'agentforge-pdf-page-wrap';
+                wrap.style.width = viewport.width + 'px';
+                wrap.style.height = viewport.height + 'px';
+
                 const canvas = document.createElement('canvas');
                 canvas.className = 'agentforge-pdf-page';
                 canvas.width = viewport.width;
                 canvas.height = viewport.height;
                 canvas.style.width = viewport.width + 'px';
                 canvas.style.height = viewport.height + 'px';
-                viewer.appendChild(canvas);
+                wrap.appendChild(canvas);
+                viewer.appendChild(wrap);
 
                 const ctx = canvas.getContext('2d');
                 if (!ctx) continue;
                 await page.render({ canvas, canvasContext: ctx, viewport }).promise;
 
+                // Yellow highlight on the cited region of the cited page
+                // when a normalized bbox was forwarded. Positions are
+                // computed against the rendered canvas dimensions; mirrors
+                // the bboxToPixels math used by the in-CUI DocumentModal
+                // fallback so both surfaces feel identical.
+                if (citedBbox !== null && pageNumber === initialPage) {
+                    const overlay = document.createElement('div');
+                    overlay.className = 'agentforge-pdf-bbox-overlay';
+                    overlay.setAttribute('aria-label', 'Cited region highlight');
+                    const left = citedBbox[0] * viewport.width;
+                    const top = citedBbox[1] * viewport.height;
+                    const width = (citedBbox[2] - citedBbox[0]) * viewport.width;
+                    const height = (citedBbox[3] - citedBbox[1]) * viewport.height;
+                    overlay.style.left = left + 'px';
+                    overlay.style.top = top + 'px';
+                    overlay.style.width = width + 'px';
+                    overlay.style.height = height + 'px';
+                    wrap.appendChild(overlay);
+                }
+
                 if (pageNumber === initialPage && pageNumber > 1) {
-                    canvas.scrollIntoView({ behavior: 'auto', block: 'start' });
+                    wrap.scrollIntoView({ behavior: 'auto', block: 'start' });
                 }
             }
         }

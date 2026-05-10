@@ -197,7 +197,9 @@ export function createObservability(
       try {
         const phase = typeof meta?.['phase'] === 'string' ? meta['phase'] : 'unknown';
         const isCompleted =
-          phase === 'response_completed' || phase === 'case_presentation_completed';
+          phase === 'response_completed' ||
+          phase === 'case_presentation_completed' ||
+          phase === 'structured_finalize_response';
         const safeMeta = redactPhi(meta ?? {}) as Record<string, unknown>;
 
         if (!isCompleted) {

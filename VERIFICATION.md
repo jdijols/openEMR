@@ -15,6 +15,8 @@ There are four layers, each catching a different failure mode:
 3. **Numeric blood-pressure range guard** — a defense-in-depth parser that flags physiologically impossible vitals before they reach the chart.
 4. **Medication-inactive warning** — claims of "currently taking X" that cite a row whose status is `inactive` or `discontinued` are surfaced as a warning, not allowed to pass silently.
 
+W2 layered one additional substring-fidelity check on top, exercised at the eval-runner layer rather than the live-turn verification layer: **`citation_quote_in_source` (FB-D-03)** — every claim's `quote_or_value` field must appear verbatim in the cited source's text. This catches the Layer 1 limitation documented under §"What verification does NOT catch" §1 (citation-valid-but-content-drifts) for the specific surface of extracted-document citations, where we have the source text in Postgres and can compare deterministically. See [agentforge/api/eval/runner.ts:300](agentforge/api/eval/runner.ts:300) and the cases [`w2-citation-quote-drift-rejected.json`](agentforge/api/eval/cases/curated/w2-citation-quote-drift-rejected.json) and [`w2-citation-cross-patient-leak-rejected.json`](agentforge/api/eval/cases/curated/w2-citation-cross-patient-leak-rejected.json). The complementary live-turn tightening lives at [verification.ts:194](agentforge/api/src/agent/verification.ts:194).
+
 This document walks through where verification fits in the request flow, anchors each layer to the code that implements it, describes how failure cascades into a refusal, and — most importantly — enumerates the failure modes verification does *not* catch. A clinical safety story is not credible without that second list, and the brief asks for it explicitly.
 
 ---

@@ -204,6 +204,61 @@ final class SourcePackFactory
     }
 
     /**
+     * G2-Final-Citation — sidecar-derived lab observation. The
+     * navigation_hint kind `lab_pdf` tells the CUI to open the source
+     * PDF in the host-shell document overlay (same pathway as image
+     * preview clicks) at the cited page, with an optional yellow
+     * bbox highlight on the cited region — satisfying the §5 citation
+     * contract's "visual PDF bounding-box overlay" requirement for
+     * uploaded-lab citations.
+     *
+     * @param array{0: float, 1: float, 2: float, 3: float}|null $bbox normalized 0-1 [x0,y0,x1,y1]
+     *
+     * @return array{
+     *   resource_family: string,
+     *   table: string,
+     *   row_id: int,
+     *   uuid: string,
+     *   as_of: string,
+     *   retrieval_path: string,
+     *   navigation_hint: array{kind: string, params: array<string, mixed>}
+     * }
+     */
+    public static function labFromDocument(
+        string $docrefUuid,
+        string $extractionFieldPath,
+        \DateTimeImmutable $asOf,
+        ?int $page = null,
+        ?array $bbox = null,
+    ): array {
+        $params = [
+            'docref_uuid' => $docrefUuid,
+            'extraction_field_path' => $extractionFieldPath,
+        ];
+        if ($page !== null && $page >= 1) {
+            $params['page'] = $page;
+        }
+        if ($bbox !== null && \count($bbox) === 4) {
+            $params['bbox'] = \array_values($bbox);
+        }
+
+        $rowId = \max(1, \abs(\crc32($docrefUuid . '|' . $extractionFieldPath)));
+
+        return [
+            'resource_family' => 'lab',
+            'table' => 'documents',
+            'row_id' => $rowId,
+            'uuid' => $docrefUuid,
+            'as_of' => $asOf->format(\DateTimeInterface::ATOM),
+            'retrieval_path' => 'agentforge_w2/_obs',
+            'navigation_hint' => [
+                'kind' => 'lab_pdf',
+                'params' => $params,
+            ],
+        ];
+    }
+
+    /**
      * @return array{
      *   resource_family: string,
      *   table: string,

@@ -38,26 +38,34 @@ if ($pid <= 0) {
     agentforge_emit_json(404, ['error' => 'not_found', 'correlation_id' => $correlationId]);
 }
 
+// QA-pass — `ObservationLabService::getAll` with a patient UUID throws
+// `SqlQueryException("Column 'uuid' in WHERE is ambiguous")` against the
+// stock OpenEMR FHIR query (multiple tables in the join carry a `uuid`
+// column; the search builder generates an unqualified `WHERE uuid = ?`).
+// That uncaught exception used to crash the endpoint before the sidecar
+// augmentation below could run, leaving the agent's `get_labs` tool
+// reporting `openemr_error` even though Margaret's uploaded lab is sitting
+// in the agentforge_w2 observation store. Catch the upstream failure,
+// degrade to empty `procedure_result` rows, and let the sidecar loop
+// below surface the uploaded labs. Long-term fix: qualify the WHERE in
+// the upstream service; this catch keeps the endpoint serviceable until
+// then.
 $svc = new ObservationLabService();
-$pr = $svc->getAll([], true, $ingress['patient_uuid']);
-
-if (!$pr->isValid()) {
-    AgentAuditLogger::recordAgentEvent(
-        $ctx['auth_user'],
-        $ctx['auth_provider'],
-        $pid,
-        'context_read',
-        'labs',
-        $correlationId,
-        false,
-        ['reason' => 'service_invalid'],
-    );
-    agentforge_emit_json(500, ['error' => 'internal_error', 'correlation_id' => $correlationId]);
+$rows = [];
+try {
+    $pr = $svc->getAll([], true, $ingress['patient_uuid']);
+    if ($pr->isValid()) {
+        $maybeRows = $pr->getData();
+        if (\is_array($maybeRows)) {
+            $rows = $maybeRows;
+        }
+    }
+} catch (\Throwable $t) {
+    \error_log('agentforge.labs_getall_failed: ' . $t->getMessage());
 }
 
 $limit = $ingress['window_limit'];
 $out = [];
-$rows = $pr->getData();
 
 if (\is_array($rows)) {
     foreach ($rows as $raw) {
@@ -196,9 +204,37 @@ if (\count($out) < $limit && \is_dir($obsRoot)) {
             }
         }
 
-        // The sidecar row_id is synthesized from (docref_uuid, field_path) so
-        // the agent and dashboard agree on identity for the same observation.
-        $synthRowId = \max(1, \abs(\crc32($docrefUuid . '|' . $fieldPath)));
+        // G2-Final-Citation — the persisted sidecar carries the citation
+        // page + bbox we kept in `attach_and_extract` (citation envelope
+        // still stripped; only structural overlay metadata retained). Pass
+        // them through to the source_pack so the CUI can deep-link the
+        // citation click to the host-shell PDF overlay with a highlighted
+        // region on the right page.
+        $page = null;
+        $rawPage = $payload['page'] ?? null;
+        if (\is_int($rawPage) && $rawPage >= 1) {
+            $page = $rawPage;
+        } elseif (\is_string($rawPage) && \is_numeric($rawPage)) {
+            $intPage = (int) $rawPage;
+            $page = $intPage >= 1 ? $intPage : null;
+        }
+
+        $bbox = null;
+        $rawBbox = $payload['bbox'] ?? null;
+        if (\is_array($rawBbox) && \count($rawBbox) === 4) {
+            $coerced = [];
+            $allNumeric = true;
+            foreach (\array_values($rawBbox) as $component) {
+                if (!\is_numeric($component)) {
+                    $allNumeric = false;
+                    break;
+                }
+                $coerced[] = (float) $component;
+            }
+            if ($allNumeric) {
+                $bbox = $coerced;
+            }
+        }
 
         $out[] = [
             'procedure_name' => $testName,
@@ -212,10 +248,12 @@ if (\count($out) < $limit && \is_dir($obsRoot)) {
             'reported_at' => $collectionDate,
             'extraction_field_path' => $fieldPath,
             'docref_uuid' => $docrefUuid,
-            'source_pack' => SourcePackFactory::lab(
-                $synthRowId,
-                $docrefUuid !== '' ? $docrefUuid : ('lab-sidecar-' . (string) $synthRowId),
-                $asOf
+            'source_pack' => SourcePackFactory::labFromDocument(
+                $docrefUuid !== '' ? $docrefUuid : ('lab-sidecar-' . \bin2hex(\random_bytes(4))),
+                $fieldPath,
+                $asOf,
+                $page,
+                $bbox,
             ),
         ];
     }

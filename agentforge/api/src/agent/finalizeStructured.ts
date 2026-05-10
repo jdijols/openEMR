@@ -23,6 +23,7 @@ import { generateObject, type LanguageModel } from 'ai';
 import { z } from 'zod';
 import type { Observability } from '../observability/index.js';
 import type { ChatBlock } from '../openemr/types.js';
+import { estimateUsdForProviderTokens } from './cost_estimate.js';
 import {
   buildResponseEnvelopeSchema,
   envelopeToChatBlocks,
@@ -138,6 +139,8 @@ Hard rules:
 
 export type FinalizeStructuredInput = Readonly<{
   model: LanguageModel;
+  providerModelId: string;
+  provider: string;
   userMessage: string;
   draftText: string;
   citationLegend: ReadonlyArray<CitationLegendEntry>;
@@ -161,7 +164,7 @@ export async function finalizeStructuredEnvelope(
 ): Promise<FinalizeStructuredResult | null> {
   await input.observability.recordLlmCall({
     correlationId: input.correlationId,
-    providerModel: 'finalizer',
+    providerModel: input.providerModelId,
     meta: { phase: 'structured_finalize_request' },
   });
 
@@ -173,6 +176,7 @@ export async function finalizeStructuredEnvelope(
     allowedCitationIds: input.allowedCitationIds,
   });
 
+  const llmStartedAtMs = Date.now();
   try {
     const result = await generateObject({
       model: input.model,
@@ -205,15 +209,23 @@ export async function finalizeStructuredEnvelope(
     }
 
     const claimBlockCount = envelope.blocks.filter((b) => b.type === 'claim').length;
+    const usage = result.usage;
+    const costUsd =
+      estimateUsdForProviderTokens(input.provider, usage?.inputTokens, usage?.outputTokens) ?? null;
     await input.observability.recordLlmCall({
       correlationId: input.correlationId,
-      providerModel: 'finalizer',
+      providerModel: input.providerModelId,
       meta: {
         phase: 'structured_finalize_response',
         outcome: 'ok',
         block_count: envelope.blocks.length,
         claim_blocks: claimBlockCount,
         legend_size: input.citationLegend.length,
+        provider: input.provider,
+        start_time_ms: llmStartedAtMs,
+        input_tokens: usage?.inputTokens ?? null,
+        output_tokens: usage?.outputTokens ?? null,
+        cost_usd: costUsd,
       },
     });
 

@@ -953,7 +953,11 @@ export default function App(): ReactElement {
    * which sidesteps the buffer-detach bug we hit when reusing cached
    * Uint8Array bytes through pdfjs across multiple opens.
    */
-  const onOpenDocument = useCallback((docrefUuid: string, page?: number): void => {
+  const onOpenDocument = useCallback((
+    docrefUuid: string,
+    page?: number,
+    bbox?: readonly [number, number, number, number],
+  ): void => {
     if (typeof window.parent === 'undefined' || window.parent === null) {
       return;
     }
@@ -970,6 +974,10 @@ export default function App(): ReactElement {
         bytes_url: bytesUrl.toString(),
         docref_uuid: docrefUuid,
         initial_page: page ?? 1,
+        // G2-Final-Citation — when the citation carries a normalized
+        // bounding box, forward it to the host overlay so document-viewer.html
+        // can render the §5 yellow-highlight overlay on the cited region.
+        ...(bbox !== undefined ? { bbox: [bbox[0], bbox[1], bbox[2], bbox[3]] } : {}),
       },
       window.location.origin,
     );

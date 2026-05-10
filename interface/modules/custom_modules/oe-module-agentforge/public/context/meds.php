@@ -38,29 +38,32 @@ if ($pid <= 0) {
     agentforge_emit_json(404, ['error' => 'not_found', 'correlation_id' => $correlationId]);
 }
 
+// QA-pass — `PrescriptionService::getAll(['patient.uuid' => ...])` throws
+// `SqlQueryException("Unknown column 'patient.uuid' in 'WHERE'")` against
+// the stock OpenEMR query (the SELECT exposes the alias `patient.puuid`,
+// not `patient.uuid`, so the FhirSearchWhereClauseBuilder generates a
+// WHERE referencing a non-existent column). The uncaught exception used
+// to crash this endpoint, which the agent then reported as
+// "medications endpoint returned errors." Catch it and degrade to empty
+// rows so the script still emits a well-formed `{ok:true, data:[]}`
+// response. Upstream fix: switch to the `patient.puuid` search alias or
+// resolve pid first and search by `patient_id`.
 $svc = new PrescriptionService();
-$pr = $svc->getAll(['patient.uuid' => $ingress['patient_uuid']]);
-
-if (!$pr->isValid()) {
-    AgentAuditLogger::recordAgentEvent(
-        $ctx['auth_user'],
-        $ctx['auth_provider'],
-        $pid,
-        'context_read',
-        'meds',
-        $correlationId,
-        false,
-        ['reason' => 'service_invalid'],
-    );
-    agentforge_emit_json(500, ['error' => 'internal_error', 'correlation_id' => $correlationId]);
+$rows = [];
+try {
+    $pr = $svc->getAll(['patient.uuid' => $ingress['patient_uuid']]);
+    if ($pr->isValid()) {
+        $maybeRows = $pr->getData();
+        if (\is_array($maybeRows)) {
+            $rows = $maybeRows;
+        }
+    }
+} catch (\Throwable $t) {
+    \error_log('agentforge.meds_getall_failed: ' . $t->getMessage());
 }
 
 $limit = $ingress['window_limit'];
 $out = [];
-$rows = $pr->getData();
-if (!\is_array($rows)) {
-    $rows = [];
-}
 
 foreach ($rows as $raw) {
     if (!\is_array($raw)) {

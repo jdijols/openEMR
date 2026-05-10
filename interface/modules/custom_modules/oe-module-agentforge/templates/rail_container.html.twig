@@ -637,7 +637,7 @@
         // exactly as it does for any other module HTTP call.
         var documentOverlay = null;
         var documentOverlayKeyHandler = null;
-        function openDocumentOverlay(bytesUrl, initialPage) {
+        function openDocumentOverlay(bytesUrl, initialPage, bbox) {
             closeDocumentOverlay();
 
             var overlay = document.createElement('div');
@@ -678,6 +678,15 @@
                 '/interface/modules/custom_modules/oe-module-agentforge/public/cui/document-viewer.html' +
                 '?file=' + encodeURIComponent(bytesUrl) +
                 '&page=' + encodeURIComponent(String(page));
+            // G2-Final-Citation — when a citation forwards a normalized
+            // bbox, encode it into the viewer URL so document-viewer.html
+            // can render the §5 yellow-highlight overlay on the cited page.
+            if (bbox && bbox.length === 4) {
+                viewerUrl += '&bbox=' + encodeURIComponent(
+                    String(bbox[0]) + ',' + String(bbox[1]) + ',' +
+                    String(bbox[2]) + ',' + String(bbox[3])
+                );
+            }
             pdfFrame.src = viewerUrl;
 
             // Order matters for tab focus: iframe first so the PDF
@@ -849,7 +858,26 @@
                     return;
                 }
                 var initialPage = typeof data.initial_page === 'number' ? data.initial_page : 1;
-                openDocumentOverlay(bytesUrl, initialPage);
+                // G2-Final-Citation — accept an optional normalized bbox
+                // forwarded by the CUI on citation clicks; the viewer
+                // renders a §5 yellow highlight on the cited region of
+                // the cited page. Strict-shape validation: must be a
+                // 4-tuple of finite numbers, otherwise drop silently.
+                var rawBbox = Array.isArray(data.bbox) ? data.bbox : null;
+                var bbox = null;
+                if (rawBbox !== null && rawBbox.length === 4) {
+                    var allFinite = true;
+                    for (var bi = 0; bi < 4; bi++) {
+                        if (typeof rawBbox[bi] !== 'number' || !isFinite(rawBbox[bi])) {
+                            allFinite = false;
+                            break;
+                        }
+                    }
+                    if (allFinite) {
+                        bbox = rawBbox;
+                    }
+                }
+                openDocumentOverlay(bytesUrl, initialPage, bbox);
                 return;
             }
 

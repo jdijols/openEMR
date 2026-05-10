@@ -45,6 +45,11 @@ function requestCitationNavigation(
   citeId: string,
   hint: CitationNavigationHint,
   expectedPatientUuid: string,
+  onOpenDocument?: (
+    docrefUuid: string,
+    page?: number,
+    bbox?: readonly [number, number, number, number],
+  ) => void,
 ): void {
   // G2-MVP-99 — guideline-chunk citations open their primary source URL
   // directly in a new tab. The parent OpenEMR shell only handles
@@ -59,6 +64,35 @@ function requestCitationNavigation(
       window.open(sourceUrl, '_blank', 'noopener');
     }
     return;
+  }
+
+  // G2-Final-Citation — sidecar-derived lab citations route through the
+  // host-shell document overlay (the same pathway image-preview clicks
+  // use), with the cited bbox forwarded so the PDF viewer renders the
+  // §5 yellow-highlight overlay on the cited region. Falls through to
+  // the chart-NAV path when the openDocument callback isn't wired (test
+  // contexts) so existing behavior is preserved.
+  if (hint.kind === 'lab_pdf' && onOpenDocument !== undefined) {
+    const params = hint.params as {
+      docref_uuid?: unknown;
+      page?: unknown;
+      bbox?: unknown;
+    };
+    const docref = typeof params.docref_uuid === 'string' ? params.docref_uuid : '';
+    if (docref !== '') {
+      const page = typeof params.page === 'number' && params.page >= 1 ? params.page : 1;
+      let bbox: readonly [number, number, number, number] | undefined;
+      const rawBbox = params.bbox;
+      if (
+        Array.isArray(rawBbox) &&
+        rawBbox.length === 4 &&
+        rawBbox.every((n) => typeof n === 'number' && Number.isFinite(n))
+      ) {
+        bbox = [rawBbox[0] as number, rawBbox[1] as number, rawBbox[2] as number, rawBbox[3] as number];
+      }
+      onOpenDocument(docref, page, bbox);
+      return;
+    }
   }
 
   if (typeof window.parent === 'undefined' || window.parent === null) {
@@ -664,7 +698,11 @@ function renderBlock(
     readonly proposalEnv?: ProposalApiEnv;
     readonly voiceCompletedProposalIds?: ReadonlySet<string>;
     readonly onProposalResolved?: OnProposalResolved;
-    readonly onOpenDocument?: (docrefUuid: string, page?: number) => void;
+    readonly onOpenDocument?: (
+      docrefUuid: string,
+      page?: number,
+      bbox?: readonly [number, number, number, number],
+    ) => void;
     /** Post-extraction "View in documents" handler — opens the canonical OpenEMR Document viewer. */
     readonly onViewInDocuments?: (docrefUuid: string) => void;
   },
@@ -788,7 +826,7 @@ function renderBlock(
                     <button
                       type="button"
                       className="agentforge-msg__cite-link"
-                      onClick={() => requestCitationNavigation(seg.citation_id, hint, bound)}
+                      onClick={() => requestCitationNavigation(seg.citation_id, hint, bound, opts.onOpenDocument)}
                     >
                       {seg.text}
                     </button>
@@ -850,7 +888,7 @@ function renderBlock(
               <button
                 type="button"
                 className="agentforge-msg__cite-link"
-                onClick={() => requestCitationNavigation(citeId, hint, bound)}
+                onClick={() => requestCitationNavigation(citeId, hint, bound, opts.onOpenDocument)}
               >
                 {renderedText}
               </button>
@@ -1022,7 +1060,11 @@ export function MessageList(props: {
    * file (App owns the modal state, hosted in the parent shell as an
    * overlay).
    */
-  readonly onOpenDocument?: (docrefUuid: string, page?: number) => void;
+  readonly onOpenDocument?: (
+    docrefUuid: string,
+    page?: number,
+    bbox?: readonly [number, number, number, number],
+  ) => void;
   /**
    * Open the canonical OpenEMR Documents-tab viewer for a given
    * docref_uuid. Used by the post-extraction "View in documents" link
