@@ -7,6 +7,7 @@ import {
   FhirObservationSchema,
   type FhirObservation,
 } from '../fhir/schemas'
+import { useAgentForgeLabs } from '../fhir/agentforge_labs'
 import { formatDob } from '../utils/date'
 import { formatQuantity } from '../utils/ucum'
 
@@ -16,7 +17,15 @@ const MAX_ROWS = 20
 const Schema = FhirBundleSchema(FhirObservationSchema)
 
 export function LabsCard({ patientId }: Props) {
-  const query = useFhirQuery(
+  // Two sources, merged:
+  //   1. FHIR /Observation?category=laboratory — stock OpenEMR labs (procedure_result table)
+  //   2. agentforge JSON-sidecar store — labs the agent extracted from
+  //      uploaded PDFs (W2 MVP deferred persisting them as proper FHIR
+  //      Observation rows; this hook reads the sidecars via a custom
+  //      PHP endpoint and reshapes to FHIR).
+  // Both sources return FhirObservation shapes; we concat + sort by
+  // effectiveDateTime descending so the newest extracted lab tops the list.
+  const fhirQuery = useFhirQuery(
     '/Observation',
     {
       patient: patientId,
@@ -26,25 +35,40 @@ export function LabsCard({ patientId }: Props) {
     },
     Schema,
   )
+  const agentforgeQuery = useAgentForgeLabs(patientId)
 
-  if (query.isLoading) return <ClinicalCard title="Labs" icon={<FlaskConical size={16} />} accent="violet" status="loading" />
-  if (query.error) {
+  // Treat each query independently — one failing doesn't blank the card.
+  const fhirLabs = fhirQuery.data ? bundleEntries(fhirQuery.data) : []
+  const agentforgeLabs = agentforgeQuery.data ? bundleEntries(agentforgeQuery.data) : []
+  const combined = [...agentforgeLabs, ...fhirLabs]
+    .slice()
+    .sort((a, b) => (b.effectiveDateTime ?? '').localeCompare(a.effectiveDateTime ?? ''))
+    .slice(0, MAX_ROWS)
+
+  const stillLoading =
+    (fhirQuery.isLoading && agentforgeQuery.isLoading) ||
+    (combined.length === 0 && (fhirQuery.isLoading || agentforgeQuery.isLoading))
+
+  if (stillLoading) {
+    return <ClinicalCard title="Labs" icon={<FlaskConical size={16} />} accent="violet" status="loading" />
+  }
+  // Surface error only if BOTH sources failed AND we have nothing to show.
+  if (combined.length === 0 && fhirQuery.error && agentforgeQuery.error) {
     return (
       <ClinicalCard
         title="Labs" icon={<FlaskConical size={16} />} accent="violet"
         status="error"
         errorMessage="Could not load labs."
-        errorCorrelationId={query.error.detail.correlationId}
+        errorCorrelationId={fhirQuery.error.detail.correlationId}
       />
     )
   }
-  const labs = bundleEntries(query.data).slice(0, MAX_ROWS)
-  if (labs.length === 0) {
+  if (combined.length === 0) {
     return <ClinicalCard title="Labs" icon={<FlaskConical size={16} />} accent="violet" status="empty" emptyMessage="No labs recorded." />
   }
   return (
     <ClinicalCard title="Labs" icon={<FlaskConical size={16} />} accent="violet" status="content">
-      <LabList labs={labs} />
+      <LabList labs={combined} />
     </ClinicalCard>
   )
 }

@@ -280,12 +280,22 @@ describe('FB-B-01 + FB-B-02 — observation persistence gating', () => {
     expect((call.results[0] as Record<string, unknown>)['citation']).toBeUndefined();
   });
 
-  it('skips persistence + records cross_check_failed when text layer is present but quotes do not match (S14, FB-B-02 hallucination guard)', async () => {
-    const persistObservations = vi.fn(async () => ({ inserted: 0, updated: 0, failed: 0 }));
+  it('persists every extracted row even when text layer cross-check is unverified (QA-pass policy: trust the model)', async () => {
+    // QA-pass policy update: the cross-check was a strict S14 hallucination
+    // guard that refused to write any rows when the PDF text layer was
+    // present but no citation quotes matched. For the demo this is too
+    // aggressive — scanned labs and unusual table layouts trip the guard
+    // even when the model read the values correctly. Trust the model;
+    // labs persist regardless of crossCheckStatus.
+    const persistObservations = vi.fn(async (args: { results: ReadonlyArray<unknown> }) => ({
+      inserted: args.results.length,
+      updated: 0,
+      failed: 0,
+    }));
     const deps: AttachAndExtractDeps = {
       env: makeEnv(),
       sessionToken: bound(),
-      correlationId: 'corr-fb-b-02',
+      correlationId: 'corr-unverified-still-persists',
       observability: makeObs(),
       fetchBytes: vi.fn(async () => ({ bytes: new Uint8Array([1, 2, 3]), mimeType: 'application/pdf' })),
       extractorDeps: makeExtractorDepsReturning(true, 'unverified', 2),
@@ -299,9 +309,10 @@ describe('FB-B-01 + FB-B-02 — observation persistence gating', () => {
 
     expect(out.ok).toBe(true);
     if (!out.ok) return;
-    expect(out.persistence.attempted).toBe(false);
-    expect(out.persistence.skipped_reason).toBe('cross_check_failed');
-    expect(persistObservations).not.toHaveBeenCalled();
+    expect(out.persistence.attempted).toBe(true);
+    expect(out.persistence.inserted).toBe(2);
+    expect(out.persistence.skipped_reason).toBeUndefined();
+    expect(persistObservations).toHaveBeenCalledOnce();
   });
 
   it('persists when crossCheckStatus is not_applicable (image-only PDF — vision is the OCR source)', async () => {
@@ -334,11 +345,11 @@ describe('FB-B-01 + FB-B-02 — observation persistence gating', () => {
     expect(persistObservations).toHaveBeenCalledOnce();
   });
 
-  it('persists only verified rows on partial cross-check; refusal does not fire', async () => {
-    // S14 / FB-B-03 (per-row gating) — when some citation quotes match
-    // and others don't, the gate persists the verified subset and
-    // drops the rest. The chat surfaces "wrote N of M" via
-    // `rows_dropped_unverified`; no `cross_check_failed` is emitted.
+  it('persists every extracted row on partial cross-check (QA-pass: per-row filter dropped)', async () => {
+    // QA-pass policy update: the previous behavior persisted only the
+    // verified subset on `partial`. With the demo policy that trusts
+    // the model, ALL rows persist and `rows_dropped_unverified` is no
+    // longer emitted. Re-tighten if the trust posture changes.
     const persistObservations = vi.fn(async (args: { results: ReadonlyArray<unknown> }) => ({
       inserted: args.results.length,
       updated: 0,
@@ -347,11 +358,9 @@ describe('FB-B-01 + FB-B-02 — observation persistence gating', () => {
     const deps: AttachAndExtractDeps = {
       env: makeEnv(),
       sessionToken: bound(),
-      correlationId: 'corr-fb-b-02-partial',
+      correlationId: 'corr-partial-persists-all',
       observability: makeObs(),
       fetchBytes: vi.fn(async () => ({ bytes: new Uint8Array([1, 2, 3]), mimeType: 'application/pdf' })),
-      // The fixture's partial branch arranges rawText so rows 0 and 1
-      // (of 4) match their citations; rows 2 and 3 do not.
       extractorDeps: makeExtractorDepsReturning(true, 'partial', 4),
       persistObservations,
     };
@@ -364,20 +373,18 @@ describe('FB-B-01 + FB-B-02 — observation persistence gating', () => {
     expect(out.ok).toBe(true);
     if (!out.ok) return;
     expect(out.persistence.attempted).toBe(true);
-    expect(out.persistence.inserted).toBe(2);
-    expect(out.persistence.rows_dropped_unverified).toBe(2);
+    expect(out.persistence.inserted).toBe(4);
     expect(out.persistence.skipped_reason).toBeUndefined();
     expect(persistObservations).toHaveBeenCalledOnce();
-    // Per-row filter: only the verified rows reach the persister.
     const call = persistObservations.mock.calls[0]![0];
-    expect(call.results).toHaveLength(2);
+    expect(call.results).toHaveLength(4);
   });
 
-  it('still refuses when partial but zero result rows verified (only non-row citations matched — treat as hallucination)', async () => {
+  it('persists every row even when only non-row citations matched (QA-pass: cross-check no longer gates persistence)', async () => {
     // Edge case: factsVerified > 0 because (e.g.) the
     // `interpretive_comments_citation` matched, but no result rows
-    // verified. The chart still gets nothing; refusal fires so the
-    // clinician sees the failure mode.
+    // verified. With the QA-pass policy, ALL extracted rows persist;
+    // the cross-check signal is informational, not gating.
     const partialNoRowsExtractorDeps: AttachAndExtractDeps['extractorDeps'] = {
       client: {
         messages: {
@@ -440,11 +447,15 @@ describe('FB-B-01 + FB-B-02 — observation persistence gating', () => {
         }),
     };
 
-    const persistObservations = vi.fn(async () => ({ inserted: 0, updated: 0, failed: 0 }));
+    const persistObservations = vi.fn(async (args: { results: ReadonlyArray<unknown> }) => ({
+      inserted: args.results.length,
+      updated: 0,
+      failed: 0,
+    }));
     const deps: AttachAndExtractDeps = {
       env: makeEnv(),
       sessionToken: bound(),
-      correlationId: 'corr-fb-b-02-partial-no-rows',
+      correlationId: 'corr-partial-no-rows-still-persists',
       observability: makeObs(),
       fetchBytes: vi.fn(async () => ({ bytes: new Uint8Array([1, 2, 3]), mimeType: 'application/pdf' })),
       extractorDeps: partialNoRowsExtractorDeps,
@@ -458,9 +469,10 @@ describe('FB-B-01 + FB-B-02 — observation persistence gating', () => {
 
     expect(out.ok).toBe(true);
     if (!out.ok) return;
-    expect(out.persistence.attempted).toBe(false);
-    expect(out.persistence.skipped_reason).toBe('cross_check_failed');
-    expect(persistObservations).not.toHaveBeenCalled();
+    expect(out.persistence.attempted).toBe(true);
+    expect(out.persistence.inserted).toBe(1);
+    expect(out.persistence.skipped_reason).toBeUndefined();
+    expect(persistObservations).toHaveBeenCalledOnce();
   });
 
   it('skips persistence with not_lab_pdf when doc_type is intake_form', async () => {

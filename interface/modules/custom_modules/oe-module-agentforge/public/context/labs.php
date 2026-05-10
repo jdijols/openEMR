@@ -113,6 +113,114 @@ if (\is_array($rows)) {
     }
 }
 
+// Augment with PDF-extracted lab observations from the agentforge_w2
+// sidecar store. The CUI upload + `attach_and_extract` flow writes a
+// JSON sidecar per (patient_uuid, docref_uuid, field_path) but does not
+// (yet) project into `procedure_result`, so the loop above misses them.
+// The dashboard's LabsCard reads these via
+// `context/lab_observations_for_dashboard.php`; we mirror that filter so
+// the agent's `get_labs` tool sees the same rows the clinician sees on
+// the dashboard, satisfying the §5 citation contract for uploaded labs.
+$canonicalPatientUuid = \strtolower($ingress['patient_uuid']);
+$obsRoot = \dirname(__DIR__, 6) . '/sites/default/documents/agentforge_w2/_obs';
+
+if (\count($out) < $limit && \is_dir($obsRoot)) {
+    foreach (\scandir($obsRoot) ?: [] as $name) {
+        if ($name === '.' || $name === '..' || !\str_ends_with($name, '.json')) {
+            continue;
+        }
+        if (\count($out) >= $limit) {
+            break;
+        }
+
+        $sidecarPath = $obsRoot . '/' . $name;
+        $raw = \file_get_contents($sidecarPath);
+        if ($raw === false) {
+            continue;
+        }
+        $decoded = \json_decode($raw, true);
+        if (!\is_array($decoded)) {
+            continue;
+        }
+        if (isset($decoded['deleted_at'])) {
+            continue;
+        }
+        $sidecarPatient = \is_string($decoded['patient_uuid_canonical'] ?? null)
+            ? \strtolower((string) $decoded['patient_uuid_canonical'])
+            : '';
+        if ($sidecarPatient !== $canonicalPatientUuid) {
+            continue;
+        }
+
+        $payload = \is_array($decoded['payload'] ?? null) ? $decoded['payload'] : [];
+        $testName = \is_string($payload['test_name'] ?? null) ? (string) $payload['test_name'] : '';
+        if ($testName === '') {
+            // Intake-form / metadata-only sidecars share this directory; only
+            // result-row sidecars carry test_name.
+            continue;
+        }
+
+        $docrefUuid = \is_string($decoded['docref_uuid'] ?? null) ? (string) $decoded['docref_uuid'] : '';
+        $fieldPath = \is_string($decoded['extraction_field_path'] ?? null) ? (string) $decoded['extraction_field_path'] : '';
+
+        $valueRaw = $payload['value'] ?? null;
+        $valueStr = \is_scalar($valueRaw) ? (string) $valueRaw : '';
+        $unit = \is_string($payload['unit'] ?? null) ? (string) $payload['unit'] : '';
+        $abnormalFlag = \is_string($payload['abnormal_flag'] ?? null) ? (string) $payload['abnormal_flag'] : '';
+
+        // Build a verbatim reference_range string from the structured fields
+        // so the agent has a single readable token to cite.
+        $rangeText = \is_string($payload['reference_range_text'] ?? null) ? (string) $payload['reference_range_text'] : '';
+        if ($rangeText === '') {
+            $low = $payload['reference_range_low'] ?? null;
+            $high = $payload['reference_range_high'] ?? null;
+            if (\is_numeric($low) && \is_numeric($high)) {
+                $rangeText = (string) $low . '-' . (string) $high;
+            } elseif (\is_numeric($high)) {
+                $rangeText = '<=' . (string) $high;
+            } elseif (\is_numeric($low)) {
+                $rangeText = '>=' . (string) $low;
+            }
+        }
+
+        $collectionDate = \is_string($payload['collection_date'] ?? null) ? (string) $payload['collection_date'] : '';
+        $asOfRaw = \is_string($decoded['updated_at'] ?? null)
+            ? (string) $decoded['updated_at']
+            : (\is_string($decoded['created_at'] ?? null) ? (string) $decoded['created_at'] : '');
+        $asOf = new \DateTimeImmutable('now');
+        if ($asOfRaw !== '') {
+            try {
+                $asOf = new \DateTimeImmutable($asOfRaw);
+            } catch (\Throwable) {
+                // fall through to now()
+            }
+        }
+
+        // The sidecar row_id is synthesized from (docref_uuid, field_path) so
+        // the agent and dashboard agree on identity for the same observation.
+        $synthRowId = \max(1, \abs(\crc32($docrefUuid . '|' . $fieldPath)));
+
+        $out[] = [
+            'procedure_name' => $testName,
+            'procedure_or_result_code' => \is_string($payload['loinc'] ?? null) ? (string) $payload['loinc'] : '',
+            'result_text' => $testName,
+            'units' => $unit,
+            'result_value' => $valueStr,
+            'reference_range' => $rangeText,
+            'abnormal_flag' => $abnormalFlag,
+            'result_status' => 'final',
+            'reported_at' => $collectionDate,
+            'extraction_field_path' => $fieldPath,
+            'docref_uuid' => $docrefUuid,
+            'source_pack' => SourcePackFactory::lab(
+                $synthRowId,
+                $docrefUuid !== '' ? $docrefUuid : ('lab-sidecar-' . (string) $synthRowId),
+                $asOf
+            ),
+        ];
+    }
+}
+
 AgentAuditLogger::recordAgentEvent(
     $ctx['auth_user'],
     $ctx['auth_provider'],

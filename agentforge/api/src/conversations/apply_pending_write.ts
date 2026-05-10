@@ -453,10 +453,52 @@ async function applyBundleFanOut(
   });
   closeProposal(row.proposalId);
 
-  const anyOk = outcomes.some((o) => o.ok);
+  // Structured server-side log of the per-leaf result so a `docker logs
+  // agentforge-api | grep bundle_fan_out_outcomes` immediately surfaces
+  // which leaf rejected and why. PHI-safe — only structural fields
+  // (section_id / item_id / write_target / reason). The PHP write
+  // handlers' `reason` strings ("invalid_allergy_payload",
+  // "unsupported_payload", "duplicate_proposal", etc.) are the most
+  // actionable diagnostic for the bundle-confirm refusal path.
+  const ok = outcomes.filter((o) => o.ok).length;
+  const failed = outcomes.length - ok;
+  console.error('bundle_fan_out_outcomes', {
+    bundle_proposal_id: row.proposalId,
+    leaves_total: outcomes.length,
+    leaves_ok: ok,
+    leaves_failed: failed,
+    outcomes: outcomes.map((o) => ({
+      section_id: o.section_id,
+      item_id: o.item_id,
+      write_target: o.write_target,
+      ok: o.ok,
+      ...(o.reason !== undefined ? { reason: o.reason } : {}),
+    })),
+  });
+
+  // Aggregate reason summary for surfaces that can't render the per-leaf
+  // detail (the affordance error pill, the chat receipt). Lists the
+  // failing section ids + their reasons so the user can fix at a glance.
+  const failingSummary = outcomes
+    .filter((o) => !o.ok)
+    .slice(0, 5) // cap so the toast doesn't balloon
+    .map((o) => {
+      const path = o.item_id !== null ? `${o.section_id}/${o.item_id}` : o.section_id;
+      return `${path}: ${o.reason ?? 'rejected'}`;
+    })
+    .join('; ');
+  const reason =
+    failed === 0 ?
+      undefined
+    : failed === outcomes.length ?
+      `All ${failed} sections rejected — ${failingSummary}`
+    : `${failed} of ${outcomes.length} sections rejected — ${failingSummary}`;
+
+  const anyOk = ok > 0;
   return {
     ok: true,
     accepted: anyOk,
+    ...(reason !== undefined ? { reason } : {}),
     detail: { sections: outcomes },
   };
 }

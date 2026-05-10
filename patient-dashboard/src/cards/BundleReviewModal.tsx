@@ -28,7 +28,7 @@ import {
   setSectionRejected,
 } from '../proposals/proposalsApi'
 import { subscribeToProposalStream, type StreamEvent } from '../proposals/proposalStream'
-import { broadcast } from '../proposals/proposalBus'
+import { broadcast, subscribe as subscribeProposalEvents } from '../proposals/proposalBus'
 import { readAgentforgeSession } from '../proposals/session'
 
 type Props = {
@@ -163,9 +163,24 @@ function BundleReviewModalInner({
       },
     })
 
+    // Phase 4 follow-up — also listen on the BroadcastChannel for
+    // `proposal:resolved`. The CUI's affordance Confirm/Reject path goes
+    // through `onProposalResolved` in App.tsx, which broadcasts this
+    // event after the lifecycle call returns. Without this listener, a
+    // user who clicks Confirm on the rail affordance (instead of inside
+    // the modal) leaves the modal open — the SSE `status_changed`
+    // notification races `closeProposal()` server-side and the modal
+    // misses it. The BroadcastChannel signal is local + reliable.
+    const unsubscribeBus = subscribeProposalEvents((event) => {
+      if (event.type !== 'proposal:resolved') return
+      if (event.proposal_id !== proposalId) return
+      onCloseRef.current()
+    })
+
     return () => {
       cancelled = true
       unsubscribe()
+      unsubscribeBus()
     }
   }, [session, proposalId, patientUuid])
 
@@ -220,17 +235,44 @@ function BundleReviewModalInner({
     setActionError(null)
     try {
       const result = await confirmProposal(session, proposalId, patientUuid)
-      if (!result.accepted && (!('detail' in result) || (result as { detail?: unknown }).detail === undefined)) {
+
+      // Pull per-section outcomes off the response itself rather than
+      // waiting for the SSE `status_changed` event. The server broadcasts
+      // that event then immediately calls `closeProposal()`, which
+      // terminates the SSE stream — the in-flight broadcast can race the
+      // close and never reach the dashboard. Driving the modal-close
+      // path from the HTTP response is deterministic.
+      const detail = (result as { detail?: { sections?: SectionOutcome[] } }).detail
+      const responseSections =
+        detail !== undefined && Array.isArray(detail.sections) ? detail.sections : null
+
+      if (!result.accepted && responseSections === null) {
         setActionError(result.reason ?? 'Confirm All was rejected.')
         return
       }
-      // Outcomes will arrive via SSE status_changed; the effect above handles
-      // close. Tell the CUI the affordance can dismiss.
+
+      // Tell the CUI the affordance can dismiss + chat receipt should
+      // stamp.
       broadcast({
         type: 'proposal:resolved',
         proposal_id: proposalId,
         outcome: 'confirmed',
       })
+
+      // Refresh dashboard cards now (don't wait for the chart:updated
+      // round-trip from the CUI listener).
+      void queryClientRef.current.invalidateQueries({ queryKey: ['fhir'] })
+
+      if (responseSections !== null) {
+        // Bundle path — show per-section ✓/✗ badges briefly, then close.
+        setOutcomes(responseSections)
+        setTimeout(() => {
+          onCloseRef.current()
+        }, 1400)
+      } else {
+        // Single-write or accepted-without-detail — close immediately.
+        onCloseRef.current()
+      }
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Confirm failed.')
     } finally {

@@ -58,3 +58,6 @@ sites/default/documents/certificates/*.key
 sites/default/documents/certificates/*.pem
 sites/default/documents/logs_and_misc/methods/*
 !sites/default/documents/logs_and_misc/methods/README.md
+
+# Local DB snapshots taken before risky operations (kept on disk only)
+.local-backups/

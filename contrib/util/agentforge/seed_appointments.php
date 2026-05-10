@@ -33,13 +33,17 @@ final class AgentForgeAppointmentSeeder
     /**
      * Fixed four-day demo window. Each demo patient is scheduled exactly once across these days; dev/demo only.
      *
+     * 2026-05-10 migration: window shifted +1 day from 2026-05-09..12
+     * (Sat-Tue) to 2026-05-10..13 (Sun-Wed) for the demo-day reset, and
+     * Sunday now carries the W2-cohort spotlight (was Saturday). The four
+     * W2 cohort patients (Margaret Chen, James Whitaker, Sofia Reyes,
+     * Robert Kowalski) still fill the first four 30-min new-patient slots
+     * on the spotlight day. Sunday carries 11 appointments; Mon/Tue/Wed
+     * carry 7 each (32 total, unchanged).
+     *
      * 2026-05-07 migration: window shifted from 2026-05-10..13 (Sun-Wed)
      * to 2026-05-09..12 (Sat-Tue) and Saturday became the W2-cohort
-     * spotlight day. The four W2 cohort patients (Margaret Chen, James
-     * Whitaker, Sofia Reyes, Robert Kowalski) fill the first four 30-min
-     * new-patient slots on Saturday so the multimodal extractor/retriever
-     * demo lands on a single day. Saturday carries 11 appointments;
-     * Sun/Mon/Tue carry 7 each (32 total, unchanged).
+     * spotlight day.
      *
      * G2-Final-71 (2026-05-06): demo window migrated forward from
      * 2026-05-01..04 to 2026-05-10..13 (Sun-Wed of submission week) so
@@ -49,10 +53,10 @@ final class AgentForgeAppointmentSeeder
      * @var list<string>
      */
     private const DEMO_WEEKDAY_DATES = [
-        '2026-05-09',
         '2026-05-10',
         '2026-05-11',
         '2026-05-12',
+        '2026-05-13',
     ];
 
     private const EXPECTED_DEMO_PATIENT_COUNT = 32;

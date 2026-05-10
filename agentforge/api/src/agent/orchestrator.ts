@@ -1432,11 +1432,33 @@ function buildIntakeBundleSections(
         }
       }
     }
-    if (typeof demo['dob'] === 'string' && (demo['dob'] as string).trim() !== '') {
-      demoPayload['dob'] = (demo['dob'] as string).trim();
+    if (typeof demo['dob'] === 'string') {
+      // PHP `DemographicsUpdatePayload` rejects DOBs that aren't strict
+      // YYYY-MM-DD. Sonnet usually emits this format but if the source
+      // form had MM/DD/YYYY or "Aug 14 1967", drop it rather than
+      // bringing the whole demographics leaf down with `invalid_payload`.
+      const dobTrimmed = (demo['dob'] as string).trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dobTrimmed)) {
+        demoPayload['dob'] = dobTrimmed;
+      }
     }
     if (typeof demo['sex'] === 'string' && (demo['sex'] as string).trim() !== '') {
-      demoPayload['sex'] = (demo['sex'] as string).trim();
+      // PHP allowlist is exactly ['Male', 'Female', 'Unknown'] — case-
+      // sensitive. Sonnet usually capitalizes but a stray "female" /
+      // "FEMALE" / "M" rejects the entire demographics write. Title-case
+      // here, then validate against the closed set.
+      const raw = (demo['sex'] as string).trim().toLowerCase();
+      let normalizedSex: string | null = null;
+      if (raw === 'male' || raw === 'm') {
+        normalizedSex = 'Male';
+      } else if (raw === 'female' || raw === 'f') {
+        normalizedSex = 'Female';
+      } else if (raw === 'unknown' || raw === 'u' || raw === 'unspecified') {
+        normalizedSex = 'Unknown';
+      }
+      if (normalizedSex !== null) {
+        demoPayload['sex'] = normalizedSex;
+      }
     }
     if (typeof demo['contact_phone'] === 'string' && (demo['contact_phone'] as string).trim() !== '') {
       demoPayload['contact_phone'] = (demo['contact_phone'] as string).trim();
@@ -1527,7 +1549,34 @@ function buildIntakeBundleSections(
     }
     const severity = typeof a['severity'] === 'string' ? (a['severity'] as string).trim() : '';
     if (severity !== '') {
-      itemPayload['severity'] = severity;
+      // PHP `AllergyWritePayload`'s SEVERITY_TO_OPTION_ID accepts the
+      // severity_ccda option_ids (mild / mild_to_moderate / moderate /
+      // moderate_to_severe / severe / life_threatening_severity / fatal)
+      // plus legacy aliases (`life_threatening` → `life_threatening_severity`,
+      // `unknown` → `unassigned`). Anything else returns
+      // `invalid_allergy_payload`. Map the common Sonnet variants to
+      // valid tokens so the leaf survives PHP parse.
+      const sevLower = severity.toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
+      const SEVERITY_MAP: Readonly<Record<string, string>> = {
+        unassigned: 'unassigned',
+        unknown: 'unknown',
+        mild: 'mild',
+        mild_to_moderate: 'mild_to_moderate',
+        moderate: 'moderate',
+        moderate_to_severe: 'moderate_to_severe',
+        severe: 'severe',
+        life_threatening: 'life_threatening',
+        life_threatening_severity: 'life_threatening_severity',
+        anaphylactic: 'life_threatening',
+        anaphylaxis: 'life_threatening',
+        fatal: 'fatal',
+      };
+      const mapped = SEVERITY_MAP[sevLower];
+      if (mapped !== undefined) {
+        itemPayload['severity'] = mapped;
+      }
+      // If unmapped, leave severity off entirely — better than killing the
+      // whole allergy leaf with invalid_allergy_payload.
     }
     allergyItems.push({
       item_id: `alg-${idx + 1}`,
@@ -1549,9 +1598,47 @@ function buildIntakeBundleSections(
   : [];
   const familyItems: IntakeBundleItem[] = [];
   familyRaw.forEach((f, idx) => {
-    const relation = typeof f['relation'] === 'string' ? (f['relation'] as string).trim().toLowerCase() : '';
+    const relationRaw = typeof f['relation'] === 'string' ? (f['relation'] as string).trim().toLowerCase() : '';
     const condition = typeof f['condition'] === 'string' ? (f['condition'] as string).trim() : '';
-    if (relation === '' || condition === '') {
+    if (relationRaw === '' || condition === '') {
+      return;
+    }
+    // PHP `FamilyHistoryAddPayload` allowlist: mother, father, sibling,
+    // brother, sister, offspring, son, daughter, child, spouse, partner.
+    // Sonnet emits common natural-language variants ("mom", "dad",
+    // "grandfather") that PHP would reject. Map the obvious aliases
+    // here; drop the leaf entirely (rather than fail the whole bundle)
+    // when relation can't be coerced (grandparents / aunts / uncles
+    // don't fit OpenEMR's history columns at all).
+    const RELATION_MAP: Readonly<Record<string, string>> = {
+      mother: 'mother',
+      mom: 'mother',
+      mum: 'mother',
+      mama: 'mother',
+      ma: 'mother',
+      father: 'father',
+      dad: 'father',
+      papa: 'father',
+      pa: 'father',
+      sibling: 'sibling',
+      brother: 'brother',
+      bro: 'brother',
+      sister: 'sister',
+      sis: 'sister',
+      offspring: 'offspring',
+      son: 'son',
+      daughter: 'daughter',
+      child: 'child',
+      kid: 'child',
+      spouse: 'spouse',
+      husband: 'spouse',
+      wife: 'spouse',
+      partner: 'partner',
+    };
+    const relation = RELATION_MAP[relationRaw];
+    if (relation === undefined) {
+      // Unsupported relation (grandparent / aunt / uncle / cousin / etc.).
+      // Skip rather than fail the bundle.
       return;
     }
     const itemPayload: Record<string, unknown> = { relation, condition };

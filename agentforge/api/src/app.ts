@@ -548,6 +548,7 @@ export function buildApp(
       ok: true,
       accepted: out.accepted,
       ...(out.reason !== undefined ? { reason: out.reason } : {}),
+      ...(out.detail !== undefined ? { detail: out.detail } : {}),
       correlation_id: correlationId,
     });
   });
@@ -1022,6 +1023,11 @@ export function buildApp(
       ok: true,
       accepted: out.accepted,
       ...(out.reason !== undefined ? { reason: out.reason } : {}),
+      // Phase 4 — bundle proposals carry per-leaf outcomes on `detail`. The
+      // dashboard's BundleReviewModal renders per-section "✓ Wrote" / "✗ <reason>"
+      // badges from this; the affordance falls back to the top-level `reason`
+      // summary above. Single-write proposals don't populate detail.
+      ...(out.detail !== undefined ? { detail: out.detail } : {}),
       correlation_id: correlationId,
     });
   });

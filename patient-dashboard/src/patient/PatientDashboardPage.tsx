@@ -55,6 +55,11 @@ export function PatientDashboardPage() {
     return subscribeProposalEvents((event) => {
       if (event.type === 'chart:updated') {
         void queryClient.invalidateQueries({ queryKey: ['fhir'] })
+        // Also refresh the agentforge sidecar-backed lab observations
+        // (LabsCard reads these alongside FHIR /Observation; they live in
+        // a JSON store on disk and need an explicit re-fetch when a new
+        // lab lands).
+        void queryClient.invalidateQueries({ queryKey: ['agentforge-labs'] })
       }
     })
   }, [queryClient])

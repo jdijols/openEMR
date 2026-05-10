@@ -54,10 +54,26 @@ async function postContext(
   }
 
   let json: unknown;
+  let rawText = '';
   try {
-    json = await res.json();
+    rawText = await res.text();
+    json = JSON.parse(rawText);
   } catch {
-    throw new OpenEmrCallError('openemr_invalid_json', res.status);
+    // Non-JSON body. Log the head + tail so we can see what PHP actually
+    // returned (PHP warnings/notices interspersed with JSON, HTML error
+    // pages, empty bodies, etc.).
+    console.error('openemr_invalid_json', {
+      url,
+      status: res.status,
+      content_type: res.headers.get('content-type'),
+      body_length: rawText.length,
+      body_head: rawText.slice(0, 600),
+      body_tail: rawText.length > 600 ? rawText.slice(-200) : '',
+    });
+    throw new OpenEmrCallError('openemr_invalid_json', res.status, {
+      body_head: rawText.slice(0, 600),
+      body_length: rawText.length,
+    });
   }
 
   if (!res.ok) {

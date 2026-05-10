@@ -29,6 +29,12 @@ export type WorkerModel = string | null;
 
 const WORKER_MODELS: Readonly<Record<WorkerName, WorkerModel>> = {
   supervisor: 'claude-sonnet-4-6',
+  // Sonnet 4.6 for intake extraction — demo sweet spot. ~2× faster than
+  // Opus (~60 s vs ~120 s) with vision/reasoning quality close enough to
+  // Opus for the QA forms. The sharpened prompt (table reading + NKDA
+  // negation rules + conservative null) does the heavy lifting; the
+  // model just needs to follow long structured prompts reliably, which
+  // Sonnet does. Haiku was too risky on negation patterns.
   intake_extractor: 'claude-sonnet-4-6',
   evidence_retriever: null,
   critic: null,

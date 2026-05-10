@@ -13,9 +13,19 @@ type Props = { patientId: string }
 const Schema = FhirBundleSchema(FhirMedicationRequestSchema)
 
 export function MedicationsCard({ patientId }: Props) {
+  // The FHIR `MedicationRequest` endpoint UNIONs two sources via OpenEMR's
+  // `PrescriptionService::getBaseSql`:
+  //   - `prescriptions` table → `intent = 'order'` (clinical orders)
+  //   - `lists` table type='medication' → `intent = 'plan'` (community /
+  //     patient-reported meds)
+  // Filtering on `intent: 'order'` would drop everything the agentforge
+  // module writes (it lands in `lists`). We want both sources surfaced on
+  // the dashboard, so we leave `intent` un-filtered and keep only the
+  // status filter (active row vs stopped/completed). The card's render
+  // logic already handles both shapes.
   const query = useFhirQuery(
     '/MedicationRequest',
-    { patient: patientId, intent: 'order', status: 'active' },
+    { patient: patientId, status: 'active' },
     Schema,
   )
 

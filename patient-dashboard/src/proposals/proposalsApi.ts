@@ -57,6 +57,14 @@ export type ConfirmResult = {
   ok: boolean
   accepted: boolean
   reason?: string
+  /**
+   * Phase 4 — for bundle proposals (intake_bundle), the API response carries
+   * `detail.sections` with per-leaf outcomes. The BundleReviewModal renders
+   * these as ✓/✗ badges and uses their presence to drive the auto-close
+   * (independent of the SSE status_changed event, which can race with
+   * closeProposal on the server side).
+   */
+  detail?: unknown
 }
 
 type FetchImpl = typeof fetch

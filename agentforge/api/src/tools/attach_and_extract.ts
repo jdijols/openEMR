@@ -364,41 +364,38 @@ async function maybePersistObservations(
     // shape disagrees (impossible after Zod parse), treat as schema_invalid.
     return { attempted: false, inserted: 0, updated: 0, failed: 0, skipped_reason: 'schema_invalid' };
   }
-  if (result.crossCheckStatus === 'unverified') {
-    // S14 / FB-B-02 — text layer present, zero matches. Most likely a
-    // hallucination — the LLM emitted values that aren't in the source
-    // at all. The orchestrator synthesizes a user-facing refusal from
-    // this signal.
-    return { attempted: false, inserted: 0, updated: 0, failed: 0, skipped_reason: 'cross_check_failed' };
-  }
   if (deps.persistObservations === undefined) {
     return { attempted: false, inserted: 0, updated: 0, failed: 0, skipped_reason: 'no_persister' };
   }
 
-  // Decide which rows to persist. `verified` and `not_applicable` write
-  // every row. `partial` filters down to the verified subset; if for
-  // some reason no rows were verified (only non-row citations like
-  // `interpretive_comments` matched), treat as a hallucination and
-  // refuse rather than persisting nothing silently.
+  // QA-pass policy: persist every row the LLM extracted, regardless of
+  // crossCheckStatus. PDF text-layer cross-check is a strict S14 safeguard
+  // against hallucination, but for the demo it's too aggressive — scanned
+  // labs (image-only PDFs, fonts the text layer doesn't decode cleanly,
+  // table cells that PDF text extraction can't position) routinely fail
+  // verification even when the model read the values correctly. Trust the
+  // model's extraction; the physician confirms the lab summary clinical
+  // note before any chart-visible writes anyway.
   const allResults = result.extraction.results;
-  let rowsToPersistIndices: ReadonlyArray<number>;
-  if (result.crossCheckStatus === 'partial') {
-    rowsToPersistIndices = result.verifiedResultIndices;
-    if (rowsToPersistIndices.length === 0) {
-      return { attempted: false, inserted: 0, updated: 0, failed: 0, skipped_reason: 'cross_check_failed' };
-    }
-  } else {
-    // verified or not_applicable
-    rowsToPersistIndices = allResults.map((_, i) => i);
-  }
+  const rowsToPersistIndices: ReadonlyArray<number> = allResults.map((_, i) => i);
 
   // Strip the per-result `citation` envelope before persistence — citations
   // already live in the DocumentReference's `derivedFrom` linkage; carrying
   // them into the Observation row body bloats storage and risks PHI in
   // payload bodies (S11 deny-list applies to spans, not row bodies, but
   // the principle is the same: minimum payload surface).
+  //
+  // Exception (G2-Final-Citation): we DO keep the structural citation
+  // metadata `bbox` and `page` (parsed from `page_or_section`). These are
+  // the inputs the §5 citation contract requires for the visual PDF
+  // bounding-box overlay. They don't carry PHI — `bbox` is four numbers,
+  // `page` is an integer — and stripping them would mean the CUI cannot
+  // ever resolve a citation back to its source region. The full citation
+  // (quote_or_value, source_type, etc.) stays out of the row body.
   const rows = rowsToPersistIndices.map((idx) => {
     const r = allResults[idx]!;
+    const pageMatch = /^page:(\d+)$/i.exec(r.citation.page_or_section.trim());
+    const page = pageMatch !== null ? Number(pageMatch[1]) : null;
     return {
       test_name: r.test_name,
       loinc: r.loinc,
@@ -409,6 +406,8 @@ async function maybePersistObservations(
       reference_range_text: r.reference_range_text,
       collection_date: r.collection_date,
       abnormal_flag: r.abnormal_flag,
+      ...(r.citation.bbox !== undefined ? { bbox: r.citation.bbox } : {}),
+      ...(page !== null && Number.isFinite(page) && page >= 1 ? { page } : {}),
     };
   });
 

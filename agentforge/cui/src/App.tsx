@@ -559,7 +559,11 @@ export default function App(): ReactElement {
       return;
     }
     lastBroadcastedHeadIdRef.current = headId;
-    if (headTarget !== 'allergy') {
+    // Phase 4 — both `allergy` (single-write modal) and `intake_bundle`
+    // (multi-section review modal) auto-open. Other targets (vitals,
+    // clinical_note, chief_complaint, tobacco) have no dashboard modal yet
+    // and are confirmed directly from the affordance.
+    if (headTarget !== 'allergy' && headTarget !== 'intake_bundle') {
       return;
     }
     broadcastProposalEvent({
@@ -684,7 +688,10 @@ export default function App(): ReactElement {
       return;
     }
     const target = activeProposal.writeTarget;
-    if (target === 'allergy') {
+    // Modal-bearing targets — broadcast so the dashboard reopens the
+    // matching modal (AllergyModal for `allergy`, BundleReviewModal for
+    // `intake_bundle`).
+    if (target === 'allergy' || target === 'intake_bundle') {
       broadcastProposalEvent({
         type: 'proposal:open_modal',
         proposal_id: activeProposal.proposalId,

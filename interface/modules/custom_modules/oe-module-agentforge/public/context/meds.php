@@ -96,6 +96,8 @@ foreach ($rows as $raw) {
         }
     }
 
+    $drug = \is_string($raw['drug'] ?? null) ? $raw['drug'] : '';
+    $status = \is_string($raw['status'] ?? null) ? $raw['status'] : '';
     $dosage = \is_string($raw['dosage'] ?? null) ? $raw['dosage'] : '';
     $schedule = '';
     if (\is_string($raw['interval'] ?? null)) {
