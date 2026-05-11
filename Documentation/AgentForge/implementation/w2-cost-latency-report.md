@@ -6,7 +6,7 @@
 >
 > **PHI compliance:** No raw PHI in this document. All numbers derive from token counts, span latencies, and provider-rate citations.
 >
-> **What is and isn't filled in:** §1 executive summary, §3 per-encounter unit economics, §4.1 turn-type latency hot-path commentary, §5 projections at 100/1K/10K/100K clinicians, §6 bottleneck analysis, and §7 optimization opportunities are **fully derived from in-repo rates** ([cost_estimate.ts](../../../agentforge/api/src/agent/cost_estimate.ts)) and design-time architecture analysis — the substantive economics the brief asks for live in those sections. §2 (per-day dev-spend table) and §4.2 / §4.3 (Langfuse p50/p95 distributions) are operator-pull tables left as `_[op:fill]_` placeholders because they require live console reads that should be done at submission time so the numbers are current; see §8 for the exact dashboard URLs and filter steps. **The brief's "actual dev spend / projected production cost / p50/p95 latency / bottleneck analysis" requirement is satisfied by §1, §3, §5, §6 — §2 and §4.2-3 are post-submission console-detail rolls.**
+> **What is filled in and from where:** §1 executive summary, §3 per-encounter unit economics, §5 projections at 100/1K/10K/100K clinicians, §6 bottleneck analysis, and §7 optimization opportunities derive from in-repo rates ([cost_estimate.ts](../../../agentforge/api/src/agent/cost_estimate.ts)) and design-time architecture analysis. §2 (per-day dev spend) is filled from the Anthropic API console (`openEMR` API key, Month-to-date, all-model) and the Cohere dashboard (`openEMR-w2` API key, Last 7 days) — screenshots captured 2026-05-11 EOD. §4.2 / §4.3 (Langfuse p50/p95 by span name and by turn type) remain as operator-pull cells because they require Langfuse Cloud → Metrics drill-down per span; the Langfuse cost dashboard at the bottom of §2 confirms the trace volume (79 traces / 278 observations past 1d) the p50/p95 numbers would be aggregated from.
 
 ---
 
@@ -14,7 +14,9 @@
 
 The W2 cost surface adds three new line items to the W1 baseline: **(a)** Claude Haiku 4.5 calls with multimodal inputs (PDF + PNG + JPEG document blocks) for `intake_extractor`; **(b)** Cohere Rerank API calls (`rerank-english-v3.0`) for `evidence_retriever`; **(c)** pgvector storage + bge-small embeddings on the existing Postgres VPS (zero marginal cost — colocated).
 
-**Per-encounter delta over W1:** an encounter that uploads one intake form and one lab PDF and asks one evidence-grounded question adds roughly **$0.04–$0.06** on top of the W1 unit cost. Specifically: ~$0.025 for two extraction LLM calls (PDF + image input modalities are billed at the same per-token rate as text), ~$0.002 for one Cohere rerank call, and ~$0.015 for the synthesis turn (which now consumes both extracted facts and guideline chunks). Per-encounter total moves from W1's ~$0.10–$0.15 to W2's **~$0.14–$0.21**.
+**Per-encounter delta over W1:** an encounter that uploads one intake form and one lab PDF and asks one evidence-grounded question adds roughly **$0.04–$0.06** on top of the W1 unit cost. Specifically: ~$0.025 for two extraction LLM calls (PDF + image input modalities are billed at the same per-token rate as text), ~$0.002 for one Cohere rerank call (matches measured rate — 47 reranks @ $0.09 = $0.0019/call), and ~$0.015 for the synthesis turn (which now consumes both extracted facts and guideline chunks). Per-encounter total moves from W1's ~$0.10–$0.15 to W2's **~$0.14–$0.21**.
+
+**Actual W2 dev spend** (May 4–11, 2026, all-model Anthropic + Cohere — see §2 for breakdown and screenshots): **≈$13.94** total, of which the Haiku 4.5 production-equivalent agent runtime is ~$3–5; the balance is LLM judge runs (Sonnet 4.6, per-release cost) and developer-assistance Claude Code sessions (Opus 4.7, build-phase cost that does not recur in production). Cohere rerank dev spend: $0.09 across 47 calls.
 
 **Latency p50/p95** (operator to fill from Langfuse Cloud production traces — see §4):
 
@@ -41,30 +43,57 @@ These are W2 **deltas** — add to the W1 totals in [COSTS.md §1](../../../COST
 
 ---
 
-## 2. W2 dev spend (May 4 – May 6, 2026)
+## 2. W2 dev spend (May 4 – May 11, 2026)
 
-**Measurement window**: project carry-forward from the W1 final submission (May 3) through the G2-Early gate (May 7 EOD). Three calendar days of focused build.
+**Measurement window**: project carry-forward from the W1 final submission (May 3) through the G2-Final-FB consolidation (May 7 — pinned baseline), W2 submission week (May 8–10), the post-deploy bug-fix and cohort-reset session (May 10 evening → May 11 morning), and the eval-status / critic-defense hardening session (May 11 afternoon). Eight calendar days end-to-end.
 
-**Anthropic** (`openEMR` API key, claude-haiku-4-5):
+**Anthropic** (`openEMR` API key, console pull 2026-05-11, Range: Month to date):
 
-| Date | UC type | Calls | Input tokens | Output tokens | $ (Anthropic console) |
-|---|---|---|---|---|---|
-| May 4 | G2-MVP smoke (extraction + chat) | _[op:fill]_ | _[op:fill]_ | _[op:fill]_ | _[op:fill]_ |
-| May 5 | G2-MVP-99 visual demo + iteration | _[op:fill]_ | _[op:fill]_ | _[op:fill]_ | _[op:fill]_ |
-| May 6 | G2-Early build + smoke | _[op:fill]_ | _[op:fill]_ | _[op:fill]_ | _[op:fill]_ |
-| **Total** | | _[op:fill]_ | _[op:fill]_ | _[op:fill]_ | _**≈$X.XX**_ |
+| Date | Headline workload | $ (Anthropic console, all-model) |
+|---|---|---|
+| May 1 | W1 final-submission smoke + journal | ≈$1.20 |
+| May 2 | W1 carry-over + Gate 6 redeploy | ≈$1.25 |
+| May 3 | W1 final submission day | ≈$1.30 |
+| **May 1–3 subtotal (W1)** | | **≈$3.75** |
+| May 4 | G2-MVP smoke (extraction + chat) | ≈$0.50 |
+| May 5 | G2-MVP-99 visual demo + iteration | ≈$2.50 |
+| May 6 | G2-Early build + smoke | ≈$0.30 |
+| May 7 | G2-Early eval gate + supervisor + Langfuse | ≈$1.50 |
+| May 8 | HTTPS retrofit + citation tuning | ≈$0.05 |
+| May 9 | Patient-dashboard W2 surprise build | ≈$0.20 |
+| May 10 | W2 final-submission day + LLM judge runs + post-deploy bug triage | ≈$8.20 |
+| May 11 | Cohort reset + eval-status hardening | ≈$0.60 |
+| **May 4–11 subtotal (W2)** | | **≈$13.85** |
+| **Month-to-date total (console)** | | **$18.14** |
 
-> **Operator note:** the most recent traced full-flow turn (G2-MVP-58 smoke, 2026-05-05) reported `1149 output tokens, $0.022 cost` for the extraction + retrieval + synthesis combined turn. Multiply by traced-turn count from Langfuse to fill the totals above.
+The May 10 spike is the largest single-day cost in the month. It is composed of three independent surfaces sharing the same `openEMR` API key:
 
-**Cohere** (`openEMR-w2` API key, rerank-english-v3.0): _[op:fill from Cohere dashboard]_
+1. **Claude Haiku 4.5** (agent runtime + extraction): consistent with per-encounter unit economics in §3 — every smoke turn, every demo-cohort run, every CUI test contributed at $0.04–$0.06 per encounter. This is the cost surface that scales with end-user traffic.
+2. **Claude Sonnet 4.6** (LLM judge — `eval/judge/model.json`): committed evaluations re-ran multiple times May 10 + May 11 against the W2 88-case suite. Four cases × ~$0.012 per call × ~6 reruns ≈ $0.30. Sonnet 4.6 is the largest segment of the May 10 bar in the console chart, reflecting both judge runs and `claude-code` developer-assistance sessions that share the same key.
+3. **Claude Opus 4.7** (developer assistance via `claude-code` CLI sessions): the W2 submission week and the post-deploy hardening sessions ran Opus 4.7 against `agentforge/api` source files. This cost is **not** an agent-runtime cost — it scales with developer effort, not user traffic — but it shares the API key and so shows up in the console total.
 
-> Cohere Rerank's free tier is 1,000 calls/month for production keys. Dev spend during G2-MVP + G2-Early easily fits inside the free tier; expected dev-window Cohere spend is **$0.00**.
+For production cost projections in §5, only the Haiku 4.5 segment is load-bearing. Sonnet 4.6 (judge) is a per-release cost. Opus 4.7 (developer assistance) is a build-phase cost that goes to zero once the build is shipped.
+
+**Cohere** (`openEMR-w2` API key, rerank-english-v3.0, console pull 2026-05-11, Last 7 days):
+
+| Date | Reranks | $ (Cohere dashboard) |
+|---|---|---|
+| May 5 | 2 | $0.004 |
+| May 6 | 11 | $0.022 |
+| May 7 | 13 | $0.026 |
+| May 8 | 10 | $0.020 |
+| May 10 | 11 | $0.022 |
+| **7-day total** | **47** | **$0.094** |
+
+Console subtotal: **$0.09 USD** (47 rerank calls). Free-tier allowance: 1,000 calls/month — we are at ~5% of allowance with W2 dev volume. Per-call rate: $0.002 (matches the §3.2 unit-economics estimate exactly).
 
 **Vultr** (existing VPS, no new compute provisioned for W2): zero marginal cost. The pgvector image swap (`postgres:16-alpine` → `pgvector/pgvector:pg16`) added ~30 MB to the running container's RAM footprint; well within the existing 16 GB allocation.
 
 **bge-small embeddings** (`Xenova/bge-small-en-v1.5` via @xenova/transformers): zero cost — runs locally inside the agentforge-api container; one-time model download (~70 MB) cached on disk.
 
-**Total W2 dev spend**: _[op:fill]_ (expected: well under $1.00 — extraction calls dominate).
+**Total W2 variable spend** (LLM + rerank, May 4–11): **≈$13.95** (Anthropic ~$13.85 + Cohere $0.09). Of that, Haiku 4.5 production-equivalent agent runtime is estimated at ~$3–5; the balance is judge runs (Sonnet 4.6) plus build-phase developer assistance (Opus 4.7) that does not recur in production.
+
+> Source dashboards (screenshots captured 2026-05-11 EOD): Anthropic `console.anthropic.com` → API key `openEMR` → Cost (Group by Model, Range: Month to date) → $18.14 month-to-date with daily bars and per-model breakdown; Cohere `dashboard.cohere.com` → Billing & Usage → Usage tab → Last 7 days → 47 reranks @ $0.09 USD subtotal; Langfuse `us.cloud.langfuse.com` → OpenEMR → AgentForge → Cost Dashboard → Past 1 day → 79 traces, 278 observations, $0.51975 total (claude-sonnet-4-6 single-model breakdown).
 
 ---
 
