@@ -135,7 +135,7 @@ The trace is the primary debugging tool when something goes wrong in production.
 
 The screenshot below is the Tracing list view for the OpenEMR / AgentForge project on Langfuse Cloud. Each row is one of the trace entries described above — `case_presentation` and `chat` traces, with their `llm.request` / `response_completed` generations expanded inline, the `correlation_id` in the metadata column, latency in seconds, and per-trace USD cost computed from the canonical model name (`claude-haiku-4-5`).
 
-![Langfuse Tracing list view — OpenEMR / AgentForge project, showing case_presentation and chat traces with correlation_id, latency, cost, and provider model name columns](Documentation/AgentForge/assets/LangFuse.png)
+![Langfuse Tracing list view — OpenEMR / AgentForge project, showing case_presentation and chat traces with correlation_id, latency, cost, and provider model name columns](Documentation/AgentForge/assets/W1-LangFuse.png)
 
 This is the surface a grader, an SRE, or an incident reviewer lands on when they have a `correlation_id` and need to reconstruct a turn. The four brief questions answered above (what / when / failures / cost) are all answerable from this list plus a click into any single trace.
 

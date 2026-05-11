@@ -93,7 +93,13 @@ Console subtotal: **$0.09 USD** (47 rerank calls). Free-tier allowance: 1,000 ca
 
 **Total W2 variable spend** (LLM + rerank, May 4–11): **≈$13.95** (Anthropic ~$13.85 + Cohere $0.09). Of that, Haiku 4.5 production-equivalent agent runtime is estimated at ~$3–5; the balance is judge runs (Sonnet 4.6) plus build-phase developer assistance (Opus 4.7) that does not recur in production.
 
-> Source dashboards (screenshots captured 2026-05-11 EOD): Anthropic `console.anthropic.com` → API key `openEMR` → Cost (Group by Model, Range: Month to date) → $18.14 month-to-date with daily bars and per-model breakdown; Cohere `dashboard.cohere.com` → Billing & Usage → Usage tab → Last 7 days → 47 reranks @ $0.09 USD subtotal; Langfuse `us.cloud.langfuse.com` → OpenEMR → AgentForge → Cost Dashboard → Past 1 day → 79 traces, 278 observations, $0.51975 total (claude-sonnet-4-6 single-model breakdown).
+**Source-dashboard screenshots** (captured 2026-05-11 EOD, archived under [`Documentation/AgentForge/assets/W2-cost-evidence/`](../assets/W2-cost-evidence/)):
+
+| Dashboard | Path | What it shows |
+|---|---|---|
+| Anthropic API console | [`Claude.png`](../assets/W2-cost-evidence/Claude.png) | API key `openEMR`, Cost view, Group by Model, Range: Month to date. $18.14 month-to-date total, daily-token-cost bar chart, per-model breakdown (Sonnet 4.6 / Sonnet 4.5 / Opus 4.7 / Haiku 4.5). |
+| Cohere Billing & Usage | [`Cohere.png`](../assets/W2-cost-evidence/Cohere.png) | API key `openEMR-w2`, Usage tab, Last 7 days. $0.09 USD subtotal, 47 Rerank calls broken out by date. |
+| Langfuse Cost dashboard | [`Langfuse.png`](../assets/W2-cost-evidence/Langfuse.png) | Past 1 day filter, 79 traces / 278 observations, $0.51975 total cost, Cost by Model (claude-sonnet-4-6), Cost by Environment. |
 
 ---
 
