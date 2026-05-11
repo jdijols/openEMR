@@ -72,6 +72,18 @@ final class AppointmentEncounterBinder
             return $sameDayEncounter;
         }
 
+        // Demo fallback: if no encounter matches today's date AND no
+        // appointment-context date matched either, bind the patient's most
+        // recent encounter outright. This preserves the realistic "encounter
+        // already queued by the MA" experience for the multi-day cohort
+        // (5/10 / 5/12 / 5/13 patients) without forcing every demo day to
+        // run on the literal calendar date the encounter was prepared for.
+        $latestEncounter = $this->findLatestEncounter($pid);
+        if ($latestEncounter !== null) {
+            $this->setOpenEncounter($latestEncounter->encounterId);
+            return $latestEncounter;
+        }
+
         $appointment ??= $this->findLatestSameDayAppointment($pid, $targetDate);
         if ($appointment === null) {
             return new AppointmentEncounterBindingResult(null, '', '', false);
@@ -174,6 +186,28 @@ final class AppointmentEncounterBinder
              ORDER BY fe.`date` DESC, fe.`encounter` DESC
              LIMIT 1",
             [$pid, $today]
+        );
+
+        return $this->resultFromEncounterRow($row, false);
+    }
+
+    /**
+     * Demo-fallback companion to {@see self::findLatestSameDayEncounter()}.
+     * Returns the patient's most recent encounter regardless of date — used
+     * when no encounter matches the target/today date so the cohort still
+     * shows a queued encounter at chart-open even on days that don't equal
+     * the encounter's calendar date.
+     */
+    private function findLatestEncounter(int $pid): ?AppointmentEncounterBindingResult
+    {
+        $row = \sqlQuery(
+            "SELECT fe.`encounter`, DATE(fe.`date`) AS encounter_date, COALESCE(cat.`pc_catname`, '') AS category
+             FROM `form_encounter` fe
+             LEFT JOIN `openemr_postcalendar_categories` cat ON cat.`pc_catid` = fe.`pc_catid`
+             WHERE fe.`pid` = ?
+             ORDER BY fe.`date` DESC, fe.`encounter` DESC
+             LIMIT 1",
+            [$pid]
         );
 
         return $this->resultFromEncounterRow($row, false);
