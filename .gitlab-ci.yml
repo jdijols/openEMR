@@ -1,0 +1,55 @@
+# GitLab CI mirror of .github/workflows/agentforge-eval.yml.
+#
+# Deterministic regression gate for the Clinical Copilot's stop-the-line
+# invariants. Runs `npm run eval` from agentforge/api. Pure CPU + filesystem
+# — no network, no LLM, no DB. Architecture: agentforge/api/eval/README.md
+# and EVALUATION.md at repo root.
+#
+# This file exists so the eval gate runs on the GauntletAI GitLab remote
+# (labs.gauntletai.com/jasondijols/openemr) in addition to the GitHub mirror.
+# Both pipelines invoke the identical `npm run eval` command and share the
+# same 5pp regression cap / 95% absolute floor enforced by eval/runner.ts.
+
+stages:
+  - eval
+
+agentforge_eval:
+  stage: eval
+  image: node:24-bookworm-slim
+  rules:
+    # Run on MRs targeting master or rel-* when relevant files change.
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^rel-/)
+      changes:
+        - agentforge/api/eval/**/*
+        - agentforge/api/src/schemas/extraction.ts
+        - agentforge/api/src/observability/redact.ts
+        - agentforge/api/package.json
+        - agentforge/api/package-lock.json
+        - Documentation/AgentForge/assets/W2-documents/**/*
+        - .gitlab-ci.yml
+    # Run on direct pushes to master or rel-* branches.
+    - if: $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH =~ /^rel-/
+      changes:
+        - agentforge/api/eval/**/*
+        - agentforge/api/src/schemas/extraction.ts
+        - agentforge/api/src/observability/redact.ts
+        - agentforge/api/package.json
+        - agentforge/api/package-lock.json
+        - Documentation/AgentForge/assets/W2-documents/**/*
+        - .gitlab-ci.yml
+  cache:
+    key:
+      files:
+        - agentforge/api/package-lock.json
+    paths:
+      - .npm/
+  before_script:
+    - cd agentforge/api
+    - npm ci --cache ../../.npm --prefer-offline
+  script:
+    - npm run eval
+  artifacts:
+    when: on_failure
+    expire_in: 14 days
+    paths:
+      - agentforge/api/eval/reports/
