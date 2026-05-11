@@ -65,15 +65,44 @@ final class DocumentUploadAction
 
         $existing = $this->port->findExistingDocRef($patientUuidCanonical, $payload->sha256);
         if ($existing !== null) {
+            // Idempotency at the agentforge_w2/ sidecar level — same (patient,
+            // sha256) → reuse the existing docref UUID; no new .bin written.
+            //
+            // BUT the OpenEMR `documents` projection needs separate care: the
+            // sidecar's stored `oe_document_id` may be stale (operator-driven
+            // full-DB re-clones from local for demo data refresh wipe the
+            // documents row while the filesystem volume — sidecars + .bin —
+            // survives intact). If the sidecar's id no longer resolves to a
+            // real row, re-register so the response carries a fresh, valid
+            // `oe_document_id`. Without this, the CUI's "View in documents"
+            // link is hidden on every re-upload of a previously-seen file.
+            $oeDocumentId = $this->port->findOpenEmrDocumentId($existing);
+            $stillExists = $patientId > 0
+                && $oeDocumentId !== null
+                && $this->oeRegistrar->documentExistsForPatient($oeDocumentId, $patientId);
+            if (!$stillExists) {
+                $oeDocumentId = $this->oeRegistrar->register(
+                    $patientId,
+                    $this->resolveFilename($originalFilename, $payload),
+                    $payload->mimeType,
+                    $payload->fileBytes,
+                );
+                if ($oeDocumentId !== null) {
+                    $this->port->recordOpenEmrMapping($existing, $oeDocumentId);
+                }
+            }
+
             $this->audit->recordDocUpload(
                 $authUser,
                 $authProvider,
                 $patientId > 0 ? $patientId : null,
                 $correlationId,
                 true,
-                $payload->toAuditPayload($existing, true),
+                $payload->toAuditPayload($existing, true) + [
+                    'oe_document_id' => $oeDocumentId,
+                ],
             );
-            return DocumentUploadResult::existing($existing);
+            return DocumentUploadResult::existing($existing, $oeDocumentId);
         }
 
         $docrefUuid = $this->port->mintAndPersistDocument($patientUuidCanonical, $payload);

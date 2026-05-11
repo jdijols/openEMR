@@ -36,4 +36,19 @@ interface OpenEmrDocumentsRegistrarPort
         string $mimeType,
         string $fileBytes,
     ): ?int;
+
+    /**
+     * True if a `documents.id` row exists with `foreign_id = $patientPid`.
+     * Used by the idempotency-hit path on document upload to verify that a
+     * sidecar's previously-stored `oe_document_id` still resolves to a real
+     * row — necessary because operator-driven workflows (full-DB re-clone
+     * from local for demo data refresh) can wipe `documents` rows while the
+     * `agentforge_w2/` sidecar JSONs survive on the filesystem volume,
+     * leaving the sidecar's `oe_document_id` annotation stale. When this
+     * returns false, the upload action re-registers to mint a fresh id.
+     *
+     * Patient-scoped to prevent cross-patient ID confusion in the unlikely
+     * case of a documents row having been re-numbered on a foreign patient.
+     */
+    public function documentExistsForPatient(int $oeDocumentId, int $patientPid): bool;
 }

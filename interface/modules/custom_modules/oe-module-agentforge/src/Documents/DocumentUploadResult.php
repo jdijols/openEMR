@@ -28,8 +28,8 @@ final readonly class DocumentUploadResult
         return new self($docrefUuid, false, $oeDocumentId);
     }
 
-    public static function existing(string $docrefUuid): self
+    public static function existing(string $docrefUuid, ?int $oeDocumentId = null): self
     {
-        return new self($docrefUuid, true, null);
+        return new self($docrefUuid, true, $oeDocumentId);
     }
 }

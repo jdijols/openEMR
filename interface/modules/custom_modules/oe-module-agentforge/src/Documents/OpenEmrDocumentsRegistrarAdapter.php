@@ -30,6 +30,24 @@ namespace OpenEMR\Modules\AgentForge\Documents;
 
 final class OpenEmrDocumentsRegistrarAdapter implements OpenEmrDocumentsRegistrarPort
 {
+    public function documentExistsForPatient(int $oeDocumentId, int $patientPid): bool
+    {
+        if ($oeDocumentId <= 0 || $patientPid <= 0) {
+            return false;
+        }
+        try {
+            $found = \OpenEMR\Common\Database\QueryUtils::fetchSingleValue(
+                "SELECT `id` FROM `documents` WHERE `id` = ? AND `foreign_id` = ? LIMIT 1",
+                'id',
+                [$oeDocumentId, $patientPid],
+            );
+        } catch (\Throwable $e) {
+            \error_log('agentforge.oe_docs_registrar.exists_check_failed: ' . $e->getMessage());
+            return false;
+        }
+        return $found !== null;
+    }
+
     public function register(
         int $patientPid,
         string $filename,
