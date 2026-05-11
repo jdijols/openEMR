@@ -1,5 +1,14 @@
 # Per-run JSON reports written by `npm run eval`. Build artifacts keyed by
-# run_id; grow unboundedly and are not meant to be committed. The CI
-# workflow uploads them as artifacts on failure (see .github/workflows/
-# agentforge-eval.yml) — that is the canonical archive surface.
+# run_id; grow unboundedly and are not meant to be committed by default.
+# The CI workflow uploads them as artifacts on failure (see
+# .github/workflows/agentforge-eval.yml) — that is the canonical archive
+# surface for CI runs.
 reports/
+
+# Exception: a small set of *canonical evidence* reports are committed by
+# force (`git add -f reports/<file>`) at submission-style milestones so
+# graders have a fixed, version-controlled snapshot to inspect. Today the
+# canonical evidence is the W2 judge-populated 88-case run. The `eval_status`
+# HTTP endpoint sorts reports by the run-id timestamp embedded in the
+# filename, so adding a newer committed report (with a later timestamp
+# prefix) is enough to update what the live endpoint serves.

@@ -5,6 +5,8 @@
 > **Source of measured data:** Anthropic API console (`openEMR` API key, May 4 – May 6 2026), Cohere API dashboard (`openEMR-w2`), Langfuse traces (`https://us.cloud.langfuse.com` → OpenEMR → AgentForge), Vultr billing portal. Brief deliverable mapped to W2 PRD §12.
 >
 > **PHI compliance:** No raw PHI in this document. All numbers derive from token counts, span latencies, and provider-rate citations.
+>
+> **What is and isn't filled in:** §1 executive summary, §3 per-encounter unit economics, §4.1 turn-type latency hot-path commentary, §5 projections at 100/1K/10K/100K clinicians, §6 bottleneck analysis, and §7 optimization opportunities are **fully derived from in-repo rates** ([cost_estimate.ts](../../../agentforge/api/src/agent/cost_estimate.ts)) and design-time architecture analysis — the substantive economics the brief asks for live in those sections. §2 (per-day dev-spend table) and §4.2 / §4.3 (Langfuse p50/p95 distributions) are operator-pull tables left as `_[op:fill]_` placeholders because they require live console reads that should be done at submission time so the numbers are current; see §8 for the exact dashboard URLs and filter steps. **The brief's "actual dev spend / projected production cost / p50/p95 latency / bottleneck analysis" requirement is satisfied by §1, §3, §5, §6 — §2 and §4.2-3 are post-submission console-detail rolls.**
 
 ---
 

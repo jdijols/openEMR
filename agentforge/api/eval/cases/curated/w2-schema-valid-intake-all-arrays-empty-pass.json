@@ -4,7 +4,7 @@
   "category": "schema_valid",
   "expect_pass_for_eval_report": true,
   "correlation_id": "eval-w2-schema-valid-intake-all-arrays-empty",
-  "use_case": "W2 §6 — synthetic 'healthy new patient' intake: current_medications=[], allergies=[], family_history=[]. IntakeFormSchema does not require any of these arrays to be non-empty. A regression that adds .min(1) to any one would reject every healthy-cohort intake and silently break the 'no known X' workflow.",
+  "use_case": "W2 §6 — synthetic 'healthy new patient' intake: current_medications=[], allergies=[], family_history=[], problem_list=[]. IntakeFormSchema does not require any of these arrays to be non-empty. A regression that adds .min(1) to any one would reject every healthy-cohort intake and silently break the 'no known X' workflow.",
   "context": {
     "schema": "intake_form",
     "extraction": {
@@ -46,6 +46,7 @@
       "current_medications": [],
       "allergies": [],
       "family_history": [],
+      "problem_list": [],
       "extraction_metadata": {
         "pages_processed": 1,
         "overall_confidence": "high",

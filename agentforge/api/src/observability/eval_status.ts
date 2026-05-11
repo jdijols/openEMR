@@ -82,15 +82,25 @@ export function loadEvalStatus(reportsDir: string, fs: FsLike = REAL_FS): EvalSt
     return { ok: false, error: 'eval_unavailable', reason: 'no_reports_found' };
   }
 
-  let latestPath = '';
-  let latestMtime = -Infinity;
-  for (const name of reports) {
-    const full = join(reportsDir, name);
-    const m = fs.statSync(full).mtimeMs;
-    if (m > latestMtime) {
-      latestMtime = m;
-      latestPath = full;
-    }
+  // Sort by the run-id timestamp prefix embedded in the filename (e.g.
+  // `eval-20260510T193243101Z_<uuid>.json`) rather than mtime. Mtime ties
+  // are real after a fresh `git checkout` / clone — every tracked report
+  // gets the checkout instant and the strict-`>` mtime comparison below
+  // resolved ties to whichever file `readdirSync` visited first
+  // (typically alphabetical → April 30 always won on the VPS post-deploy
+  // when older reports were also committed). Sorting by the timestamp
+  // in the filename is deterministic across deploys and clones.
+  const sorted = [...reports].sort();
+  const latestName = sorted[sorted.length - 1];
+  if (latestName === undefined) {
+    return { ok: false, error: 'eval_unavailable', reason: 'no_reports_found' };
+  }
+  const latestPath = join(reportsDir, latestName);
+  let latestMtime: number;
+  try {
+    latestMtime = fs.statSync(latestPath).mtimeMs;
+  } catch {
+    return { ok: false, error: 'eval_unavailable', reason: 'latest_report_unreadable' };
   }
 
   let parsed: unknown;

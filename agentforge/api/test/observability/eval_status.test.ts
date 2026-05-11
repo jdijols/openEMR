@@ -57,10 +57,20 @@ function fsWith(reports: Readonly<Record<string, { mtimeMs: number; body: unknow
 }
 
 describe('loadEvalStatus (FB-A-04)', () => {
-  it('returns ok with the latest report by mtime', () => {
+  it('returns ok with the latest report by run-id timestamp prefix', () => {
+    // Filenames carry the run_id timestamp (`eval-YYYYMMDDTHHMMSSmmmZ_<uuid>.json`)
+    // — lexical sort = chronological sort. Mtime is intentionally ordered the
+    // other way to prove the sort uses the filename, not mtime (mtime ties are
+    // real after a fresh `git checkout` of multiple committed reports).
     const fs = fsWith({
-      'eval-old.json': { mtimeMs: 100, body: { ...SAMPLE_REPORT, run_id: 'OLD_aaaa' } },
-      'eval-new.json': { mtimeMs: 200, body: SAMPLE_REPORT },
+      'eval-20260510T193243101Z_88744fe6.json': {
+        mtimeMs: 100,
+        body: SAMPLE_REPORT,
+      },
+      'eval-20260430T225137000Z_13cf8189.json': {
+        mtimeMs: 200,
+        body: { ...SAMPLE_REPORT, run_id: 'OLD_aaaa' },
+      },
     });
     const out = loadEvalStatus('/reports', fs);
     expect(out.ok).toBe(true);

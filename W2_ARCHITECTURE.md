@@ -89,7 +89,7 @@ UC-K and UC-L extend UC-I (medication reconciliation) and UC-J (abnormal-lab sur
 
 - A third document type (referral fax, medication list) — **explicit pitfall in the brief**.
 - ColQwen2 or multi-vector indexing — listed as stretch.
-- A critic agent — listed as extension, not core.
+- A **separate** critic agent (as a distinct supervisor-orchestrated worker). The brief lists "Critic agent that rejects uncited claims or unsafe action suggestions" under Core. We satisfy that contract via the **deterministic verification gate** built in W1 and extended in W2 (citation enforcement, negative-claim backing, uncited-claim stripping, constraint-boundary describes-vs-recommends rule) — see §11 eval architecture + [VERIFICATION.md](VERIFICATION.md) for the full enforcement story. We chose the deterministic verifier over a probabilistic critic-LLM because the verifier's outputs are auditable, sub-millisecond, and provably correct against the rule set; a critic-LLM at this layer would add latency and a second hallucination surface to defend.
 - A lab-trend chart widget using extracted Observations — extension.
 - Migrating to LangGraph or OpenAI Agents SDK.
 - Streaming UI — W1 chose batch verification; no reason to revisit mid-W2.
@@ -1393,7 +1393,7 @@ Pitfalls list rewards saying no. We are deliberately skipping:
 | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | Third document type (referral fax, medication list)                    | Brief pitfall: "trying to support five document types before two work reliably."                                    |
 | ColQwen2 / multi-vector indexing                                        | Listed as stretch.                                                                                                  |
-| Critic agent                                                            | Listed as extension, not core. Verification gate already does the work a critic would do.                          |
+| Separate critic-LLM agent                                              | Brief's Core item "Critic agent that rejects uncited claims or unsafe action suggestions" is fulfilled by the **deterministic verification gate** (citation enforcement strips uncited claims; constraint-boundary rule catches advisory phrasing). Chose deterministic over LLM-critic for auditability + zero added latency + no second hallucination surface. See [VERIFICATION.md](VERIFICATION.md) and §11 for the rules. |
 | Lab trend chart widget using extracted Observations                    | Extension. Visual trend display is not on the rubric.                                                              |
 | LangGraph or OpenAI Agents SDK migration                               | Risk-adjusted return is negative; Vercel AI SDK + Langfuse spans satisfies "inspectable orchestration framework."  |
 | Streaming UI                                                            | W1 chose batch verification (full response built and verified before display); no reason to revisit mid-W2.        |

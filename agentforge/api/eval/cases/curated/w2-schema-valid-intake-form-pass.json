@@ -46,6 +46,7 @@
       "current_medications": [],
       "allergies": [],
       "family_history": [],
+      "problem_list": [],
       "extraction_metadata": {
         "pages_processed": 1,
         "overall_confidence": "high",
