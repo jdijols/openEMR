@@ -2,7 +2,7 @@
 
 > Built on OpenEMR. Developed during the Gauntlet AI AgentForge program. Stage 5 hard-gate deliverable.
 
-> **What this is:** The AI integration plan for our OpenEMR fork. It ties together [`AUDIT.md`](AUDIT.md) (what OpenEMR forces us to respect) and [`USERS.md`](USERS.md) (who we build for and which use cases are in scope).  
+> **What this is:** The AI integration plan for our OpenEMR fork. It ties together [`AUDIT.md`](AUDIT.md) (what OpenEMR forces us to respect) and [`USERS.md`](USERS.md) (who we build for and which use cases are in scope).
 > **V1 use cases (10 total):** UC-A pre-room case presentation, UC-B / UC-C read-shaped Q&A (single- and cross-domain), UC-D / UC-E / UC-F / UC-G confirmed writes across the CRUD surface (chief complaint / vitals / tobacco-allergy / clinical notes), UC-H refusal posture, UC-I documentary medication reconciliation, UC-J documentary abnormal lab surfacing — see [`USERS.md` §4](USERS.md).
 
 > **Working document:** This file may be revised up to **MVP submission** (Gauntlet deadline). Keep the instructor table + executive summary aligned with whatever ships.

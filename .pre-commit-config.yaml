@@ -31,6 +31,8 @@ exclude: |
     .*\.(js|css)\.map$|
     # PHPStan baseline files (generated)
     \.phpstan/baseline/|
+    # AgentForge reference PDFs (instructor materials, exceed the 500 KB default)
+    Documentation/AgentForge/references/.*\.pdf$|
     # Vendored/generated third-party code (alphabetized)
     Documentation/EHI_Export/|
     gacl/|

@@ -83,6 +83,12 @@ spacify
 # Software design terminology
 wither
 
+# AgentForge — internal abbreviations + word forms codespell flags
+# "ObsTable" — Observation Table (W2 evidence-retrieval pipeline class)
+# "unparseable" — valid US spelling alongside "unparsable"
+obstable
+unparseable
+
 # Third-party library terms
 afterall
 atleast

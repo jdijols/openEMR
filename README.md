@@ -1,9 +1,29 @@
 # Clinical Copilot
 
-> A conversational AI agent for primary healthcare physicians embedded inside the most popular open source electronic health record and medical practice management solution, OpenEMR.  
+> A conversational AI agent for primary healthcare physicians embedded inside the most popular open source electronic health record and medical practice management solution, OpenEMR.
 > Developed by Jason Dijols during Cohort 5 of the Gauntlet AI program.
 
-**Live demo:** [http://108-61-145-220.nip.io:8300/](http://108-61-145-220.nip.io:8300/) · **Login:** `physician` / `password123` (synthetic data only) · **Walkthrough video:** [Loom](https://www.loom.com/share/56623736a29d4b8681c9a0152e584042)
+**Live demo:** [https://oe.108-61-145-220.nip.io/](https://oe.108-61-145-220.nip.io/) · **Login:** `physician` / `password123` (synthetic data only) · **W2 walkthrough video:** [Loom](https://www.loom.com/share/56623736a29d4b8681c9a0152e584042) · **W3 MVP demo video:** _added after recording_
+
+---
+
+## Week 3 submission — start here
+
+Week 3 builds the **AgentForge Adversarial AI Security Platform** — a standalone multi-agent system that continuously red-teams the Clinical Co-Pilot from W1/W2. Graders reviewing the Week 3 MVP milestone should read in this order:
+
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** — full multi-agent platform architecture: four agent roles (Red Team, Judge, Orchestrator, Documentation), inter-agent communication via a Postgres findings ledger, vulnerability lifecycle with five HITL gates, AI-vs-deterministic-tooling decision table, cost posture across 100/1K/10K/100K runs. ~500-word executive summary at top. Mermaid diagram of agent interactions.
+- **[THREAT_MODEL.md](THREAT_MODEL.md)** — full attack surface map: six categories (prompt injection, data exfiltration, state corruption, tool misuse, denial of service, identity exploitation) across twelve subcategories. Each mapped to OWASP LLM Top 10 + MITRE ATLAS technique IDs. Living-document discipline. ~500-word executive summary at top.
+- **[evals/](evals/)** — adversarial test suite: 9 seed cases across 3 distinct categories (prompt injection, cross-patient exfiltration, persona hijacking). Live run captured at [`evals/results/run-2026-05-12T23-15-12-514Z.json`](evals/results/run-2026-05-12T23-15-12-514Z.json) — 9 attacks executed against the deployed prod target.
+- **[agentforge-redteam/](agentforge-redteam/)** — the platform code: Red Team Agent prototype (one live agent role running against the deployed target per the Stage 3 hard gate), deterministic Judge, target HTTP client with HMAC session-token minting.
+- **[Documentation/AgentForge/w3-mvp/](Documentation/AgentForge/w3-mvp/)** — stage notes, demo script, and ongoing task tracking:
+  - [`STAGE_1_TARGET_STATE.md`](Documentation/AgentForge/w3-mvp/STAGE_1_TARGET_STATE.md) — target deployed URL verification + no-changes-required documentation
+  - [`STAGE_3_RUN_NOTES.md`](Documentation/AgentForge/w3-mvp/STAGE_3_RUN_NOTES.md) — analysis of the live MVP attack run, including the discovered defensive surface (typed `refusal` blocks) and Judge false-positive characterization
+  - [`W3_TASKS.md`](Documentation/AgentForge/w3-mvp/W3_TASKS.md) — gate-by-gate roadmap from MVP to Friday Final
+  - [`MVP_DEMO_SCRIPT.md`](Documentation/AgentForge/w3-mvp/MVP_DEMO_SCRIPT.md) — script + storyboard for the MVP demo video
+
+**Deployed target (the system the adversarial platform attacks):** [`https://oe.108-61-145-220.nip.io/`](https://oe.108-61-145-220.nip.io/) — same OpenEMR + Clinical Co-Pilot deployment from W2, treated as a network black box over HTTPS.
+
+**Running the platform against the deployed target:** see [`agentforge-redteam/README.md`](agentforge-redteam/README.md). The runner mints valid session tokens, hits the deployed `/chat` endpoint exactly the way a real attacker would, captures responses, and applies the deterministic Judge.
 
 ---
 
