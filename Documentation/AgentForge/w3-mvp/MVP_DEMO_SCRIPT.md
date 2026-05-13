@@ -1,6 +1,8 @@
 # W3 MVP Demo Video — Script + Storyboard
 
 > Target length: 3–5 min. Terminal-first, evidence-based. Defends the Tuesday MVP gate. No UI shown — the Review Console ships Friday with real Orchestrator data behind it.
+>
+> **For a one-page cue sheet** with beats, on-screen pointers, and anchor phrases — see [`DEMO_CHEAT_SHEET.md`](DEMO_CHEAT_SHEET.md). That's the recording-time artifact. This longer script is the underlying reference.
 
 ## What this video has to do
 

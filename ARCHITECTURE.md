@@ -217,37 +217,33 @@ A confirmed exploit can also detect **cross-category regression**: if fixing fin
 
 Findings move through eight states. Five HITL gates are placed deliberately — every other transition runs autonomously.
 
-```
-discovered ── (auto, Red Team writes attack_case)
-    ↓
-evaluated  ── (auto, Judge writes verdict)
-    ↓
-confirmed  ── (auto, on tier-2 pass + severity assignment)
-    ↓
-documented ── (auto, Documentation Agent writes VULN-NNN.md)
-    │
-    └── GATE #2: HUMAN APPROVE if severity ≥ High ─→ added to active backlog
-    ↓
-fix_proposed ── (auto, Documentation Agent has emitted the recommended fix)
-    ↓
-fix_applied   ── GATE #3: HUMAN — engineer who applied the fix marks it applied
-    ↓
-regression_verified ── (auto, Judge re-runs in fix-validation mode against new target version)
-    ↓
-resolved    ── GATE #4: HUMAN — closes the finding; cannot be auto-closed
-    │
-    └── (auto-reopen if regression run later flips the verdict back to fail)
+```mermaid
+flowchart TD
+    Start([Red Team generates attack]) --> discovered
+    discovered -->|auto · Judge evaluates| evaluated
+    evaluated -->|auto · confirmed exploit| confirmed
+    confirmed -->|auto · Doc Agent writes report| documented
+    documented --> SevCheck{severity ≥ High?}
+    SevCheck -->|No · auto| fix_proposed
+    SevCheck -->|Yes| awaiting[awaiting human approval]
+    awaiting -->|HITL #2 · operator approves| fix_proposed
+    fix_proposed -->|HITL #3 · engineer applies fix| fix_applied
+    fix_applied -->|auto · Judge regression run| regression_verified
+    regression_verified -->|HITL #4 · operator closes| resolved([resolved])
+    resolved -.->|auto re-open if regression flips| confirmed
 
-GATE #1: Trace labeling (ONGOING, primary)
-    Per the error-analysis lesson, humans must look at raw traces — never delegated.
-    The Review Console's journal field is the labeling surface. Notes feed into
-    the failure taxonomy and tier-2 Judge calibration set.
-
-GATE #5: Judge re-calibration (TRIGGERED)
-    When tier-1/tier-2 disagreement rate exceeds threshold OR weekly agreement
-    with hand-labeled ground truth falls below 90%, the Review Console requests
-    operator re-labeling of N recent cases. Rubric is updated.
+    classDef hitl fill:#fef3c7,stroke:#d97706,stroke-width:2px;
+    classDef terminal fill:#dcfce7,stroke:#16a34a;
+    classDef auto fill:#e0f2fe,stroke:#0284c7;
+    class awaiting,fix_applied,resolved hitl;
+    class Start,resolved terminal;
+    class discovered,evaluated,confirmed,documented,fix_proposed,regression_verified auto;
 ```
+
+**Two ongoing gates not on the linear path:**
+
+- **HITL #1 — Trace labeling (continuous, primary).** Per the error-analysis lesson, humans look at raw traces — that's never delegated. The Review Console's journal field is the labeling surface. Notes feed into the failure taxonomy and the LLM Judge's calibration set.
+- **HITL #5 — Judge re-calibration (triggered).** When tier-1/tier-2 disagreement rate exceeds threshold, or weekly agreement with hand-labeled ground truth falls below 90%, the Review Console asks the operator to re-label N recent cases. The Judge rubric is updated.
 
 The five gates are the *only* places the platform stops to ask a human. Everything else is autonomous — that's the brief's bar for "a system that doesn't need a human in the loop for every step."
 
