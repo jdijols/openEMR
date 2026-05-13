@@ -3,7 +3,7 @@
 > A conversational AI agent for primary healthcare physicians embedded inside the most popular open source electronic health record and medical practice management solution, OpenEMR.
 > Developed by Jason Dijols during Cohort 5 of the Gauntlet AI program.
 
-**Live demo:** [https://oe.108-61-145-220.nip.io/](https://oe.108-61-145-220.nip.io/) · **Login:** `physician` / `password123` (synthetic data only) · **W2 walkthrough video:** [Loom](https://www.loom.com/share/56623736a29d4b8681c9a0152e584042) · **W3 MVP demo video:** _added after recording_
+**Live demo:** [https://oe.108-61-145-220.nip.io/](https://oe.108-61-145-220.nip.io/) · **Login:** `physician` / `password123` (synthetic data only) · **W2 walkthrough video:** [Loom](https://www.loom.com/share/56623736a29d4b8681c9a0152e584042) · **W3 MVP demo video:** [Loom](https://www.loom.com/share/1c1476293fce47b7bf06af1fef57bed3)
 
 ---
 
