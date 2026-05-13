@@ -9,7 +9,7 @@
 
 ## Week 3 submission — start here
 
-Week 3 builds the **AgentForge Adversarial AI Security Platform** — a standalone multi-agent system that continuously red-teams the Clinical Co-Pilot from W1/W2. Graders reviewing the Week 3 MVP milestone should read in this order:
+Week 3 builds **Clinical Adversary** — a standalone multi-agent adversarial security platform that continuously red-teams the Clinical Co-Pilot from W1/W2. ("AgentForge" is the Gauntlet AI program; "Clinical Adversary" is the W3 product, parallel to W1/W2's "Clinical Co-Pilot.") Graders reviewing the Week 3 MVP milestone should read in this order:
 
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** — full multi-agent platform architecture: four agent roles (Red Team, Judge, Orchestrator, Documentation), inter-agent communication via a Postgres findings ledger, vulnerability lifecycle with five HITL gates, AI-vs-deterministic-tooling decision table, cost posture across 100/1K/10K/100K runs. ~500-word executive summary at top. Mermaid diagram of agent interactions.
 - **[THREAT_MODEL.md](THREAT_MODEL.md)** — full attack surface map: six categories (prompt injection, data exfiltration, state corruption, tool misuse, denial of service, identity exploitation) across twelve subcategories. Each mapped to OWASP LLM Top 10 + MITRE ATLAS technique IDs. Living-document discipline. ~500-word executive summary at top.

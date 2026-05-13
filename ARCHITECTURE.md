@@ -1,4 +1,6 @@
-# ARCHITECTURE.md — AgentForge Adversarial AI Security Platform
+# Clinical Adversary — Architecture
+
+> **Clinical Adversary** is the adversarial AI security platform that continuously red-teams the Clinical Co-Pilot. "AgentForge" is the program/cohort name (Gauntlet AI); the product is Clinical Adversary.
 
 > Week 3 multi-agent architecture for continuously red-teaming the W1/W2 Clinical Co-Pilot. Submitted at MVP gate 2026-05-12; final-deadline locks 2026-05-15 noon CT.
 >
@@ -32,7 +34,7 @@ flowchart TB
         Console["Review Console<br/>· bucket → session → trace drill<br/>· freeform journal<br/>· human approval gates"]
     end
 
-    subgraph Platform["AgentForge Adversarial Platform — standalone in spirit, agentforge-redteam/ in repo"]
+    subgraph Platform["Clinical Adversary — standalone in spirit, agentforge-redteam/ in repo"]
         direction TB
 
         subgraph Agents["Multi-agent core (TS / Vercel AI SDK state machine)"]

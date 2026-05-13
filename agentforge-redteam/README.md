@@ -1,6 +1,8 @@
-# AgentForge Adversarial AI Security Platform (MVP)
+# Clinical Adversary (MVP)
 
-Week 3 prototype — a standalone multi-agent platform that continuously red-teams the W1/W2 Clinical Co-Pilot. This MVP ships the **Red Team Agent** and a deterministic Judge as the first live agent role, plus a runner against `./evals/` seed cases. The Orchestrator, Documentation Agent, full LLM Judge, Review Console, and findings ledger are on the Friday plan.
+**Clinical Adversary** is the standalone multi-agent adversarial security platform that continuously red-teams the W1/W2 Clinical Co-Pilot. Week 3 ships the MVP prototype: the **Red Team Agent** and a deterministic Judge as the first live agent role, plus a runner against `./evals/` seed cases. The Orchestrator, Documentation Agent, full LLM Judge, Review Console, and findings ledger are on the Friday plan.
+
+> **Naming note:** "AgentForge" is the Gauntlet AI program/cohort designation; "Clinical Adversary" is the product itself. The W1/W2 product (also built in this cohort) is called "Clinical Co-Pilot." The directory is named `agentforge-redteam/` for historical and code-organization reasons, but it holds the Clinical Adversary platform.
 
 ## Layout
 
